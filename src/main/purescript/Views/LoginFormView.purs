@@ -106,6 +106,7 @@ pinLoginWidget active pin = do
           Props._type "password"
         , Props.placeholder "PIN"
         , Props.value v
+        , Props.autoFocus active
         , Props.disabled (not active)
         , Props.onChange
         , Props.pattern "[0-9]{5}"
