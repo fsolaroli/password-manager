@@ -5,12 +5,13 @@ import Concur.Core.FRP (loopS, loopW, fireOnce, demand)
 import Concur.React (HTML)
 import Concur.React.DOM (a, button, div, div_, form, form_, input, label, span, text)
 import Concur.React.Props as Props
-import Control.Alt ((<$), (<|>))
+import Control.Alt (($>), (<$), (<|>))
+import Control.Alternative ((*>))
 import Control.Applicative (pure)
 import Control.Bind (bind)
 import Data.Either (Either(..), either)
 import Data.Eq ((/=), (==))
-import Data.Function (($))
+import Data.Function ((#), ($))
 import Data.Functor ((<$>))
 import Data.HeytingAlgebra ((&&), not)
 import Data.Maybe (Maybe(..))
@@ -18,7 +19,9 @@ import Data.Ord ((<))
 import Data.String (length)
 import DataModel.Credentials (Credentials, emptyCredentials)
 import DataModel.WidgetState (LoginFormData, LoginType(..))
+import Effect.Class (liftEffect)
 import Functions.Communication.OneTimeShare (PIN)
+import Functions.Events (focus)
 
 type Username = String
 
@@ -55,7 +58,7 @@ loginPage {credentials, pin, loginType} =
         , LoginPinEvent <$> pinLoginWidget (length pin < 5) pin
         , GoToCredentialLoginEvent credentials.username <$ a [Props.onClick] [text "Login with passphrase"]
         ] <|> ((GoToSignupEvent credentials) <$ button [Props.onClick] [text "sign up"])
-          ]
+      ]
 
 credentialLoginWidget :: LoginDataForm -> Widget HTML (Either Credentials Credentials)
 credentialLoginWidget formData = do
@@ -65,6 +68,7 @@ credentialLoginWidget formData = do
             span [Props.className "label"] [text "Username"]
           , (Props.unsafeTargetValue) <$> input [
               Props._type "text"
+            , Props._id "loginUsernameInput"
             , Props.placeholder "username"
             , Props.autoComplete "off", Props.autoCorrect "off", Props.autoCapitalize "off", Props.spellCheck false
             , Props.value v
@@ -88,10 +92,16 @@ credentialLoginWidget formData = do
         ])
         pure { username: username', password: password' }
       result <- do
-                  fireOnce ( div [Props.className "loginButton"] [
-                              button [(Right formValues) <$ Props.onClick, Props.className "login", Props.disabled (not (isFormValid formValues))] [span [] [text "login"]]
-                             ] <|> 
-                              button [(Left  formValues) <$ Props.onClick]                                                                         [text "sign up"]
+                  fireOnce (div [Props.className "loginButton"] [
+                              button [ Props.onClick $> (Right formValues)
+                                     , Props.className "login"
+                                     , Props.disabled (not (isFormValid formValues))
+                                     ] [span [] [text "login"]]
+                            ]
+                            <|> 
+                            (button [Props.onClick] [
+                              text "sign up"
+                            ] *> (focus "signupUsernameInput" # liftEffect) $> (Left  formValues))
                            )
       pure result
     pure signalResult

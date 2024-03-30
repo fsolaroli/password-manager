@@ -29,7 +29,7 @@ import DataModel.Password (PasswordGeneratorSettings)
 import DataModel.WidgetState (CardFormInput(..), CardManagerState, CardViewState(..))
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
-import Functions.Events (blur, focus, keyboardShortcut)
+import Functions.Events (blur, focus, keyboardShortcut, select)
 import IndexFilterView (Filter(..), FilterData, FilterViewStatus(..), filteredEntries, getClassNameFromFilterStatus, indexFilterView, initialFilterData, shownEntries)
 import Views.CardViews (CardEvent(..), cardView)
 import Views.Components (proxyInfoComponent)
@@ -137,8 +137,8 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
 
     shortcutsHandlers :: Widget HTML CardManagerEvent
     shortcutsHandlers =
-         ((keyboardShortcut ["*"                  ] # liftAff) *>  updateFilterData initialFilterData)
-      <> ((keyboardShortcut ["/"                  ] # liftAff) *>  updateFilterData filterData {filterViewStatus = FilterViewOpen, filter = Search searchString})
+         ((keyboardShortcut ["*"                  ] # liftAff) *>                                             updateFilterData initialFilterData)
+      <> ((keyboardShortcut ["/"                  ] # liftAff) *> (select "searchInputField" # liftEffect) *> updateFilterData filterData {filterViewStatus = FilterViewOpen, filter = Search searchString})
       <> ((keyboardShortcut ["j", "down"          ] # liftAff) $> (NavigateCardsEvent $ Move (increaseIndex (length sortedCards))))
       <> ((keyboardShortcut ["k", "up"            ] # liftAff) $> (NavigateCardsEvent $ Move (decreaseIndex                     )))
       <> ((keyboardShortcut ["l", "right", "enter"] # liftAff) $> (NavigateCardsEvent $ Open (getCardToOpen sortedCards         )))
