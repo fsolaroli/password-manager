@@ -57,7 +57,7 @@ loginPage {credentials, pin, loginType} =
           span [] [text "Enter your PIN"]
         , LoginPinEvent <$> pinLoginWidget (length pin < 5) pin
         , GoToCredentialLoginEvent credentials.username <$ a [Props.onClick] [text "Login with passphrase"]
-        ] <|> ((GoToSignupEvent credentials) <$ button [Props.onClick] [text "sign up"])
+        ]
       ]
 
 credentialLoginWidget :: LoginDataForm -> Widget HTML (Either Credentials Credentials)
