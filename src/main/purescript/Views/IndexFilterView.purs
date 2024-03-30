@@ -61,7 +61,8 @@ indexFilterView filterData@{archived, filter, searchString} (Index {entries}) = 
         ] <#> updateFilter
       , form  [ Props._id "searchForm"
               , Props.classList [searchFormClassName]
-              , Props.onSubmit $> filterData {filterViewStatus = FilterViewClosed}
+              , Props.onSubmit $> filterData {filterViewStatus = FilterViewClosed                             }
+              , Props.onClick  $> filterData {filterViewStatus = FilterViewOpen,  filter = Search searchString}
               ] [
                 label [Props.className "search"] [
                   span [Props.className "label"] [text "search"]
