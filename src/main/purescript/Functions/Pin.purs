@@ -62,11 +62,17 @@ deleteCredentials storage = do
   removeItem (makeKey "passphrase") storage
   removeItem (makeKey "failures")   storage
 
+encryptedPassphraseByteLength :: Int
+encryptedPassphraseByteLength = 1024
+
 saveCredentials :: AppState -> String -> Storage -> ExceptT AppError Aff HexString
 saveCredentials {username: Just u, password: Just p, hash: hashf} pin storage = do
   key <- liftAff $ (generateKeyFromPin hashf pin)
+
   -- 256 bits
-  let paddingBytesLength = (256 - 16 * length (toString Hex (hex p))) / 8
+  -- let paddingBytesLength = (256 - 16 * length (toString Hex (hex p))) / 8
+  let passphraseHexBytes = ((length (toString Hex (hex p))) * 4) / 8
+  let paddingBytesLength =  encryptedPassphraseByteLength - passphraseHexBytes - 1
   paddingBytes     <- liftAff $ randomArrayBuffer paddingBytesLength
   paddedPassphrase <- liftAff $ fromArrayBuffer <$> (liftEffect $ concatArrayBuffers ((toArrayBuffer $ hex p) : paddingBytes : Nil))
   let obj = { padding: paddingBytesLength, passphrase: toString Hex paddedPassphrase }

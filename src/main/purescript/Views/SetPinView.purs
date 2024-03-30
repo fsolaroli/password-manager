@@ -46,6 +46,7 @@ setPinView pinExists = div [Props._id "pinPage"] [ form [] [
               , Props.inputMode "numeric"
               , Props.placeholder (if pinExists then "*****" else "PIN")
               , Props.value value
+              , Props.autoFocus (not pinExists)
               , Props.disabled pinExists
               , Props.pattern "^[0-9]+$"
               , (\e -> 
