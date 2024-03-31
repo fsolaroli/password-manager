@@ -79,8 +79,8 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
         ]
       ]
     ]
-  ] <> if enableShortcuts then shortcutsHandlers else (text "")
-    <> shortcutsHelp     showShortcutsHelp
+  ] <> (if enableShortcuts then shortcutsHandlers else (text ""))
+    <> (shortcutsHelp     showShortcutsHelp)
   <#> (Tuple state >>> swap)
 
   where
