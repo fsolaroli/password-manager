@@ -5,11 +5,12 @@ import Concur.Core.FRP (Signal, fireOnce, loopW)
 import Concur.React (HTML)
 import Concur.React.DOM (a_, div, h3, li', li_, p_, text, textarea, ul)
 import Concur.React.Props as Props
-import Control.Alt ((<#>))
+import Control.Alt (void, (<#>), (<|>))
+import Control.Alternative ((*>))
 import Control.Applicative (pure)
 import Control.Bind (bind, discard, (=<<))
 import Data.Array (null)
-import Data.Function (($))
+import Data.Function ((#), ($))
 import Data.Functor ((<$), (<$>))
 import Data.HeytingAlgebra (not, (&&))
 import Data.Maybe (Maybe(..))
@@ -18,6 +19,7 @@ import Data.Set (isEmpty, toUnfoldable)
 import Data.Unit (unit)
 import DataModel.CardVersions.Card (Card(..), CardField(..), CardValues(..))
 import DataModel.IndexVersions.Index (CardEntry)
+import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
@@ -25,6 +27,7 @@ import Functions.Clipboard (copyToClipboard)
 import Functions.State (isOffline)
 import MarkdownIt (renderString)
 import Views.Components (dynamicWrapper, entropyMeter)
+import Views.OverlayView (OverlayColor(..), OverlayStatus(..), overlay)
 import Views.SimpleWebComponents (simpleButton, confirmationWidget)
 
 -- -----------------------------------
@@ -95,13 +98,15 @@ cardContent (CardValues {title: t, tags: ts, fields: fs, notes: n}) = div [Props
 
 cardField :: forall a. CardField -> Widget HTML a
 cardField f@(CardField {name, value, locked}) = do
-  _ <- div [Props.className "fieldValue"] [
+  div [Props.className "field"] [
     div [Props.className "fieldLabel"] [text name]
-  , dynamicWrapper (if locked then Just "PASSWORD" else Nothing) value $ textarea [Props.rows 1, Props.value value, Props.onClick, Props.disabled true] [] 
+  , div [Props.className "fieldValue", Props.onClick # void] [
+      dynamicWrapper (if locked then Just "PASSWORD" else Nothing) value $ textarea [Props.rows 1, Props.value value, Props.readOnly true] [] 
+    ]
   , (if locked
     then (entropyMeter value)
     else (text "")
     )
   ] --TODO add class based on content for urls and emails
-  liftAff $ copyToClipboard value
+  cardField f <|> (liftAff $ copyToClipboard value *> delay (Milliseconds 1000.0)) <|> overlay { status: Copy, color: Black, message: "copied" }
   cardField f

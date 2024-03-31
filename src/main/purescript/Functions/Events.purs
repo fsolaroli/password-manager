@@ -10,6 +10,7 @@ module Functions.Events
   , readFile
   , readFileFromDrop
   , renderElement
+  , select
   )
   where
 
@@ -37,8 +38,9 @@ foreign import printEvent :: forall r. SyntheticEvent_ (currentTarget :: NativeE
 
 foreign import cursorToEnd :: forall r. SyntheticEvent_ (currentTarget :: NativeEventTarget | r) -> Effect Unit
 
-foreign import focus :: String -> Effect Unit
-foreign import blur :: String -> Effect Unit
+foreign import focus  :: String -> Effect Unit
+foreign import blur   :: String -> Effect Unit
+foreign import select :: String -> Effect Unit
 
 readFile :: NativeEventTarget -> Aff String
 readFile ev = fromEffectFnAff (_readFile ev)

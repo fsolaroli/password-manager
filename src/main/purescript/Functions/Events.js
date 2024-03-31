@@ -110,6 +110,13 @@ const blur = function(id) {
 	}
 }
 
+const select = function(id) {
+	return function() {
+		document.getElementById(id).select();
+		return;
+	}
+}
+
 export {
     _readFile,
     _readFileFromDrop,
@@ -121,5 +128,6 @@ export {
     printEvent,
 	cursorToEnd,
 	focus,
-	blur
+	blur,
+	select
 }

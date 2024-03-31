@@ -1,24 +1,27 @@
 module Views.SignupFormView where
 
 import Concur.Core (Widget)
-import Concur.Core.FRP (loopS, fireOnce, demand)
+import Concur.Core.FRP (demand, fireOnce, loopS, loopW)
 import Concur.React (HTML)
-import Concur.React.DOM (a, button, div, div_, form, span, text)
+import Concur.React.DOM (a, button, div, div_, form, input, label, span, text)
 import Concur.React.Props as Props
-import Control.Alt ((<$), (<$>), (<|>))
+import Control.Alt (($>), (<#>), (<$>), (<|>))
+import Control.Alternative ((*>))
 import Control.Applicative (pure)
 import Control.Bind (bind)
 import Data.Either (Either(..), either)
 import Data.Eq ((==), (/=))
 import Data.Foldable (all)
-import Data.Function (($))
+import Data.Function ((#), ($))
 import Data.HeytingAlgebra ((&&), not)
 import Data.Map (Map, fromFoldable)
 import Data.Tuple (Tuple(..))
 import DataModel.Credentials (Credentials)
+import Effect.Class (liftEffect)
+import Functions.Events (focus)
 import Functions.Password (standardPasswordStrengthFunction)
 import Record (merge)
-import Views.SimpleWebComponents (PasswordForm, checkboxesSignal, simpleButton, simpleUserSignal, simpleVerifiedPasswordSignal)
+import Views.SimpleWebComponents (PasswordForm, checkboxesSignal, simpleButton, simpleVerifiedPasswordSignal)
 
 type SignupDataForm = { username       :: String
                       , password       :: String
@@ -68,7 +71,19 @@ signupFormView formData = either GoToLoginEvent SignupEvent <$>
     do
       signalResult <- demand $ do
         formValues :: SignupDataForm <- loopS formData $ \{username: username, password: password, verifyPassword: verifyPassword, checkboxes: checkboxMap} -> div_ [Props.className "signupInputs"] do
-          username' :: String <- simpleUserSignal "username" username
+          username' :: String <- loopW username (\value -> 
+            label [Props.className "username"] [
+              span [Props.className "label"] [(text "Username")]
+            , input [
+                Props._type "text"
+              , Props._id "signupUsernameInput"
+              , Props.placeholder "username"
+              , Props.value value
+              , Props.onChange <#> Props.unsafeTargetValue
+              ]
+            ]
+          )
+
           eitherPassword :: Either PasswordForm String <- simpleVerifiedPasswordSignal standardPasswordStrengthFunction $ Left {password: password, verifyPassword: verifyPassword}
           checkboxMap' :: Array (Tuple String Boolean) <- div_ [Props.className "checkboxes"] $ checkboxesSignal checkboxMap checkboxesLabels   
           case eitherPassword of
@@ -80,6 +95,10 @@ signupFormView formData = either GoToLoginEvent SignupEvent <$>
   ]
 
 submitWidget :: SignupDataForm -> Widget HTML (Either Credentials Credentials)
-submitWidget f@{ username, password } = div [Props.className "signupButton"] [simpleButton "signup" "Sign up" (not (isFormValid f)) (Right { username, password })]
+submitWidget f@{ username, password } = div [Props.className "signupButton"] [
+                                          simpleButton "signup" "Sign up" (not (isFormValid f)) (Right { username, password })
+                                        ]
                                         <|>
-                                        button [(Left { username, password }) <$ Props.onClick] [span [] [text "login"]]
+                                        (button [Props.onClick] [
+                                          span [] [text "login"]
+                                        ] *> (focus "loginUsernameInput" # liftEffect) $> (Left { username, password }))
