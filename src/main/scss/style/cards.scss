@@ -302,59 +302,92 @@ div#homePage {
 							}
 	
 							div.card_fields {
-								padding: 10px 42px 10px 32px;
+								// padding: 10px 42px 10px 32px;
+								padding: 10px 0px 10px 32px;
 								
-								div.field {
+								div.cardField {
 									padding: 10px;
+									display: flex;
+
+									div.fieldValues {
+										flex: 1;
+
+										div.fieldLabel {
+											color: gray;
+											padding-bottom: 4px;
+											margin-bottom: 4px;
+											user-select: text;
+										}
+
+										.dynamicWrap {
+											display: grid;
+											width: 100%;
+											
+											&::after {
+												content: attr(replicatedvalue) " ";
+												white-space: pre-wrap;
+												visibility: hidden;
+											}
 	
-									div.fieldLabel {
-										color: gray;
-										padding-bottom: 4px;
-										margin-bottom: 4px;
-										user-select: text;
-									}
+											textarea {
+												resize: none;
+												overflow: hidden;
+											}
+	
+											&.PASSWORD {
+												textarea, &::after {
+													font-family: clipperz-password;
+													font-size: 22pt;
+													line-height: 28px;
+													margin-top: -2px;  
+												}
+											}
 
-									.dynamicWrap {
-										display: grid;
-										width: 100%;
-										
-										&::after {
-											content: attr(replicatedvalue) " ";
-											white-space: pre-wrap;
-											visibility: hidden;
-										}
-
-										textarea {
-											resize: none;
-											overflow: hidden;
-										}
-
-										&.PASSWORD {
 											textarea, &::after {
-												font-family: clipperz-password;
-												font-size: 22pt;
+												font-family: 'clipperz-font';
+												outline: none;
+												cursor: pointer;
+												font-size: 18pt;
 												line-height: 28px;
-												margin-top: -2px;  
+												user-select: text;
+												resize: none;
+												white-space: pre-wrap;
+												word-wrap: break-word;
+												border: 0px;
+												width: 100%;
+												background-color: white;
+												color: $alternate-text-color;
+												
+												@include dontBreakOut;
+												grid-area: 1 / 1 / 2 / 2;
 											}
 										}
 
-										textarea, &::after {
-											font-family: 'clipperz-font';
-											outline: none;
-											cursor: pointer;
-											font-size: 18pt;
-											line-height: 28px;
-											user-select: text;
-											resize: none;
-											white-space: pre-wrap;
-											word-wrap: break-word;
+									}
+
+									div.fieldAction {
+										flex-direction: column;
+										padding-left: 5px;
+										padding-right: 10px;
+										// background-color: purple;
+
+										button, a {
+											font-family: 'clipperz-icons';
+											font-size: 15pt;
+											text-decoration: none;
+											color: #aaa;
 											border: 0px;
-											width: 100%;
-											background-color: white;
-											color: $alternate-text-color;
+											background-color: inherit;
+											color: #ccc;
+											padding: 0px;
+											margin: 10px 0 6px;
 											
-											@include dontBreakOut;
-											grid-area: 1 / 1 / 2 / 2;
+											&:enabled {
+												cursor: pointer;
+												&:hover {
+													color: #666;
+												}
+											}
 										}
 									}
 								}
