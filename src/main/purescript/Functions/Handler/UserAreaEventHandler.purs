@@ -39,7 +39,7 @@ import DataModel.Credentials (emptyCredentials)
 import DataModel.FragmentState as Fragment
 import DataModel.IndexVersions.Index (CardEntry(..), CardReference(..), Index(..), addToIndex)
 import DataModel.UserVersions.User (IndexReference(..), UserInfo(..))
-import DataModel.WidgetState (CardManagerState, CardViewState(..), ImportStep(..), LoginType(..), Page(..), UserAreaPage(..), UserAreaState, WidgetState(..))
+import DataModel.WidgetState (CardManagerState, CardViewState(..), ImportStep(..), LoginType(..), Page(..), UserAreaPage(..), UserAreaState, WidgetState(..), MainPageWidgetState)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Functions.Card (addTag)
@@ -89,6 +89,12 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
                     (Main defaultPage {userAreaState = userAreaState {showUserArea = false, userAreaOpenPage = None}})
                   )
                 )
+
+    (OpenUserAreaPage userAreaPage) -> 
+      updateUserAreaState defaultPage userAreaState {userAreaOpenPage = userAreaPage}
+    
+    (ChangeUserAreaSubmenu userAreaSubmenu) ->
+      updateUserAreaState defaultPage userAreaState {userAreaSubmenus = userAreaSubmenu}
     
     (UpdateUserPreferencesEvent newUserPreferences) -> 
       let page = Main defaultPage { userPreferences = newUserPreferences }
@@ -290,6 +296,18 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
         logoutSteps (state {username = Nothing}) "Logout" page
         # runExceptT
         >>= handleOperationResult state defaultErrorPage true White
+
+  where
+    updateUserAreaState :: MainPageWidgetState -> UserAreaState -> Widget HTML OperationState
+    updateUserAreaState mainPageState userAreaState' = 
+      noOperation (Tuple 
+                    state
+                    (WidgetState
+                      hiddenOverlayInfo
+                      (Main mainPageState { userAreaState = userAreaState' }
+                      )
+                    )
+                  )  
 
 handleUserAreaEvent _ _ _ state _ = do
   throwError $ InvalidStateError (CorruptedState "userAreaEvent")
