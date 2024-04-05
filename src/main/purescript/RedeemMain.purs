@@ -13,7 +13,6 @@ import Data.Maybe (Maybe(..))
 import Data.String (Pattern(..), drop, split)
 import Data.Unit (Unit)
 import DataModel.AppState (Proxy(..))
-import DataModel.AsyncValue (AsyncValue(..))
 import DataModel.SRPVersions.SRP (baseSRPConf, hashFuncSHA256)
 import Effect (Effect)
 import Functions.Communication.Backend (ConnectionState)
@@ -24,7 +23,7 @@ import Web.HTML.Window (location)
 
 initialConnectionState :: ConnectionState
 initialConnectionState = {
-  proxy: OnlineProxy "/api" { toll: Loading Nothing, currentChallenge: Nothing } Nothing
+  proxy: OnlineProxy "/api" { toll: Nothing, currentChallenge: Nothing } Nothing
 , hashFunc: hashFuncSHA256
 , srpConf: baseSRPConf
 , c: hex ""

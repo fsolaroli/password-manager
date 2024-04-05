@@ -15,7 +15,6 @@ import Data.Traversable (sequence)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Unit (Unit)
 import DataModel.AppState (Proxy(..), AppState)
-import DataModel.AsyncValue (AsyncValue(..))
 import DataModel.CardVersions.Card (Card)
 import DataModel.IndexVersions.Index (Index)
 import DataModel.SRPVersions.SRP (HashFunction, SRPConf, baseSRPConf, hashFuncSHA256)
@@ -57,7 +56,7 @@ computeInitialState = do
 
   where
     withOfflineProxy     = merge { proxy: StaticProxy Nothing                                                        } baseState
-    withOnlineProxy  url = merge { proxy: OnlineProxy url {toll: Loading Nothing, currentChallenge: Nothing} Nothing } baseState
+    withOnlineProxy  url = merge { proxy: OnlineProxy url {toll: Nothing, currentChallenge: Nothing} Nothing } baseState
 
 resetState :: AppState -> AppState
 resetState state = merge baseState state

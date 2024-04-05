@@ -24,7 +24,7 @@ computeReceipt hash challenge = do
   receipt <- fromArrayBuffer <$> randomArrayBuffer 32
   verification <- verifyReceipt hash challenge receipt
   case verification of
-    true -> pure receipt
+    true  -> pure receipt
     false -> computeReceipt hash challenge
 
 verifyReceipt :: HashFunction -> TollChallenge -> Receipt -> Aff Boolean

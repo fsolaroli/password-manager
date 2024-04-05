@@ -1,5 +1,6 @@
 module DataModel.AppState where
 
+import Data.Either (Either)
 import Data.Eq (class Eq)
 import Data.HexString (HexString)
 import Data.Map.Internal (Map)
@@ -8,11 +9,11 @@ import Data.PrettyShow (class PrettyShow)
 import Data.Semigroup ((<>))
 import Data.Show (class Show)
 import Data.Unit (Unit, unit)
-import DataModel.AsyncValue (AsyncValue)
 import DataModel.CardVersions.Card (Card)
 import DataModel.IndexVersions.Index (Index)
 import DataModel.SRPVersions.SRP (HashFunction, SRPConf)
 import DataModel.UserVersions.User (MasterKey, UserInfo, UserInfoReferences)
+import Effect.Aff (Fiber)
 import Functions.Donations (DonationLevel)
 import Functions.HashCash (TollChallenge)
 
@@ -27,8 +28,8 @@ type BackendSessionState = {
 }
 
 type TollManager = {
-  toll             :: AsyncValue HexString
-, currentChallenge :: Maybe TollChallenge
+  toll             :: Maybe (Either (Fiber HexString) HexString)
+, currentChallenge :: Maybe  TollChallenge
 }
 
 data Proxy = OnlineProxy Url TollManager (Maybe SessionKey)

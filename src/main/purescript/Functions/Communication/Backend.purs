@@ -18,7 +18,6 @@ import Affjax.ResponseHeader (ResponseHeader, name, value)
 import Affjax.StatusCode (StatusCode(..))
 import Affjax.Web as AXW
 import Control.Alt ((<#>))
-import Control.Alternative ((*>))
 import Control.Applicative (pure)
 import Control.Bind (bind, (>>=))
 import Control.Category ((<<<), (>>>))
@@ -48,14 +47,13 @@ import Data.Semigroup ((<>))
 import Data.Show (show)
 import Data.String.Common (joinWith, split)
 import Data.String.Pattern (Pattern(..))
-import Data.Time.Duration (Milliseconds(..), Seconds(..), fromDuration)
+import Data.Time.Duration (Seconds(..), fromDuration)
 import Data.Traversable (sequence)
 import Data.Tuple (Tuple(..))
 import Data.Unfoldable (fromMaybe)
 import Data.Unit (Unit, unit)
 import DataModel.AppError (AppError(..))
 import DataModel.AppState (BackendSessionState, Proxy(..), ProxyResponse(..))
-import DataModel.AsyncValue (AsyncValue(..), arrayFromAsyncValue)
 import DataModel.Communication.FromString (class FromString)
 import DataModel.Communication.FromString as BCFS
 import DataModel.Communication.Login (LoginStep2Response, loginStep1ResponseCodec, loginStep2ResponseCodec)
@@ -63,7 +61,7 @@ import DataModel.Communication.ProtocolError (ProtocolError(..))
 import DataModel.SRPVersions.SRP (HashFunction, SRPConf)
 import DataModel.UserVersions.User (MasterKey, RequestUserCard(..), requestUserCardCodec)
 import Effect (Effect)
-import Effect.Aff (Aff, delay)
+import Effect.Aff (Aff, Fiber, forkAff, joinFiber)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Functions.ArrayBuffer (arrayBufferToBigInt)
@@ -117,12 +115,14 @@ tollReceiptHeaderName :: String
 tollReceiptHeaderName = "clipperz-hashcash-tollreceipt"
 
 createHeaders :: Proxy -> Array RequestHeader
-createHeaders (OnlineProxy _ { toll, currentChallenge } sessionKey) = 
-  let
-    tollChallengeHeader = (\t ->   RequestHeader tollHeaderName        (show t.toll)) <$> fromMaybe currentChallenge
-    tollCostHeader      = (\t ->   RequestHeader tollCostHeaderName    (show t.cost)) <$> fromMaybe currentChallenge
-    tollReceiptHeader   = (\t ->   RequestHeader tollReceiptHeaderName (show t))      <$> arrayFromAsyncValue toll
-    sessionHeader       = (\key -> RequestHeader sessionKeyHeaderName  (show key))    <$> fromMaybe sessionKey
+createHeaders (OnlineProxy _ { toll, currentChallenge } sessionKey) =
+  let 
+    tollChallengeHeader = (\t   -> RequestHeader tollHeaderName        (show t.toll)) <$> fromMaybe currentChallenge
+    tollCostHeader      = (\t   -> RequestHeader tollCostHeaderName    (show t.cost)) <$> fromMaybe currentChallenge
+    sessionHeader       = (\key -> RequestHeader sessionKeyHeaderName  (show key   )) <$> fromMaybe sessionKey
+    tollReceiptHeader   = (\t   -> RequestHeader tollReceiptHeaderName (show t     )) <$> case toll of
+                                                                                              Just (Right t) -> [t]
+                                                                                              _              -> [ ]
   in tollChallengeHeader <> tollCostHeader <> tollReceiptHeader <> sessionHeader
 createHeaders (StaticProxy _) = []
 
@@ -150,15 +150,15 @@ requestWithoutAuthorization connectionState path method body responseFormat =
 manageGenericRequestAndResponse :: forall a. FromString a => ConnectionState -> Path -> Method -> Maybe RequestBody -> RF.ResponseFormat a -> ExceptT AppError Aff (ProxyResponse (AXW.Response a))
 manageGenericRequestAndResponse connectionState@{proxy, hashFunc, srpConf} path method body responseFormat = do
   case proxy of
-    (OnlineProxy baseUrl tollManager _) -> 
+    (OnlineProxy baseUrl tollManager _) ->
       case tollManager.toll of
-        Loading (Just _)  -> (liftAff $ delay $ Milliseconds 1.0) *> -- small delay to prevent js single thread to block in recourive calling and let the time to the computation of the toll receipt inside forkAff to finish
-                              manageGenericRequestAndResponse connectionState path method body responseFormat 
+        Just (Left fiber) -> do
+                              toll <- liftAff $ joinFiber fiber
+                              manageGenericRequestAndResponse connectionState {proxy = updateToll { toll: Just $ Right toll } proxy} path method body responseFormat 
         _                 ->  withExceptT ProtocolError (doOnlineRequest  baseUrl) >>= manageOnlineResponse
     (StaticProxy session) ->  withExceptT ProtocolError (doOfflineRequest session)
   
-  where 
-  
+  where
     doOnlineRequest :: String -> ExceptT ProtocolError Aff (AXW.Response a)
     doOnlineRequest baseUrl =
       ExceptT $ lmap (\e -> RequestError e) <$> AXW.request (
@@ -178,16 +178,16 @@ manageGenericRequestAndResponse connectionState@{proxy, hashFunc, srpConf} path 
           case extractChallenge response.headers, extractSession response.headers of
             Just challenge, Just session -> do
                   receipt <- liftAff $ computeReceipt hashFunc challenge
-                  genericRequest connectionState { proxy = (updateToll { toll: Done receipt, currentChallenge: Just challenge } >>> updateSession (Just session)) proxy } path method body responseFormat
-            _, _ ->
+                  genericRequest connectionState { proxy = (updateToll { toll: Just $ Right receipt, currentChallenge: Just challenge } >>> updateSession (Just session)) proxy } path method body responseFormat
+            _             , _            ->
                   throwError $ ProtocolError (IllegalResponse "HashCash and Session headers not present or wrong")
       | isStatusCodeOk status =
           case extractChallenge response.headers, extractSession response.headers of
             Just challenge, Just session -> do
-                  receipt  <- liftAff $ computeReceipt hashFunc challenge --TODO this is not async anymore
-                  pure $ ProxyResponse (updateToll { toll: Done receipt   , currentChallenge: Just challenge } >>> updateSession (Just session) $ proxy) response
+                  receiptFiber <- liftAff $ forkAff $ computeReceipt hashFunc challenge
+                  pure $ ProxyResponse (updateToll { toll: Just $ Left receiptFiber, currentChallenge: Just challenge } >>> updateSession (Just session) $ proxy) response
             _, _ ->
-                  pure $ ProxyResponse (updateToll { toll: Loading Nothing, currentChallenge: Nothing        } >>> updateSession  Nothing       $ proxy) response
+                  pure $ ProxyResponse (updateToll { toll: Nothing                 , currentChallenge: Nothing        } >>> updateSession  Nothing       $ proxy) response
       | otherwise =
                   throwError $ ProtocolError (ResponseError (unwrap status))
 
@@ -322,8 +322,8 @@ isStatusCodeOk code = (code >= (StatusCode 200)) && (code <= (StatusCode 299))
 -- ----------------------------------------------------------------------------------------
 
 updateToll :: forall r1 r2.
-     Union  r1 ( currentChallenge :: Maybe TollChallenge, toll :: AsyncValue HexString) r2
-  => Nub    r2 ( currentChallenge :: Maybe TollChallenge, toll :: AsyncValue HexString)
+     Union  r1 ( currentChallenge :: Maybe TollChallenge, toll :: Maybe (Either (Fiber HexString) HexString)) r2
+  => Nub    r2 ( currentChallenge :: Maybe TollChallenge, toll :: Maybe (Either (Fiber HexString) HexString))
   => Record r1 -> Proxy -> Proxy
 updateToll tollManager (OnlineProxy baseUrl oldTollManager sessionKey) = OnlineProxy baseUrl (merge tollManager oldTollManager) sessionKey
 updateToll _           offline@(StaticProxy _)                         = offline
