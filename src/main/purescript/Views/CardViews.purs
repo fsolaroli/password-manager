@@ -97,7 +97,7 @@ cardContent (CardValues {title: t, tags: ts, fields: fs, notes: n}) = div [Props
   ]
 ]
 
-data CardFieldAction = ShowPassword | CopyValue
+data CardFieldAction = ShowPassword | HidePassword | CopyValue
 
 cardField :: forall a. Boolean -> CardField -> Widget HTML a
 cardField showPassword f@(CardField {name, value, locked}) = do
@@ -119,14 +119,15 @@ cardField showPassword f@(CardField {name, value, locked}) = do
   case res of
     ShowPassword -> cardField true         f <|> (liftAff $                          delay (Milliseconds 5000.0))
     CopyValue    -> cardField showPassword f <|> (liftAff $ copyToClipboard value *> delay (Milliseconds 1000.0)) <|> overlay { status: Copy, color: Black, message: "copied" }
+    HidePassword -> pure unit
   cardField false f
 
   where
     getActionButton =
       case getFieldType f of
-        Passphrase  -> ShowPassword <$ button [Props.className "action PASSWORD", Props.disabled false, Props.onClick        ] [span [] [text "view password"]]
-        Email       ->                 button [Props.className "action EMAIL",    Props.disabled true                        ] [span [] [text "email"        ]]
-        Url         ->                 a      [Props.className "action URL",      Props.disabled false, Props.href value
-                                                                                                      , Props.target "_blank"] [span [] [text "url"          ]]
-        None        ->                 button [Props.className "action NONE",     Props.disabled true                        ] [span [] [text "none"         ]]
+        Passphrase  -> button [Props.className "action PASSWORD", Props.disabled false, Props.onClick        ] [span [] [text "view password"]] $> if showPassword then HidePassword else ShowPassword
+        Email       -> button [Props.className "action EMAIL",    Props.disabled true                        ] [span [] [text "email"        ]]
+        Url         -> a      [Props.className "action URL",      Props.disabled false, Props.href value
+                                                                                      , Props.target "_blank"] [span [] [text "url"          ]]
+        None        -> button [Props.className "action NONE",     Props.disabled true                        ] [span [] [text "none"         ]]
 
