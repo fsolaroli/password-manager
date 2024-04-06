@@ -66,13 +66,7 @@ div#userPage {
 						visibility: hidden;
 					}
 
-					li {
-
-						&.selected {
-							background-color: #333;
-						}
-
-
+					li.subMenuElement {
 						button {
 							padding: 10px;
 							padding-left: 20px;
@@ -86,6 +80,10 @@ div#userPage {
 						}
 					}
 				}
+			}
+
+			li.subMenuElement.selected {
+				background-color: #333;
 			}
 		}
 
@@ -349,6 +347,43 @@ div#userPage {
 					font-size: 18pt;
 					padding: 6px 10px;
 				}
+			}
+		}
+
+		#donationUserArea {
+			height: 100%;
+			display: flex;
+			flex-direction: column;
+
+			.donationInfo {
+				display: flex;
+				justify-content: space-evenly;
+
+				padding: 20px 0;
+				width: 100%;
+				border-bottom: white 1px dashed;
+
+				span.dateOfLastDonation {
+					&::before {
+						font-size: 12px;
+						content: "You last donated on: ";
+					}
+				}
+				
+				span.timeFromLastDonation {
+					&::before {
+						font-size: 12px;
+						content: "It was "
+					}
+
+					strong {
+						font-weight: bold;
+					}
+				}
+			}
+
+			iframe {
+				flex: 1;
 			}
 		}
     }

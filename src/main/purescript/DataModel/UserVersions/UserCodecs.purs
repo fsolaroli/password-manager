@@ -50,6 +50,9 @@ toUserInfo_V2 (UserInfo_V1 userInfo@{indexReference: IndexReference_V1 indexRefe
 iso8601DateFormatter :: Formatter
 iso8601DateFormatter = YearFull : Placeholder "-" : MonthTwoDigits : Placeholder "-" : DayOfMonthTwoDigits : Nil
 
+dateTimeCodec :: CA.JsonCodec DateTime
+dateTimeCodec = codec' (\json -> decode CA.string json >>= (lmap TypeMismatch <<< unformat iso8601DateFormatter)) (format iso8601DateFormatter >>> encode CA.string)
+
 newtype UserInfo_V2 = 
   UserInfo_V2
     { indexReference     :: IndexReference_V1
@@ -63,7 +66,7 @@ userInfoV2Codec = wrapIso UserInfo_V2 (
     { indexReference:  indexReferenceV1Codec
     , identifier:      hexStringCodec
     , userPreferences: userPreferencesV1Codec
-    , dateOfLastDonation: CAC.maybe $ codec' (\json -> decode CA.string json >>= (lmap TypeMismatch <<< unformat iso8601DateFormatter)) (format iso8601DateFormatter >>> encode CA.string)
+    , dateOfLastDonation: CAC.maybe dateTimeCodec
     }
 )
 

@@ -30,7 +30,7 @@ import Views.SignupFormView (SignupPageEvent, emptyDataForm, signupFormView)
 import Views.UserAreaView (UserAreaEvent, userAreaInitialState, userAreaView)
 
 emptyMainPageWidgetState :: MainPageWidgetState
-emptyMainPageWidgetState = { index: emptyIndex, credentials: emptyCredentials, pinExists: false, userAreaState: userAreaInitialState, cardManagerState: cardManagerInitialState, donationLevel: DonationOk, userPreferences: defaultUserPreferences }
+emptyMainPageWidgetState = { index: emptyIndex, credentials: emptyCredentials, dateOfLastDonation: Nothing, pinExists: false, userAreaState: userAreaInitialState, cardManagerState: cardManagerInitialState, donationLevel: DonationOk, userPreferences: defaultUserPreferences }
 
 data PageEvent = LoginPageEvent           LoginPageEvent
                | SignupPageEvent          SignupPageEvent
@@ -68,13 +68,13 @@ appView widgetState@(WidgetState overlayInfo page) =
 
     ]
     , div [Props.classList (Just <$> ["page", "main", show $ location (Main emptyMainPageWidgetState) page])] [ do
-        let Tuple {index, userAreaState, credentials, pinExists, cardManagerState, userPreferences, donationLevel} enableShortcuts = case page of
+        let Tuple {index, userAreaState, credentials, dateOfLastDonation, pinExists, cardManagerState, userPreferences, donationLevel} enableShortcuts = case page of
                                         Main homePageWidgetState' -> Tuple homePageWidgetState'     true
                                         _                         -> Tuple emptyMainPageWidgetState false
         
         div [Props._id "homePage"] [
           ( MainPageCardManagerEvent                         # uncurry) <$> cardsManagerView cardManagerState index (unwrap userPreferences).passwordGeneratorSettings enableShortcuts
-        , ((MainPageUserAreaEvent # flip $ cardManagerState) # uncurry) <$> userAreaView userAreaState userPreferences credentials pinExists
+        , ((MainPageUserAreaEvent # flip $ cardManagerState) # uncurry) <$> userAreaView userAreaState userPreferences credentials dateOfLastDonation pinExists
         , ( DonationPageEvent                                         ) <$> donationReminder donationLevel
         ] 
       ]

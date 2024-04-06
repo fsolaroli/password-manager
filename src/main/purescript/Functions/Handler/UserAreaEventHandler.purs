@@ -48,6 +48,7 @@ import Functions.Communication.Blobs (deleteBlob, getBlob)
 import Functions.Communication.Cards (deleteCard, getCard, postCard)
 import Functions.Communication.Users (computeRemoteUserCard, deleteUserCard, deleteUserInfo, updateUserPreferences)
 import Functions.Export (BlobsList, appendCardsDataInPlace, getBasicHTML, prepareUnencryptedExport, prepareHTMLBlob)
+import Functions.Handler.DonationEventHandler (handleDonationPageEvent)
 import Functions.Handler.GenericHandlerFunctions (OperationState, defaultErrorPage, noOperation, handleOperationResult, runStep)
 import Functions.Import (ImportVersion(..), decodeImport, parseImport, readFile)
 import Functions.Index (updateIndex)
@@ -57,6 +58,7 @@ import Functions.Time (formatDateTimeToDate, getCurrentDateTime)
 import Functions.Timer (activateTimer, stopTimer)
 import Functions.User (changeUserPassword)
 import Record (merge)
+import Views.DonationViews as DonationEvent
 import Views.ExportView (ExportEvent(..))
 import Views.LoginFormView (emptyLoginFormData)
 import Views.OverlayView (OverlayColor(..), hiddenOverlayInfo, spinnerOverlay)
@@ -70,9 +72,10 @@ import Web.Storage.Storage (getItem)
 handleUserAreaEvent :: UserAreaEvent -> CardManagerState -> UserAreaState -> AppState -> Fragment.FragmentState -> Widget HTML OperationState
 
 
-handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, srpConf, hash: hashFunc, cardsCache, username: Just username, password: Just password, index: Just index, userInfo: Just userInfo@(UserInfo {indexReference: IndexReference { reference: indexRef}, userPreferences}), userInfoReferences: Just userInfoReferences, c: Just c, p: Just p, pinEncryptedPassword, donationLevel: Just donationLevel} _ = do
+handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, srpConf, hash: hashFunc, cardsCache, username: Just username, password: Just password, index: Just index, userInfo: Just userInfo@(UserInfo {indexReference: IndexReference { reference: indexRef}, userPreferences, dateOfLastDonation}), userInfoReferences: Just userInfoReferences, c: Just c, p: Just p, pinEncryptedPassword, donationLevel: Just donationLevel} f = do
   let defaultPage = { index
                     , credentials:      {username, password}
+                    , dateOfLastDonation
                     , pinExists:        isJust pinEncryptedPassword
                     , userPreferences
                     , userAreaState
@@ -96,6 +99,8 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
     (ChangeUserAreaSubmenu userAreaSubmenu) ->
       updateUserAreaState defaultPage userAreaState {userAreaSubmenus = userAreaSubmenu}
     
+    (UpdateDonationLevel) -> handleDonationPageEvent DonationEvent.UpdateDonationLevel state f
+
     (UpdateUserPreferencesEvent newUserPreferences) -> 
       let page = Main defaultPage { userPreferences = newUserPreferences }
       in do

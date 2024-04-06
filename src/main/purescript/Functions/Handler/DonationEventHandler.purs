@@ -32,9 +32,10 @@ import Views.UserAreaView (userAreaInitialState)
 
 handleDonationPageEvent :: DonationPageEvent -> AppState -> Fragment.FragmentState -> Widget HTML OperationState
 
-handleDonationPageEvent donationPageEvent state@{username: Just username, password: Just password, index: Just index, userInfo: Just userInfo@(UserInfo {userPreferences}), pinEncryptedPassword, donationLevel: Just donationLevel} fragmentState = do
+handleDonationPageEvent donationPageEvent state@{username: Just username, password: Just password, index: Just index, userInfo: Just userInfo@(UserInfo {userPreferences, dateOfLastDonation}), pinEncryptedPassword, donationLevel: Just donationLevel} fragmentState = do
   let defaultPage = { index
                     , credentials:      {username, password}
+                    , dateOfLastDonation
                     , pinExists:        isJust pinEncryptedPassword
                     , userPreferences
                     , userAreaState:    userAreaInitialState

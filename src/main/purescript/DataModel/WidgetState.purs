@@ -1,6 +1,7 @@
 module DataModel.WidgetState where
 
 import Data.Bounded (class Ord)
+import Data.DateTime (DateTime)
 import Data.Either (Either)
 import Data.Eq (class Eq)
 import Data.Map (Map)
@@ -39,7 +40,7 @@ type UserAreaState = {
 , userAreaSubmenus :: Map UserAreaSubmenu Boolean
 }
 
-data UserAreaPage = Export | Import | Pin | Delete | Preferences | ChangePassword | About | None
+data UserAreaPage = Export | Import | Pin | Delete | Preferences | ChangePassword | Donate | About | None
 derive instance eqUserAreaPage :: Eq UserAreaPage
 
 data ImportStep = Upload | Selection | Confirm
@@ -58,13 +59,14 @@ derive instance ordUserAreaSubmenus :: Ord UserAreaSubmenu
 -- ========================================================================
 
 type MainPageWidgetState = {
-  index             :: Index
-, credentials       :: Credentials
-, pinExists         :: Boolean
-, userAreaState     :: UserAreaState
-, cardManagerState  :: CardManagerState
-, userPreferences   :: UserPreferences
-, donationLevel     :: DonationLevel
+  index              :: Index
+, credentials        :: Credentials
+, dateOfLastDonation :: Maybe DateTime
+, pinExists          :: Boolean
+, userAreaState      :: UserAreaState
+, cardManagerState   :: CardManagerState
+, userPreferences    :: UserPreferences
+, donationLevel      :: DonationLevel
 }
 
 data WidgetState = WidgetState OverlayInfo Page

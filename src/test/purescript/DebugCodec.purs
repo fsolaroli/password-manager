@@ -16,6 +16,7 @@ import DataModel.Credentials (Credentials)
 import DataModel.IndexVersions.Index (CardEntry(..), CardReference(..), Index(..))
 import DataModel.Password (PasswordGeneratorSettings)
 import DataModel.UserVersions.User (UserPreferences(..))
+import DataModel.UserVersions.UserCodecs (dateTimeCodec)
 import DataModel.WidgetState (CardFormInput(..), CardManagerState, CardViewState, ImportState, ImportStep(..), LoginFormData, LoginType(..), MainPageWidgetState, Page(..), UserAreaPage(..), UserAreaState, UserAreaSubmenu(..), WidgetState(..))
 import DataModel.WidgetState (CardViewState(..)) as CardViewState
 import Functions.Donations (DonationLevel(..))
@@ -172,6 +173,7 @@ signupDataFormCodec =
 -- type MainPageWidgetState = {
 --   index                         :: Index
 -- , credentials                   :: Credentials
+-- , dateOfLastDonation            :: Maybe DateTime
 -- , pinExists                     :: Boolean
 -- , userAreaState                 :: UserAreaState
 -- , cardManagerState              :: CardManagerState
@@ -184,6 +186,7 @@ mainPageWidgetStateCodec =
     (CAR.record
       { index:            indexCodec
       , credentials:      credentialsCodec
+      , dateOfLastDonation: CAC.maybe dateTimeCodec
       , pinExists:        CA.boolean
       , userAreaState:    userAreaStateCodec
       , cardManagerState: cardManagerStateCodec
@@ -258,7 +261,7 @@ userAreaStateCodec =
       }
     )
 
--- data UserAreaPage = Export | Import | Pin | Delete | Preferences | ChangePassword | About | None
+-- data UserAreaPage = Export | Import | Pin | Delete | Preferences | Donate | ChangePassword | About | None
 userAreaPageCodec :: CA.JsonCodec UserAreaPage
 userAreaPageCodec = dimap toVariant fromVariant $ CAV.variantMatch
     { export:         Left unit
@@ -267,6 +270,7 @@ userAreaPageCodec = dimap toVariant fromVariant $ CAV.variantMatch
     , delete:         Left unit
     , preferences:    Left unit
     , changePassword: Left unit
+    , donate:         Left unit
     , about:          Left unit
     , noPage:         Left unit
     }
@@ -278,6 +282,7 @@ userAreaPageCodec = dimap toVariant fromVariant $ CAV.variantMatch
       Delete         -> V.inj (Proxy :: _ "delete") unit
       Preferences    -> V.inj (Proxy :: _ "preferences") unit
       ChangePassword -> V.inj (Proxy :: _ "changePassword") unit
+      Donate         -> V.inj (Proxy :: _ "donate") unit
       About          -> V.inj (Proxy :: _ "about") unit
       None           -> V.inj (Proxy :: _ "noPage") unit     
     fromVariant = V.match
@@ -287,6 +292,7 @@ userAreaPageCodec = dimap toVariant fromVariant $ CAV.variantMatch
       , delete:         \_ -> Delete
       , preferences:    \_ -> Preferences
       , changePassword: \_ -> ChangePassword
+      , donate:         \_ -> Donate
       , about:          \_ -> About
       , noPage:         \_ -> None
       }

@@ -4,14 +4,17 @@ import Concur.Core (Widget)
 import Concur.React (HTML)
 import Concur.React.DOM (button, div, iframe, span, text)
 import Concur.React.Props as Props
-import Control.Alt (void, ($>), (<$))
+import Control.Alt (void, ($>), (<#>), (<$))
 import Control.Alternative (pure)
-import Control.Bind (bind, discard)
-import Data.Function (($))
+import Control.Bind (bind, discard, (=<<))
+import Data.Function (flip, ($))
 import Data.Maybe (Maybe(..))
 import Data.Monoid ((<>))
+import Data.Semigroup (append)
 import Effect.Aff.Class (liftAff)
+import Effect.Class (liftEffect)
 import Functions.Donations (DonationLevel(..), donationLevelClass)
+import Functions.EnvironmentalVariables (donationIFrameURL)
 import Functions.Events (getWindowMessage)
 
 
@@ -30,7 +33,7 @@ donationPage :: DonationLevel -> Widget HTML DonationPageEvent
 donationPage DonationWarning =
   div [Props.className "donationPage"] [
     CloseDonationPage <$ div [Props.className "closeButton"] [ button [Props.onClick] [span [] [text "remove field"]] ] 
-  , donationIFrame "/donations/app/splash/"
+  , donationIFrame =<< (liftEffect donationIFrameURL <#> (flip append "splash/"))
   ]
 donationPage _ = text ""
 
@@ -45,7 +48,7 @@ donationReminder donationLevel = do
               div [Props.className "disableOverlay"] [
                 div [Props.className "mask", Props.onClick $> CloseDonationPage] []
               , div [Props.className "dialog"] [
-                  donationIFrame "/donations/app/"
+                  donationIFrame =<< liftEffect donationIFrameURL
                 ]
               ]
             , button [void Props.onClick] [span [] [text "Donate"]] $> CloseDonationPage
