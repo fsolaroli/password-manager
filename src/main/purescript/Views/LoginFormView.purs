@@ -113,9 +113,10 @@ pinLoginWidget active pin = do
       label [] [
         span [Props.className "label"] [text "Login"]
       , (Props.unsafeTargetValue) <$> input [
-          Props._type "password"
+          Props._type "tel"
         , Props.placeholder "PIN"
         , Props.value v
+        , Props.autoComplete "off", Props.autoCorrect "off", Props.autoCapitalize "off", Props.spellCheck false
         , Props.autoFocus active
         , Props.disabled (not active)
         , Props.onChange
