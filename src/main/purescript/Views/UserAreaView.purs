@@ -2,39 +2,32 @@ module Views.UserAreaView where
 
 import Concur.Core (Widget)
 import Concur.React (HTML)
-import Concur.React.DOM (a, button, div, header, int, li, li', span, strong, text, ul)
+import Concur.React.DOM (a, button, div, header, li, li', span, text, ul)
 import Concur.React.Props as Props
 import Control.Alt (($>), (<#>))
-import Control.Bind (bind, pure, (=<<), (>>=))
+import Control.Bind (bind)
 import Control.Category ((>>>))
-import Data.DateTime (DateTime, diff)
 import Data.Eq ((==))
-import Data.Formatter.DateTime (format)
 import Data.Function ((#), ($))
 import Data.Functor ((<$>))
 import Data.HeytingAlgebra (not)
-import Data.Int (floor)
 import Data.Map (Map, fromFoldable, insert, lookup)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Monoid ((<>))
-import Data.Newtype (unwrap)
 import Data.Time.Duration (Days)
 import Data.Tuple (Tuple(..), swap)
 import DataModel.Credentials (Credentials)
-import DataModel.UserVersions.User (UserPreferences)
-import DataModel.UserVersions.UserCodecs (iso8601DateFormatter)
+import DataModel.UserVersions.User (UserPreferences, DonationInfo)
 import DataModel.WidgetState (UserAreaPage(..), UserAreaState, UserAreaSubmenu(..), ImportState)
-import Effect (Effect)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
-import Effect.Now (nowDateTime)
-import Functions.EnvironmentalVariables (currentCommit, donationIFrameURL)
+import Functions.EnvironmentalVariables (currentCommit)
 import Functions.Events (keyboardShortcut)
 import Functions.State (isOffline)
 import Views.ChangePasswordView (changePasswordView)
 import Views.Components (Enabled(..), footerComponent)
 import Views.DeleteUserView (deleteUserView)
-import Views.DonationViews (donationIFrame)
+import Views.DonationViews (donationUserArea)
 import Views.DonationViews as DonationEvent
 import Views.ExportView (ExportEvent, exportView)
 import Views.ImportView (importView, initialImportState)
@@ -50,15 +43,15 @@ data UserAreaEvent    = CloseUserAreaEvent
                       | DeleteAccountEvent
                       | ImportCardsEvent ImportState
                       | ExportEvent ExportEvent
-                      | UpdateDonationLevel
+                      | UpdateDonationLevel Days
                       | LockEvent
                       | LogoutEvent
 
 userAreaInitialState :: UserAreaState
 userAreaInitialState = { showUserArea: false, userAreaOpenPage: None, importState: initialImportState, userAreaSubmenus: fromFoldable [(Tuple Account false), (Tuple Data false)]}
 
-userAreaView :: UserAreaState -> UserPreferences -> Credentials -> Maybe DateTime -> Boolean -> Widget HTML (Tuple UserAreaEvent UserAreaState)
-userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenus} userPreferences credentials dateOfLastDonation pinExists = do
+userAreaView :: UserAreaState -> UserPreferences -> Credentials -> Maybe DonationInfo -> Int -> Boolean -> Widget HTML (Tuple UserAreaEvent UserAreaState)
+userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenus} userPreferences credentials donationInfo numberOfCards pinExists = do
   commitHash <- liftEffect currentCommit
   ((div [Props._id "userPage", Props.className (if showUserArea then "open" else "closed")] [
       div [Props.onClick, Props.className "mask"] [] $> CloseUserAreaEvent
@@ -116,13 +109,16 @@ userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenu
     userAreaInternalView :: Widget HTML UserAreaEvent
     userAreaInternalView = 
       case userAreaOpenPage of
-        Preferences     -> frame (userPreferencesView userPreferences <#> UpdateUserPreferencesEvent)
-        ChangePassword  -> frame (changePasswordView  credentials     <#> ChangePasswordEvent)
-        Pin             -> frame (setPinView          pinExists       <#> SetPinEvent)
-        Delete          -> frame (deleteUserView      credentials      $> DeleteAccountEvent)
-        Import          -> frame (importView          importState     <#> ImportCardsEvent)
-        Export          -> frame (exportView                          <#> ExportEvent)
-        Donate          -> frame (donationUserAreaView)
+        Preferences     -> frame (userPreferencesView userPreferences         <#> UpdateUserPreferencesEvent)
+        ChangePassword  -> frame (changePasswordView  credentials             <#> ChangePasswordEvent)
+        Pin             -> frame (setPinView          pinExists               <#> SetPinEvent)
+        Delete          -> frame (deleteUserView      credentials              $> DeleteAccountEvent)
+        Import          -> frame (importView          importState             <#> ImportCardsEvent)
+        Export          -> frame (exportView                                  <#> ExportEvent)
+        Donate          -> frame (donationUserArea numberOfCards donationInfo <#> (\res -> case res of
+                                                                                  DonationEvent.CloseDonationPage     -> OpenUserAreaPage None
+                                                                                  DonationEvent.UpdateDonationLevel m -> UpdateDonationLevel m
+                                                                                  ))
         About           -> frame (text "This is Clipperz")
         None            -> emptyUserComponent
 
@@ -135,32 +131,3 @@ userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenu
 
         emptyUserComponent :: forall a. Widget HTML a
         emptyUserComponent = (div [Props.className "extraFeatureContent"] [])
-
-        donationUserAreaView :: Widget HTML UserAreaEvent
-        donationUserAreaView = 
-          (div [Props._id "donationUserArea"] [
-            div [Props.className "donationInfo"] $ case dateOfLastDonation of
-              Just date -> [
-                span [Props.className "dateOfLastDonation"]   [text $ format iso8601DateFormatter date]
-              , span [Props.className "timeFromLastDonation"] [
-                  (timeFromLastDonation date # liftEffect) >>= (\days -> case floor $ unwrap days of
-                    0 -> strong [] [text "Today!"]
-                    d -> int d <> text " days ago"
-                  )
-                ]
-              ]
-              Nothing -> [
-                text "You have never donated 🥹"
-              ]
-          , donationIFrame =<< liftEffect donationIFrameURL
-          ])
-          <#> (\res -> case res of
-            DonationEvent.CloseDonationPage   -> OpenUserAreaPage None
-            DonationEvent.UpdateDonationLevel -> UpdateDonationLevel
-          )
-
-          where
-            timeFromLastDonation :: DateTime -> Effect Days
-            timeFromLastDonation date = do
-              now <- liftEffect nowDateTime
-              pure $ diff now date

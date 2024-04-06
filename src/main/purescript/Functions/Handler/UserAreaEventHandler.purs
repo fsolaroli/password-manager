@@ -72,10 +72,10 @@ import Web.Storage.Storage (getItem)
 handleUserAreaEvent :: UserAreaEvent -> CardManagerState -> UserAreaState -> AppState -> Fragment.FragmentState -> Widget HTML OperationState
 
 
-handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, srpConf, hash: hashFunc, cardsCache, username: Just username, password: Just password, index: Just index, userInfo: Just userInfo@(UserInfo {indexReference: IndexReference { reference: indexRef}, userPreferences, dateOfLastDonation}), userInfoReferences: Just userInfoReferences, c: Just c, p: Just p, pinEncryptedPassword, donationLevel: Just donationLevel} f = do
+handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, srpConf, hash: hashFunc, cardsCache, username: Just username, password: Just password, index: Just index, userInfo: Just userInfo@(UserInfo {indexReference: IndexReference { reference: indexRef}, userPreferences, donationInfo}), userInfoReferences: Just userInfoReferences, c: Just c, p: Just p, pinEncryptedPassword, donationLevel: Just donationLevel} f = do
   let defaultPage = { index
                     , credentials:      {username, password}
-                    , dateOfLastDonation
+                    , donationInfo
                     , pinExists:        isJust pinEncryptedPassword
                     , userPreferences
                     , userAreaState
@@ -99,7 +99,7 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
     (ChangeUserAreaSubmenu userAreaSubmenu) ->
       updateUserAreaState defaultPage userAreaState {userAreaSubmenus = userAreaSubmenu}
     
-    (UpdateDonationLevel) -> handleDonationPageEvent DonationEvent.UpdateDonationLevel state f
+    (UpdateDonationLevel days) -> handleDonationPageEvent (DonationEvent.UpdateDonationLevel days) state f
 
     (UpdateUserPreferencesEvent newUserPreferences) -> 
       let page = Main defaultPage { userPreferences = newUserPreferences }

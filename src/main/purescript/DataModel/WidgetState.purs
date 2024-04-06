@@ -1,7 +1,6 @@
 module DataModel.WidgetState where
 
 import Data.Bounded (class Ord)
-import Data.DateTime (DateTime)
 import Data.Either (Either)
 import Data.Eq (class Eq)
 import Data.Map (Map)
@@ -10,7 +9,7 @@ import Data.Tuple (Tuple)
 import DataModel.CardVersions.Card (Card)
 import DataModel.Credentials (Credentials)
 import DataModel.IndexVersions.Index (CardEntry, Index)
-import DataModel.UserVersions.User (UserPreferences)
+import DataModel.UserVersions.User (UserPreferences, DonationInfo)
 import Functions.Donations (DonationLevel)
 import IndexFilterView (FilterData)
 import Views.OverlayView (OverlayInfo)
@@ -61,7 +60,7 @@ derive instance ordUserAreaSubmenus :: Ord UserAreaSubmenu
 type MainPageWidgetState = {
   index              :: Index
 , credentials        :: Credentials
-, dateOfLastDonation :: Maybe DateTime
+, donationInfo       :: Maybe DonationInfo
 , pinExists          :: Boolean
 , userAreaState      :: UserAreaState
 , cardManagerState   :: CardManagerState

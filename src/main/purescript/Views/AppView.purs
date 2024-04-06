@@ -8,6 +8,7 @@ import Control.Alt ((<|>))
 import Control.Bind (bind)
 import Data.Function (flip, (#), ($))
 import Data.Functor ((<$>))
+import Data.List (length)
 import Data.Maybe (Maybe(..))
 import Data.Monoid ((<>))
 import Data.Newtype (unwrap)
@@ -30,7 +31,7 @@ import Views.SignupFormView (SignupPageEvent, emptyDataForm, signupFormView)
 import Views.UserAreaView (UserAreaEvent, userAreaInitialState, userAreaView)
 
 emptyMainPageWidgetState :: MainPageWidgetState
-emptyMainPageWidgetState = { index: emptyIndex, credentials: emptyCredentials, dateOfLastDonation: Nothing, pinExists: false, userAreaState: userAreaInitialState, cardManagerState: cardManagerInitialState, donationLevel: DonationOk, userPreferences: defaultUserPreferences }
+emptyMainPageWidgetState = { index: emptyIndex, credentials: emptyCredentials, donationInfo: Nothing, pinExists: false, userAreaState: userAreaInitialState, cardManagerState: cardManagerInitialState, donationLevel: DonationOk, userPreferences: defaultUserPreferences }
 
 data PageEvent = LoginPageEvent           LoginPageEvent
                | SignupPageEvent          SignupPageEvent
@@ -68,13 +69,13 @@ appView widgetState@(WidgetState overlayInfo page) =
 
     ]
     , div [Props.classList (Just <$> ["page", "main", show $ location (Main emptyMainPageWidgetState) page])] [ do
-        let Tuple {index, userAreaState, credentials, dateOfLastDonation, pinExists, cardManagerState, userPreferences, donationLevel} enableShortcuts = case page of
+        let Tuple {index, userAreaState, credentials, donationInfo, pinExists, cardManagerState, userPreferences, donationLevel} enableShortcuts = case page of
                                         Main homePageWidgetState' -> Tuple homePageWidgetState'     true
                                         _                         -> Tuple emptyMainPageWidgetState false
         
         div [Props._id "homePage"] [
           ( MainPageCardManagerEvent                         # uncurry) <$> cardsManagerView cardManagerState index (unwrap userPreferences).passwordGeneratorSettings enableShortcuts
-        , ((MainPageUserAreaEvent # flip $ cardManagerState) # uncurry) <$> userAreaView userAreaState userPreferences credentials dateOfLastDonation pinExists
+        , ((MainPageUserAreaEvent # flip $ cardManagerState) # uncurry) <$> userAreaView userAreaState userPreferences credentials donationInfo (length (unwrap index).entries) pinExists
         , ( DonationPageEvent                                         ) <$> donationReminder donationLevel
         ] 
       ]

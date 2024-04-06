@@ -15,7 +15,7 @@ import DataModel.CardVersions.Card (Card(..), CardField(..), CardValues(..), car
 import DataModel.Credentials (Credentials)
 import DataModel.IndexVersions.Index (CardEntry(..), CardReference(..), Index(..))
 import DataModel.Password (PasswordGeneratorSettings)
-import DataModel.UserVersions.User (UserPreferences(..))
+import DataModel.UserVersions.User (UserPreferences(..), DonationInfo)
 import DataModel.UserVersions.UserCodecs (dateTimeCodec)
 import DataModel.WidgetState (CardFormInput(..), CardManagerState, CardViewState, ImportState, ImportStep(..), LoginFormData, LoginType(..), MainPageWidgetState, Page(..), UserAreaPage(..), UserAreaState, UserAreaSubmenu(..), WidgetState(..))
 import DataModel.WidgetState (CardViewState(..)) as CardViewState
@@ -170,10 +170,22 @@ signupDataFormCodec =
       }
     )
 
+-- type DonationInfo = {
+--   dateOfLastDonation   :: DateTime
+-- , nextDonationReminder :: DateTime
+-- }
+
+donationInfoCodec :: CA.JsonCodec DonationInfo
+donationInfoCodec = 
+  CAR.object "DonationInfo"
+    { dateOfLastDonation: dateTimeCodec
+    , nextDonationReminder: dateTimeCodec
+    }
+
 -- type MainPageWidgetState = {
 --   index                         :: Index
 -- , credentials                   :: Credentials
--- , dateOfLastDonation            :: Maybe DateTime
+-- , donationInfo                  :: Maybe DonationInfo
 -- , pinExists                     :: Boolean
 -- , userAreaState                 :: UserAreaState
 -- , cardManagerState              :: CardManagerState
@@ -186,7 +198,7 @@ mainPageWidgetStateCodec =
     (CAR.record
       { index:            indexCodec
       , credentials:      credentialsCodec
-      , dateOfLastDonation: CAC.maybe dateTimeCodec
+      , donationInfo:     CAC.maybe donationInfoCodec
       , pinExists:        CA.boolean
       , userAreaState:    userAreaStateCodec
       , cardManagerState: cardManagerStateCodec

@@ -25,19 +25,22 @@ import Effect.Aff (Aff)
 import Type.Proxy (Proxy(..))
 
 
-data MasterKeyEncodingVersion = MasterKeyEncodingVersion_1 | MasterKeyEncodingVersion_2
+data MasterKeyEncodingVersion = MasterKeyEncodingVersion_1 | MasterKeyEncodingVersion_2 | MasterKeyEncodingVersion_3
 masterKeyEncodingVersionCodec :: CA.JsonCodec MasterKeyEncodingVersion
 masterKeyEncodingVersionCodec = dimap toVariant fromVariant $ CAV.variantMatch
     { masterKeyEncodingVersion_1: Left unit
     , masterKeyEncodingVersion_2: Left unit
+    , masterKeyEncodingVersion_3: Left unit
     }
   where
     toVariant = case _ of
       MasterKeyEncodingVersion_1 -> V.inj (Proxy :: _ "masterKeyEncodingVersion_1") unit 
       MasterKeyEncodingVersion_2 -> V.inj (Proxy :: _ "masterKeyEncodingVersion_2") unit 
+      MasterKeyEncodingVersion_3 -> V.inj (Proxy :: _ "masterKeyEncodingVersion_3") unit 
     fromVariant = V.match
       { masterKeyEncodingVersion_1: \_ -> MasterKeyEncodingVersion_1
       , masterKeyEncodingVersion_2: \_ -> MasterKeyEncodingVersion_2
+      , masterKeyEncodingVersion_3: \_ -> MasterKeyEncodingVersion_3
       }
 
 type MasterKey = Tuple HexString MasterKeyEncodingVersion
@@ -112,12 +115,17 @@ defaultUserPreferences = UserPreferences {passwordGeneratorSettings: standardPas
 
 -- ------------------------------------------------------------------------
 
+type DonationInfo = {
+  dateOfLastDonation   :: DateTime
+, nextDonationReminder :: DateTime
+}
+
 newtype UserInfo = 
   UserInfo
-    { indexReference     :: IndexReference
-    , identifier         :: Identifier
-    , userPreferences    :: UserPreferences
-    , dateOfLastDonation :: Maybe DateTime
+    { indexReference  :: IndexReference
+    , identifier      :: Identifier
+    , userPreferences :: UserPreferences
+    , donationInfo    :: Maybe DonationInfo
     }
 
 derive instance newTypeUserInfo :: Newtype UserInfo _
@@ -130,4 +138,4 @@ type UserInfoReferences = {reference :: HexString, key :: HexString}
 prepareUserInfo :: IndexReference -> UserPreferences -> Aff UserInfo
 prepareUserInfo indexReference userPreferences = do
   identifier <- computeIdentifier
-  pure $ UserInfo {indexReference, userPreferences, identifier, dateOfLastDonation: Nothing}
+  pure $ UserInfo {indexReference, userPreferences, identifier, donationInfo: Nothing}

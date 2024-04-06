@@ -9,6 +9,7 @@ import Control.Alternative (pure)
 import Control.Bind (bind, (=<<), (>>=))
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Except (runExceptT)
+import Data.DateTime (adjust)
 import Data.Function ((#), ($))
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
@@ -32,10 +33,10 @@ import Views.UserAreaView (userAreaInitialState)
 
 handleDonationPageEvent :: DonationPageEvent -> AppState -> Fragment.FragmentState -> Widget HTML OperationState
 
-handleDonationPageEvent donationPageEvent state@{username: Just username, password: Just password, index: Just index, userInfo: Just userInfo@(UserInfo {userPreferences, dateOfLastDonation}), pinEncryptedPassword, donationLevel: Just donationLevel} fragmentState = do
+handleDonationPageEvent donationPageEvent state@{username: Just username, password: Just password, index: Just index, userInfo: Just userInfo@(UserInfo {userPreferences, donationInfo}), pinEncryptedPassword, donationLevel: Just donationLevel} fragmentState = do
   let defaultPage = { index
                     , credentials:      {username, password}
-                    , dateOfLastDonation
+                    , donationInfo
                     , pinExists:        isJust pinEncryptedPassword
                     , userPreferences
                     , userAreaState:    userAreaInitialState
@@ -44,11 +45,14 @@ handleDonationPageEvent donationPageEvent state@{username: Just username, passwo
                     }
 
   case donationPageEvent of
-    UpdateDonationLevel ->
+    UpdateDonationLevel days  ->
       do
-        newUserInfo                     <- runStep ((\now -> pure $ UserInfo ((unwrap userInfo) {dateOfLastDonation = Just now})) =<< liftEffect nowDateTime) (WidgetState (spinnerOverlay "Update user info" Black) (Main emptyMainPageWidgetState { index = index, donationLevel = DonationOk }))
-        ProxyResponse proxy stateUpdate <- runStep (updateUserInfo state newUserInfo)                                                                         (WidgetState (spinnerOverlay "Update user info" Black) (Main emptyMainPageWidgetState { index = index, donationLevel = DonationOk }))
-        newDonationLevel                <- runStep (computeDonationLevel index newUserInfo # liftEffect)                                                      (WidgetState (spinnerOverlay "Update user info" Black) (Main emptyMainPageWidgetState { index = index, donationLevel = DonationOk }))
+        newUserInfo                     <- runStep ((\now -> pure $ UserInfo ((unwrap userInfo) {donationInfo = do
+                                                      nextDonationReminder <- adjust days now
+                                                      pure {dateOfLastDonation: now, nextDonationReminder}})
+                                                    ) =<< liftEffect nowDateTime)                        (WidgetState (spinnerOverlay "Update user info" Black) (Main emptyMainPageWidgetState { index = index, donationLevel = DonationOk }))
+        ProxyResponse proxy stateUpdate <- runStep (updateUserInfo state newUserInfo)                    (WidgetState (spinnerOverlay "Update user info" Black) (Main emptyMainPageWidgetState { index = index, donationLevel = DonationOk }))
+        newDonationLevel                <- runStep (computeDonationLevel index newUserInfo # liftEffect) (WidgetState (spinnerOverlay "Update user info" Black) (Main emptyMainPageWidgetState { index = index, donationLevel = DonationOk }))
         
         let cardViewState = case fragmentState of
                         Fragment.AddCard card -> CardForm (NewCardFromFragment card)

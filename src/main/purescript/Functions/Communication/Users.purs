@@ -30,7 +30,7 @@ import DataModel.SRPVersions.CurrentSRPVersions (currentSRPVersion)
 import DataModel.SRPVersions.SRP (HashFunction)
 import DataModel.UserVersions.CurrentUserVersions (currentMasterKeyEncodingVersion, currentUserInfoCodecVersion)
 import DataModel.UserVersions.User (class UserInfoVersions, MasterKey, MasterKeyEncodingVersion(..), RequestUserCard(..), UserCard(..), UserInfo(..), UserInfoReferences, UserPreferences, toUserInfo, userCardCodec)
-import DataModel.UserVersions.UserCodecs (userInfoV1Codec, userInfoV2Codec, fromUserInfo)
+import DataModel.UserVersions.UserCodecs (fromUserInfo, userInfoV1Codec, userInfoV2Codec, userInfoV3Codec)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
@@ -76,6 +76,7 @@ extractUserInfoReference (Tuple masterKeyContent masterKeyEncodingVersion) maste
   case masterKeyEncodingVersion of
    MasterKeyEncodingVersion_1 -> decryptArrayBufferWithSplit
    MasterKeyEncodingVersion_2 -> decryptArrayBufferWithSplit
+   MasterKeyEncodingVersion_3 -> decryptArrayBufferWithSplit
 
   where
     decryptArrayBufferWithSplit = do
@@ -88,6 +89,7 @@ decryptUserInfo encryptedUserInfo key version =
   case version of 
     MasterKeyEncodingVersion_1 -> decryptJsonUserInfo userInfoV1Codec
     MasterKeyEncodingVersion_2 -> decryptJsonUserInfo userInfoV2Codec
+    MasterKeyEncodingVersion_3 -> decryptJsonUserInfo userInfoV3Codec
 
   where
     decryptJsonUserInfo :: forall a. UserInfoVersions a => JsonCodec a -> ExceptT AppError Aff UserInfo
