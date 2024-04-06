@@ -107,10 +107,9 @@ cardField showPassword f@(CardField {name, value, locked}) = do
     , div [Props.className "fieldValue", Props.onClick $> CopyValue] [
         dynamicWrapper (if (locked && (not showPassword)) then Just "PASSWORD" else Nothing) value $ textarea [Props.rows 1, Props.value value, Props.readOnly true] [] 
       ]
-    , (if locked
+    , if locked
       then (entropyMeter value)
       else (text "")
-      )
     ]
   , div [Props.className "fieldAction"] [
       getActionButton
@@ -127,7 +126,7 @@ cardField showPassword f@(CardField {name, value, locked}) = do
       case getFieldType f of
         Passphrase  -> button [Props.className "action PASSWORD", Props.disabled false, Props.onClick        ] [span [] [text "view password"]] $> if showPassword then HidePassword else ShowPassword
         Email       -> button [Props.className "action EMAIL",    Props.disabled true                        ] [span [] [text "email"        ]]
-        Url         -> a      [Props.className "action URL",      Props.disabled false, Props.href value
+        Url         -> a      [Props.className "action URL",      Props.disabled false, Props.href   value
                                                                                       , Props.target "_blank"] [span [] [text "url"          ]]
         None        -> button [Props.className "action NONE",     Props.disabled true                        ] [span [] [text "none"         ]]
 
