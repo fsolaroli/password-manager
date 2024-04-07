@@ -7,13 +7,14 @@ import Concur.React.Props as Props
 import Control.Alt (($>), (<#>), (<|>))
 import Control.Alternative ((*>))
 import Control.Applicative (pure)
-import Control.Bind ((>>=))
+import Control.Bind ((=<<), (>>=))
 import Control.Category ((<<<), (>>>))
 import Data.Array (foldl, fromFoldable, mapWithIndex)
 import Data.CommutativeRing (add)
 import Data.Eq ((/=), (==))
 import Data.Function (flip, (#), ($))
 import Data.Functor ((<$>), (<$))
+import Data.HeytingAlgebra (not)
 import Data.List (List, elemIndex, index, length)
 import Data.List as List
 import Data.Maybe (Maybe(..), maybe)
@@ -21,6 +22,7 @@ import Data.Ord (max, min)
 import Data.Ring (sub, (-))
 import Data.Semigroup ((<>))
 import Data.Set (Set, unions)
+import Data.Time.Duration (Days)
 import Data.Tuple (Tuple(..), swap)
 import Data.Unit (unit)
 import DataModel.CardVersions.Card (Card, emptyCard)
@@ -29,13 +31,17 @@ import DataModel.Password (PasswordGeneratorSettings)
 import DataModel.WidgetState (CardFormInput(..), CardManagerState, CardViewState(..))
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
+import Functions.Donations (DonationLevel(..))
+import Functions.EnvironmentalVariables (donationIFrameURL)
 import Functions.Events (blur, focus, keyboardShortcut, select)
 import IndexFilterView (Filter(..), FilterData, FilterViewStatus(..), filteredEntries, getClassNameFromFilterStatus, indexFilterView, initialFilterData, shownEntries)
 import Views.CardViews (CardEvent(..), cardView)
 import Views.Components (proxyInfoComponent)
 import Views.CreateCardView (createCardView)
+import Views.DonationViews (donationIFrame)
+import Views.DonationViews as DonationEvent
 
-data CardManagerEvent = AddCardEvent                 Card
+data CardManagerEvent = AddCardEvent       Card
                       | CloneCardEvent     CardEntry
                       | DeleteCardEvent    CardEntry
                       | EditCardEvent      (Tuple CardEntry Card)
@@ -44,8 +50,10 @@ data CardManagerEvent = AddCardEvent                 Card
                       | OpenCardFormEvent  (Maybe (Tuple CardEntry Card))
                       | OpenUserAreaEvent
                       | ShowShortcutsEvent Boolean
+                      | ShowDonationEvent  Boolean
                       | ChangeFilterEvent  FilterData
                       | NavigateCardsEvent NavigateCardsEvent
+                      | UpdateDonationLevel Days
 
 data NavigateCardsEvent = Move Int | Open (Maybe CardEntry) | Close (Maybe Int)
 
@@ -55,12 +63,13 @@ cardManagerInitialState = {
 , highlightedEntry: Nothing
 , cardViewState: NoCard
 , showShortcutsHelp: false
+, showDonationOverlay: false
 }
 
 type EnableShortcuts = Boolean
 
-cardsManagerView :: CardManagerState -> Index -> PasswordGeneratorSettings -> EnableShortcuts -> Widget HTML (Tuple CardManagerEvent CardManagerState)
-cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archived, searchString}, highlightedEntry, cardViewState, showShortcutsHelp} index'@(Index {entries}) userPasswordGeneratorSettings enableShortcuts = do
+cardsManagerView :: CardManagerState -> Index -> PasswordGeneratorSettings -> DonationLevel -> EnableShortcuts -> Widget HTML (Tuple CardManagerEvent CardManagerState)
+cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archived, searchString}, highlightedEntry, cardViewState, showShortcutsHelp, showDonationOverlay} index'@(Index {entries}) userPasswordGeneratorSettings donationLevel enableShortcuts = do
   div [Props._id "cardsManager", Props.className $ "filterView_" <> getClassNameFromFilterStatus filterViewStatus] [
     indexFilterView filterData index' >>= updateFilterData
   , div [Props.className "cardToolbarFrame"] [
@@ -73,17 +82,20 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
             button [Props.onClick, Props.className "addCard" ] [span [] [text "add card"]] $> OpenCardFormEvent Nothing
           ]
         , (indexView sortedCards getHighlightedEntry) <#> (NavigateCardsEvent <<< Open <<< Just)
+        , donationButton (donationLevel == DonationInfo) showDonationOverlay
         ]
       , div [Props._id "card"] [
           mainStageView cardViewState
         ]
       ]
+    , donationButton (donationLevel == DonationWarning) showDonationOverlay
     ]
   ] <> (if enableShortcuts then shortcutsHandlers else (text ""))
     <> (shortcutsHelp     showShortcutsHelp)
   <#> (Tuple state >>> swap)
 
   where
+
     sortedCards :: List CardEntry
     sortedCards  = List.sort $ filteredEntries filter (shownEntries entries selectedEntry archived)
 
@@ -230,6 +242,27 @@ shortcutsHelp showShortcutsHelp = div [Props.classList [Just "shortcutsHelp", Ju
     hiddenClass = if showShortcutsHelp
                   then Nothing
                   else Just "hidden"
+
+-- ==================================================================                                                                                                                             
+
+donationButton :: Boolean -> Boolean -> Widget HTML CardManagerEvent
+donationButton false _           = text ""
+donationButton true  showOverlay =
+  div [Props.classList [Just "donationButton"]] ([
+    button [Props.onClick] [span [] [text "Support Clipperz"]] $> ShowDonationEvent true
+  ] <> (if (not showOverlay) then [] else [
+    div [Props.className "disableOverlay"] [
+      div [Props.className "mask", Props.onClick] [] $> ShowDonationEvent false
+    , div [Props.className "dialog"] [
+        (donationIFrame =<< (liftEffect $ donationIFrameURL "button/")) 
+        <#> 
+        (\res -> case res of
+          DonationEvent.CloseDonationPage     ->  ShowDonationEvent false
+          DonationEvent.UpdateDonationLevel m ->  UpdateDonationLevel m
+        )
+      ]
+    ]
+  ]))
 
 -- ==================================================================                                                                                                                             
 

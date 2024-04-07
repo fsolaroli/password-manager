@@ -438,19 +438,21 @@ passwordGeneratorSettingsCodec =
     )
 
 -- type CardManagerState = { 
---   filterData       :: FilterData
--- , highlightedEntry :: Maybe Int
--- , cardViewState    :: CardViewState
--- , showShortcutsHelp:: Boolean
+--   filterData          :: FilterData
+-- , highlightedEntry    :: Maybe Int
+-- , cardViewState       :: CardViewState
+-- , showShortcutsHelp   :: Boolean
+-- , showDonationOverlay :: Boolean
 -- }
 cardManagerStateCodec :: CA.JsonCodec CardManagerState
 cardManagerStateCodec =
   CA.object "CardManagerState"
     (CAR.record
-      { filterData       : filterDataCodec
-      , highlightedEntry : CAR.optional CA.int
-      , cardViewState    : cardViewStateCodec
-      , showShortcutsHelp: CA.boolean
+      { filterData         : filterDataCodec
+      , highlightedEntry   : CAR.optional CA.int
+      , cardViewState      : cardViewStateCodec
+      , showShortcutsHelp  : CA.boolean
+      , showDonationOverlay: CA.boolean
       }
     )
 
