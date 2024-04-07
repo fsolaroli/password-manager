@@ -377,50 +377,10 @@ div#userPage {
 						content: "You last donated on ";
 					}
 				}
-				
-				span.timeFromLastDonation {
+
+				span.dateOfNextReminder {
 					&::before {
-						content: "It was "
-					}
-
-					strong {
-						font-weight: bold;
-					}
-				}
-
-				span.nextDonationReminder {
-					width: 100%;
-					display: flex;
-					flex-direction: row;
-					justify-content: center;
-					flex-wrap: wrap;
-				
-					span.timeUntilNextReminder {
-						&::before {
-							content: "We will remind you of donating in ";
-						}
-					}
-
-					span.dateOfNextReminder {
-						&::before {
-							content: ", on ";
-						}
-					}
-
-					span.numberOfMaxCards {
-						&::before {
-							content: "You don't have that many cards. We will remind you to donate when you reach "
-						}
-					}
-
-					span.numberOfCardsLeft {
-						padding-left: 8px;
-						&::before {
-							content: "("
-						}
-						&::after {
-							content: " left)"
-						}
+						content: "Next donation reminder is scheduled for ";
 					}
 				}
 			}

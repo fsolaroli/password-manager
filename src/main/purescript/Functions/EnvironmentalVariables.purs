@@ -7,6 +7,9 @@ module Functions.EnvironmentalVariables
   )
   where
 
+import Control.Alt ((<#>))
+import Data.Function (flip)
+import Data.Semigroup (append)
 import Data.Unit (Unit, unit)
 import Effect (Effect)
 
@@ -30,6 +33,6 @@ appURL = _appURL unit
 
 
 foreign import _donationIFrameURL :: Unit -> Effect String
-donationIFrameURL :: Effect String
-donationIFrameURL = _donationIFrameURL unit
+donationIFrameURL :: String -> Effect String
+donationIFrameURL path = _donationIFrameURL unit <#> (flip append path)
 

@@ -8,7 +8,6 @@ import Control.Alt ((<|>))
 import Control.Bind (bind)
 import Data.Function (flip, (#), ($))
 import Data.Functor ((<$>))
-import Data.List (length)
 import Data.Maybe (Maybe(..))
 import Data.Monoid ((<>))
 import Data.Newtype (unwrap)
@@ -75,7 +74,7 @@ appView widgetState@(WidgetState overlayInfo page) =
         
         div [Props._id "homePage"] [
           ( MainPageCardManagerEvent                         # uncurry) <$> cardsManagerView cardManagerState index (unwrap userPreferences).passwordGeneratorSettings enableShortcuts
-        , ((MainPageUserAreaEvent # flip $ cardManagerState) # uncurry) <$> userAreaView userAreaState userPreferences credentials donationInfo (length (unwrap index).entries) pinExists
+        , ((MainPageUserAreaEvent # flip $ cardManagerState) # uncurry) <$> userAreaView userAreaState userPreferences credentials donationInfo pinExists
         , ( DonationPageEvent                                         ) <$> donationReminder donationLevel
         ] 
       ]

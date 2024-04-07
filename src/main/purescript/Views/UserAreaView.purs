@@ -50,8 +50,8 @@ data UserAreaEvent    = CloseUserAreaEvent
 userAreaInitialState :: UserAreaState
 userAreaInitialState = { showUserArea: false, userAreaOpenPage: None, importState: initialImportState, userAreaSubmenus: fromFoldable [(Tuple Account false), (Tuple Data false)]}
 
-userAreaView :: UserAreaState -> UserPreferences -> Credentials -> Maybe DonationInfo -> Int -> Boolean -> Widget HTML (Tuple UserAreaEvent UserAreaState)
-userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenus} userPreferences credentials donationInfo numberOfCards pinExists = do
+userAreaView :: UserAreaState -> UserPreferences -> Credentials -> Maybe DonationInfo -> Boolean -> Widget HTML (Tuple UserAreaEvent UserAreaState)
+userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenus} userPreferences credentials donationInfo pinExists = do
   commitHash <- liftEffect currentCommit
   ((div [Props._id "userPage", Props.className (if showUserArea then "open" else "closed")] [
       div [Props.onClick, Props.className "mask"] [] $> CloseUserAreaEvent
@@ -109,16 +109,17 @@ userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenu
     userAreaInternalView :: Widget HTML UserAreaEvent
     userAreaInternalView = 
       case userAreaOpenPage of
-        Preferences     -> frame (userPreferencesView userPreferences         <#> UpdateUserPreferencesEvent)
-        ChangePassword  -> frame (changePasswordView  credentials             <#> ChangePasswordEvent)
-        Pin             -> frame (setPinView          pinExists               <#> SetPinEvent)
-        Delete          -> frame (deleteUserView      credentials              $> DeleteAccountEvent)
-        Import          -> frame (importView          importState             <#> ImportCardsEvent)
-        Export          -> frame (exportView                                  <#> ExportEvent)
-        Donate          -> frame (donationUserArea numberOfCards donationInfo <#> (\res -> case res of
-                                                                                  DonationEvent.CloseDonationPage     -> OpenUserAreaPage None
-                                                                                  DonationEvent.UpdateDonationLevel m -> UpdateDonationLevel m
-                                                                                  ))
+        Preferences     -> frame (userPreferencesView userPreferences <#> UpdateUserPreferencesEvent)
+        ChangePassword  -> frame (changePasswordView  credentials     <#> ChangePasswordEvent)
+        Pin             -> frame (setPinView          pinExists       <#> SetPinEvent)
+        Delete          -> frame (deleteUserView      credentials      $> DeleteAccountEvent)
+        Import          -> frame (importView          importState     <#> ImportCardsEvent)
+        Export          -> frame (exportView                          <#> ExportEvent)
+        Donate          -> frame (donationUserArea donationInfo       <#> 
+          (\res -> case res of
+                                  DonationEvent.CloseDonationPage     ->  OpenUserAreaPage None
+                                  DonationEvent.UpdateDonationLevel m ->  UpdateDonationLevel m
+          ))
         About           -> frame (text "This is Clipperz")
         None            -> emptyUserComponent
 
