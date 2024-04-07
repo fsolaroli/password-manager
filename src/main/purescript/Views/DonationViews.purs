@@ -55,9 +55,9 @@ donationPage _ = text ""
 donationReminder :: DonationLevel -> Widget HTML DonationPageEvent
 donationReminder DonationOk = text ""
 donationReminder donationLevel = do
-  div [Props.classList [Just "donationButton", Just $ donationLevelClass donationLevel]] [
-    button [void Props.onClick] [span [] [text "Donate"]]
-  ]
+  let donationButton = button [void Props.onClick] [span [] [text "Support Clipperz"]]
+
+  div [Props.classList [Just "donationButton", Just $ donationLevelClass donationLevel]] [donationButton]
 
   event <-  div [Props.classList [Just "donationButton", Just "overlayOpen", Just $ donationLevelClass donationLevel]] [
               div [Props.className "disableOverlay"] [
@@ -66,7 +66,7 @@ donationReminder donationLevel = do
                   donationIFrame =<< (liftEffect $ donationIFrameURL "button/")
                 ]
               ]
-            , button [void Props.onClick] [span [] [text "Donate"]] $> CloseDonationPage
+            , donationButton $> CloseDonationPage
             ]
   case event of
     CloseDonationPage -> donationReminder donationLevel
