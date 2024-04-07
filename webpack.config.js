@@ -39,10 +39,10 @@ module.exports = (env) => {
 			// environmental variables definition
 			new webpack.EnvironmentPlugin({
 				CURRENT_COMMIT:      env.production ? git('rev-parse HEAD') : "development",
-				APP_URL:	  "/" + (env.production ? 'app' 				: 'api/static/index.html'),
-				SHARE_URL:    "/" + (env.production ? 'share/#' 			: 'api/static/share_index.html#'),
-				REDEEM_URL:   "/" + (env.production ? 'share/redeem/' 	    : 'api/static/redeem_index.html#'),
-				DONATION_IFRAME_URL: env.production ? '/donations/app/'     : 'http://localhost:9090/iframe.html'
+				APP_URL:	         env.production ? '/app' 				: '/api/static/index.html',
+				SHARE_URL:           env.production ? '/share/#' 			: '/api/static/share_index.html#',
+				REDEEM_URL:          env.production ? '/share/redeem/' 	    : '/api/static/redeem_index.html#',
+				DONATION_IFRAME_URL: env.production ? '/donations/app/'     : 'http://localhost:9090/iframe.html',
 			}),
 			// app html package configuration
 			new HtmlWebpackPlugin({
