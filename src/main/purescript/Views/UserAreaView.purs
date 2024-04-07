@@ -5,9 +5,10 @@ import Concur.React (HTML)
 import Concur.React.DOM (a, button, div, header, li, li', span, text, ul)
 import Concur.React.Props as Props
 import Control.Alt (($>), (<#>))
-import Control.Bind (bind)
+import Control.Bind (bind, (=<<))
 import Control.Category ((>>>))
 import Data.Eq ((==))
+import Data.Formatter.DateTime (format)
 import Data.Function ((#), ($))
 import Data.Functor ((<$>))
 import Data.HeytingAlgebra (not)
@@ -18,16 +19,17 @@ import Data.Time.Duration (Days)
 import Data.Tuple (Tuple(..), swap)
 import DataModel.Credentials (Credentials)
 import DataModel.UserVersions.User (UserPreferences, DonationInfo)
+import DataModel.UserVersions.UserCodecs (iso8601DateFormatter)
 import DataModel.WidgetState (UserAreaPage(..), UserAreaState, UserAreaSubmenu(..), ImportState)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
-import Functions.EnvironmentalVariables (currentCommit)
+import Functions.EnvironmentalVariables (currentCommit, donationIFrameURL)
 import Functions.Events (keyboardShortcut)
 import Functions.State (isOffline)
 import Views.ChangePasswordView (changePasswordView)
 import Views.Components (Enabled(..), footerComponent)
 import Views.DeleteUserView (deleteUserView)
-import Views.DonationViews (donationUserArea)
+import Views.DonationViews (donationIFrame)
 import Views.DonationViews as DonationEvent
 import Views.ExportView (ExportEvent, exportView)
 import Views.ImportView (importView, initialImportState)
@@ -115,11 +117,7 @@ userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenu
         Delete          -> frame (deleteUserView      credentials      $> DeleteAccountEvent)
         Import          -> frame (importView          importState     <#> ImportCardsEvent)
         Export          -> frame (exportView                          <#> ExportEvent)
-        Donate          -> frame (donationUserArea donationInfo       <#> 
-          (\res -> case res of
-                                  DonationEvent.CloseDonationPage     ->  OpenUserAreaPage None
-                                  DonationEvent.UpdateDonationLevel m ->  UpdateDonationLevel m
-          ))
+        Donate          -> frame (donationUserArea)     
         About           -> frame (text "This is Clipperz")
         None            -> emptyUserComponent
 
@@ -132,3 +130,19 @@ userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenu
 
         emptyUserComponent :: forall a. Widget HTML a
         emptyUserComponent = (div [Props.className "extraFeatureContent"] [])
+
+        donationUserArea :: Widget HTML UserAreaEvent
+        donationUserArea = 
+          div [Props._id "donationUserArea"] [
+            div [Props.className "donationInfo"] $ case donationInfo of
+              Just {dateOfLastDonation, nextDonationReminder} -> [
+                span [Props.className "dateOfLastDonation"] [text $ format iso8601DateFormatter dateOfLastDonation]
+              , span [Props.className "dateOfNextReminder"] [text $ format iso8601DateFormatter nextDonationReminder]
+              ]
+              Nothing -> [ text "We don't have any donation bound to this account 🥹" ]
+          , donationIFrame =<< (liftEffect $ donationIFrameURL "userarea/")
+          ] <#> 
+          (\res -> case res of
+            DonationEvent.CloseDonationPage     ->  OpenUserAreaPage None
+            DonationEvent.UpdateDonationLevel m ->  UpdateDonationLevel m
+          )

@@ -23,7 +23,7 @@ import Functions.EnvironmentalVariables (currentCommit)
 import Test.Debug (debugState)
 import Views.CardsManagerView (CardManagerEvent, cardManagerInitialState, cardsManagerView)
 import Views.Components (footerComponent, proxyInfoComponent)
-import Views.DonationViews (DonationPageEvent, donationPage, donationReminder)
+import Views.DonationViews (DonationPageEvent, donationPage)
 import Views.LoginFormView (LoginPageEvent, emptyLoginFormData, loginPage)
 import Views.OverlayView (overlay)
 import Views.SignupFormView (SignupPageEvent, emptyDataForm, signupFormView)
@@ -73,9 +73,9 @@ appView widgetState@(WidgetState overlayInfo page) =
                                         _                         -> Tuple emptyMainPageWidgetState false
         
         div [Props._id "homePage"] [
-          ( MainPageCardManagerEvent                         # uncurry) <$> cardsManagerView cardManagerState index (unwrap userPreferences).passwordGeneratorSettings enableShortcuts
+          ( MainPageCardManagerEvent                         # uncurry) <$> cardsManagerView cardManagerState index (unwrap userPreferences).passwordGeneratorSettings donationLevel enableShortcuts
         , ((MainPageUserAreaEvent # flip $ cardManagerState) # uncurry) <$> userAreaView userAreaState userPreferences credentials donationInfo pinExists
-        , ( DonationPageEvent                                         ) <$> donationReminder donationLevel
+        -- , ( DonationPageEvent                                         ) <$> donationReminder donationLevel
         ] 
       ]
     ]

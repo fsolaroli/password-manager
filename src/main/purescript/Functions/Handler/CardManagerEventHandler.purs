@@ -28,11 +28,13 @@ import Functions.Card (appendToTitle, archiveCard, decryptCard, restoreCard)
 import Functions.Communication.Backend (ConnectionState)
 import Functions.Communication.Blobs (getBlob)
 import Functions.Communication.Cards (deleteCard, postCard)
+import Functions.Handler.DonationEventHandler (handleDonationPageEvent)
 import Functions.Handler.GenericHandlerFunctions (OperationState, defaultErrorPage, noOperation, handleOperationResult, runStep)
 import Functions.Index (updateIndex)
 import Record (merge)
 import Views.AppView (emptyMainPageWidgetState)
 import Views.CardsManagerView (CardManagerEvent(..), NavigateCardsEvent(..))
+import Views.DonationViews as DonationEvent
 import Views.OverlayView (OverlayColor(..), hiddenOverlayInfo, spinnerOverlay)
 import Views.UserAreaView (userAreaInitialState)
 
@@ -40,7 +42,7 @@ loadingMainPage :: Index -> CardManagerState -> Page
 loadingMainPage index cardManagerState = Main emptyMainPageWidgetState { index = index, cardManagerState = cardManagerState }
 
 handleCardManagerEvent :: CardManagerEvent -> CardManagerState -> AppState -> Fragment.FragmentState -> Widget HTML OperationState
-handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just index, userInfo: Just (UserInfo {userPreferences, donationInfo}), proxy, srpConf, hash: hashFunc, c: Just c, p: Just p, username: Just username, password: Just password, pinEncryptedPassword, cardsCache, donationLevel: Just donationLevel} _ = do
+handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just index, userInfo: Just (UserInfo {userPreferences, donationInfo}), proxy, srpConf, hash: hashFunc, c: Just c, p: Just p, username: Just username, password: Just password, pinEncryptedPassword, cardsCache, donationLevel: Just donationLevel} f = do
   let connectionState = {proxy, hashFunc, srpConf, c, p}
   
   let defaultPage = { index
@@ -67,6 +69,11 @@ handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just inde
 
     (ShowShortcutsEvent show) ->
       updateCardManagerState defaultPage cardManagerState {showShortcutsHelp = show}
+    
+    (ShowDonationEvent show) ->
+      updateCardManagerState defaultPage cardManagerState {showDonationOverlay = show}
+
+    (UpdateDonationLevel days) -> handleDonationPageEvent (DonationEvent.UpdateDonationLevel days) state f
 
     (ChangeFilterEvent filterData) ->
       updateCardManagerState defaultPage cardManagerState { filterData = filterData
