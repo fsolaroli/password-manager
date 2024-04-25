@@ -1,9 +1,10 @@
 'use strict'
 
-const path = require('path');
-const HtmlWebpackPlugin = require('html-webpack-plugin');
+const path                   = require('path');
+const HtmlWebpackPlugin      = require('html-webpack-plugin');
 const HtmlInlineScriptPlugin = require('html-inline-script-webpack-plugin');
-const webpack = require('webpack');
+const CopyPlugin             = require("copy-webpack-plugin");
+const webpack                = require('webpack');
 
 const child_process = require('child_process');
 function git(command) {
@@ -68,6 +69,9 @@ module.exports = (env) => {
 				new HtmlInlineScriptPlugin({
 					htmlMatchPattern: [/passwordGenerator_index.html$/],
 					scriptMatchPattern: [/passwordGenerator-bundle(.[a-zA-Z0-9]+)?.js/],
+				}),
+				new CopyPlugin({
+					patterns: [path.resolve(__dirname, 'src', "main", "purescript", "_offline-fallback.js")],
 				}),
 				// share html package configuration
 				new HtmlWebpackPlugin({

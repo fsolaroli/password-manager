@@ -66,10 +66,11 @@ object Main extends zio.ZIOAppDefault:
 
             val nThreads: Int = args.headOption.flatMap(x => Try(x.toInt).toOption).getOrElse(0)
 
-            val config        = Server.Config.default
+            val config        = Server.Config.default.copy(
+                                        responseCompression = Some(Server.Config.ResponseCompressionConfig.default)
+                                    )
                                     .port(port)
                                     .requestStreaming(RequestStreaming.Enabled)
-                                    // .enableRequestStreaming                                    
             val nettyConfig   = NettyConfig.default
                                     .leakDetection(LeakDetectionLevel.PARANOID)
                                     .maxThreads(nThreads)
