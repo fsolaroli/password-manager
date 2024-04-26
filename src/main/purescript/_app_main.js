@@ -58,11 +58,9 @@ function debugAnimation() {
 
 function registerOfflineServiceWorker() {
 	if (navigator.serviceWorker.controller) {
-		navigator.serviceWorker.getRegistration('_offline-fallback.js').then(reg => {
-			reg.update().then(_ => {
-				console.log('Cached application file updated')
-			})
-		})
+		if (window.navigator.onLine) {
+			navigator.serviceWorker.controller.postMessage('update');
+		}
 	} else {
 		navigator.serviceWorker
 			.register('_offline-fallback.js', { scope: './' })
