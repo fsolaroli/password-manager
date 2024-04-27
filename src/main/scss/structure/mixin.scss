@@ -27,7 +27,7 @@
 
 @mixin offlineHeader () {
 	div.proxyInfo {
-		&.OFFLINE {
+		&.STATIC, &.OFFLINE {
 			display: block;
 			visibility: visible;
 			background-color: #1863a1;

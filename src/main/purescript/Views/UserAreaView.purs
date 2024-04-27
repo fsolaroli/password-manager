@@ -17,18 +17,19 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Monoid ((<>))
 import Data.Time.Duration (Days)
 import Data.Tuple (Tuple(..), swap)
+import DataModel.AppState (ProxyInfo(..))
 import DataModel.Credentials (Credentials)
 import DataModel.UserVersions.User (UserPreferences, DonationInfo)
 import DataModel.UserVersions.UserCodecs (iso8601DateFormatter)
-import DataModel.WidgetState (UserAreaPage(..), UserAreaState, UserAreaSubmenu(..), ImportState)
+import DataModel.WidgetState (ImportState, UserAreaPage(..), UserAreaState, UserAreaSubmenu(..))
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Functions.EnvironmentalVariables (currentCommit, donationIFrameURL)
 import Functions.Events (keyboardShortcut)
-import Functions.State (isOffline)
 import Views.ChangePasswordView (changePasswordView)
 import Views.Components (Enabled(..), footerComponent)
 import Views.DeleteUserView (deleteUserView)
+import Views.DeviceSyncView (deviceSyncView)
 import Views.DonationViews (donationIFrame)
 import Views.DonationViews as DonationEvent
 import Views.ExportView (ExportEvent, exportView)
@@ -52,14 +53,14 @@ data UserAreaEvent    = CloseUserAreaEvent
 userAreaInitialState :: UserAreaState
 userAreaInitialState = { showUserArea: false, userAreaOpenPage: None, importState: initialImportState, userAreaSubmenus: fromFoldable [(Tuple Account false), (Tuple Data false)]}
 
-userAreaView :: UserAreaState -> UserPreferences -> Credentials -> Maybe DonationInfo -> Boolean -> Widget HTML (Tuple UserAreaEvent UserAreaState)
-userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenus} userPreferences credentials donationInfo pinExists = do
+userAreaView :: UserAreaState -> UserPreferences -> Credentials -> Maybe DonationInfo -> ProxyInfo -> Boolean -> Widget HTML (Tuple UserAreaEvent UserAreaState)
+userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenus} userPreferences credentials donationInfo proxyInfo pinExists = do
   commitHash <- liftEffect currentCommit
   ((div [Props._id "userPage", Props.className (if showUserArea then "open" else "closed")] [
       div [Props.onClick, Props.className "mask"] [] $> CloseUserAreaEvent
     , div [Props.className "panel"] [
         header [] [div [] [button [Props.onClick] [text "menu"]]] $> CloseUserAreaEvent
-      , userAreaMenu
+      , userAreaMenu (proxyInfo == Online)
       , footerComponent commitHash
       ]
     , userAreaInternalView
@@ -69,21 +70,23 @@ userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenu
   ) <#> (Tuple state >>> swap)
 
   where
-    userAreaMenu :: Widget HTML UserAreaEvent
-    userAreaMenu = do
-      offline    <- liftEffect isOffline
+    userAreaMenu :: Boolean -> Widget HTML UserAreaEvent
+    userAreaMenu enabled =
       ul [Props._id "userSidebar"] [
         subMenu Account "Account" [
-          subMenuElement Preferences    (Enabled $ not offline) "Preferences"
-        , subMenuElement ChangePassword (Enabled $ not offline) "Passphrase"
-        , subMenuElement Pin            (Enabled   true)        "Device PIN"
-        , subMenuElement Delete         (Enabled $ not offline) "Delete account"
+          subMenuElement Preferences    (Enabled enabled) "Preferences"
+        , subMenuElement ChangePassword (Enabled enabled) "Passphrase"
+        , subMenuElement Delete         (Enabled enabled) "Delete account"
         ]
       , subMenu Data    "Data"    [
-          subMenuElement Import         (Enabled $ not offline) "Import"
-        , subMenuElement Export         (Enabled $ not offline) "Export"
+          subMenuElement Import         (Enabled enabled) "Import"
+        , subMenuElement Export         (Enabled enabled) "Export"
         ]
-      , subMenuElement   Donate         (Enabled   true)        "Donate" <#> OpenUserAreaPage
+      , subMenu Device  "Device" [
+          subMenuElement Pin            (Enabled true   ) "Device PIN"
+        , subMenuElement DeviceSync      (Enabled true   ) "Device Sync" 
+      ]
+      , subMenuElement   Donate         (Enabled true)     "Donate" <#> OpenUserAreaPage
       , li' [a      [Props.className "link", Props.href "/about/app", Props.target "_blank"] [span [] [text "About"]]]
       , li' [button [Props.onClick, Props._id "lockButton"]                                  [span [] [text "Lock"]]]   $> LockEvent
       , li' [button [Props.onClick]                                                          [span [] [text "Logout"]]] $> LogoutEvent
@@ -98,8 +101,8 @@ userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenu
         ]
 
         subMenuElement :: UserAreaPage -> Enabled -> String -> Widget HTML UserAreaPage
-        subMenuElement userAreaPage (Enabled enabled) label = li [Props.classList [if userAreaOpenPage == userAreaPage then Just "selected" else Nothing, Just "subMenuElement"]] [
-          button [Props.onClick, Props.disabled (not enabled)] [span [] [text label]] $> (if userAreaOpenPage == userAreaPage then None else userAreaPage)
+        subMenuElement userAreaPage (Enabled enabled') label = li [Props.classList [if userAreaOpenPage == userAreaPage then Just "selected" else Nothing, Just "subMenuElement"]] [
+          button [Props.onClick, Props.disabled (not enabled')] [span [] [text label]] $> (if userAreaOpenPage == userAreaPage then None else userAreaPage)
         ]
         
         invertSubmenuValue :: UserAreaSubmenu -> Map UserAreaSubmenu Boolean
@@ -113,8 +116,9 @@ userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenu
       case userAreaOpenPage of
         Preferences     -> frame (userPreferencesView userPreferences <#> UpdateUserPreferencesEvent)
         ChangePassword  -> frame (changePasswordView  credentials     <#> ChangePasswordEvent)
-        Pin             -> frame (setPinView          pinExists       <#> SetPinEvent)
         Delete          -> frame (deleteUserView      credentials      $> DeleteAccountEvent)
+        Pin             -> frame (setPinView          pinExists       <#> SetPinEvent)
+        DeviceSync      -> frame (deviceSyncView)
         Import          -> frame (importView          importState     <#> ImportCardsEvent)
         Export          -> frame (exportView                          <#> ExportEvent)
         Donate          -> frame (donationUserArea)     

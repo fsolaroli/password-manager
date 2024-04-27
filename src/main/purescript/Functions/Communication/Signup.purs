@@ -9,20 +9,19 @@ import Control.Semigroupoid ((>>>))
 import Data.Codec.Argonaut (encode)
 import Data.Function (flip, ($))
 import Data.HTTP.Method (Method(..))
-import Data.HexString (HexString, hex)
+import Data.HexString (HexString)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Show (show)
 import Data.String.Common (joinWith)
 import DataModel.AppError (AppError(..))
-import DataModel.AppState (Proxy(..), ProxyResponse(..))
+import DataModel.AppState (ProxyResponse(..))
 import DataModel.Communication.ProtocolError (ProtocolError(..))
 import DataModel.Communication.Signup (registerUserRequestCodec)
 import DataModel.Credentials (Credentials)
-import DataModel.SRPVersions.SRP (SRPConf, HashFunction)
 import DataModel.UserVersions.User (RequestUserCard(..))
 import Effect.Aff (Aff)
-import Functions.Communication.Backend (isStatusCodeOk, signupRequest)
+import Functions.Communication.Backend (ConnectionState, isStatusCodeOk, signupRequest)
 import Functions.Communication.Login (PrepareLoginResult)
 import Functions.Signup (prepareSignupParameters)
 
@@ -30,14 +29,13 @@ type SessionKey = HexString
 
 type SignupResult = PrepareLoginResult
 
-signupUser :: Proxy -> HashFunction -> SRPConf -> Credentials -> ExceptT AppError Aff (ProxyResponse SignupResult)
-signupUser       (StaticProxy _)     _        _       _           = throwError $ InvalidOperationError "Cannot register new user in static usage"
-signupUser proxy@(OnlineProxy _ _ _) hashFunc srpConf credentials = do
+signupUser :: ConnectionState -> Credentials -> ExceptT AppError Aff (ProxyResponse SignupResult)
+signupUser connectionState@{srpConf} credentials = do
   request@{user: RequestUserCard u, p} <- flip withExceptT (ExceptT (prepareSignupParameters srpConf credentials)) (show >>> SRPError >>> ProtocolError)
   let path  = joinWith "/" ["users", show u.c]
   let body = (json $ encode registerUserRequestCodec request) :: RequestBody
   --- ---------------------------
-  ProxyResponse newProxy response <- signupRequest {proxy, hashFunc, srpConf, c: hex "", p: hex ""} path POST (Just body) RF.ignore
+  ProxyResponse newProxy response <- signupRequest connectionState path POST (Just body) RF.ignore
   if isStatusCodeOk response.status
     then pure $ ProxyResponse newProxy {c: u.c, p: p}
     else throwError $ ProtocolError (ResponseError (unwrap response.status))

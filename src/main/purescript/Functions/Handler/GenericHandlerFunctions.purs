@@ -24,6 +24,7 @@ import Effect.Aff (Aff, delay)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
+import Functions.State (getProxyInfoFromProxy)
 import Unsafe.Coerce (unsafeCoerce)
 import Views.AppView (appView)
 import Views.LoginFormView (emptyLoginFormData)
@@ -46,12 +47,15 @@ defaultErrorPage :: Page
 defaultErrorPage = Login emptyLoginFormData
 
 handleOperationResult :: AppState -> Page -> Boolean -> OverlayColor -> Either AppError OperationState -> Widget HTML OperationState
-handleOperationResult state page showDone color = either
-                                                    manageError
-                                                    (\res@(Tuple _ (WidgetState _ page')) -> if   showDone
-                                                                                             then delayOperation 500 (WidgetState { status: Done, color, message: "" } page') *> pure res
-                                                                                             else pure res
-                                                    )
+handleOperationResult state@{proxy} page showDone color =
+  either
+    manageError
+    (\res@(Tuple _ (WidgetState _ page' proxyInfo')) ->
+      if   showDone
+      then delayOperation 500 (WidgetState { status: Done, color, message: "" } page' proxyInfo') *> pure res
+      else pure res
+    )
+
                                                 
   where
     manageError :: AppError -> Widget HTML OperationState
@@ -60,8 +64,8 @@ handleOperationResult state page showDone color = either
         -- _ -> ErrorPage --TODO
         err -> do
           liftEffect $ log $ show err
-          delayOperation 500 (WidgetState { status: Failed, color, message: "error" } page)
-          pure $ Tuple state (WidgetState { status: Hidden, color, message: ""      } page)
+          delayOperation 500 (WidgetState { status: Failed, color, message: "error" } page (getProxyInfoFromProxy proxy))
+          pure $ Tuple state (WidgetState { status: Hidden, color, message: ""      } page (getProxyInfoFromProxy proxy))
 
 delayOperation :: Int -> WidgetState -> Widget HTML Unit
 delayOperation time widgetState = ((liftAff $ delay (Milliseconds $ toNumber time)) <|> (unit <$ appView widgetState))

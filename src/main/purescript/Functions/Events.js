@@ -71,6 +71,23 @@ const _keyboardShortcut = function(shortcut) {
 	}
 }
 
+const _online = function() {
+	return (onError, onSuccess) => {
+		let result = new Promise((resolve, reject) => {
+			window.addEventListener('offline', (event) => {
+				resolve(false)
+			});
+			window.addEventListener('online', (event) => {
+				resolve(true)
+			});
+        });
+
+        result.then(onSuccess).catch(onError);
+        return (cancelError, cancelerError, cancelerSuccess) => {
+        }
+	} 
+}
+
 const renderElement = function(element) {
     return element.innerHTML;
 }
@@ -122,6 +139,7 @@ export {
     _readFileFromDrop,
 	_getWindowMessage,
 	_keyboardShortcut,
+	_online,
     renderElement,
     _getXClickCoordinates,
     _getYClickCoordinates,

@@ -6,6 +6,7 @@ module Functions.Events
   , getClickCoordinates
   , getWindowMessage
   , keyboardShortcut
+  , online
   , printEvent
   , readFile
   , readFileFromDrop
@@ -34,6 +35,8 @@ foreign import _keyboardShortcut :: Array String -> EffectFnAff Unit
 foreign import _getXClickCoordinates :: SyntheticMouseEvent -> Int
 foreign import _getYClickCoordinates :: SyntheticMouseEvent -> Int
 
+foreign import _online :: Unit -> EffectFnAff Boolean
+
 foreign import printEvent :: forall r. SyntheticEvent_ (currentTarget :: NativeEventTarget | r) -> Effect Unit
 
 foreign import cursorToEnd :: forall r. SyntheticEvent_ (currentTarget :: NativeEventTarget | r) -> Effect Unit
@@ -56,3 +59,6 @@ getWindowMessage = fromEffectFnAff (_getWindowMessage unit)
 
 keyboardShortcut :: Array String -> Aff Unit
 keyboardShortcut = fromEffectFnAff <<< _keyboardShortcut
+
+online :: Aff Boolean
+online = fromEffectFnAff (_online unit)

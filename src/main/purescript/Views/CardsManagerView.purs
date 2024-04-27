@@ -25,6 +25,7 @@ import Data.Set (Set, unions)
 import Data.Time.Duration (Days)
 import Data.Tuple (Tuple(..), swap)
 import Data.Unit (unit)
+import DataModel.AppState (ProxyInfo)
 import DataModel.CardVersions.Card (Card, emptyCard)
 import DataModel.IndexVersions.Index (CardEntry(..), Index(..))
 import DataModel.Password (PasswordGeneratorSettings)
@@ -68,13 +69,13 @@ cardManagerInitialState = {
 
 type EnableShortcuts = Boolean
 
-cardsManagerView :: CardManagerState -> Index -> PasswordGeneratorSettings -> DonationLevel -> EnableShortcuts -> Widget HTML (Tuple CardManagerEvent CardManagerState)
-cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archived, searchString}, highlightedEntry, cardViewState, showShortcutsHelp, showDonationOverlay} index'@(Index {entries}) userPasswordGeneratorSettings donationLevel enableShortcuts = do
+cardsManagerView :: CardManagerState -> Index -> PasswordGeneratorSettings -> DonationLevel -> ProxyInfo -> EnableShortcuts -> Widget HTML (Tuple CardManagerEvent CardManagerState)
+cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archived, searchString}, highlightedEntry, cardViewState, showShortcutsHelp, showDonationOverlay} index'@(Index {entries}) userPasswordGeneratorSettings donationLevel proxyInfo enableShortcuts = do
   div [Props._id "cardsManager", Props.className $ "filterView_" <> getClassNameFromFilterStatus filterViewStatus] [
     indexFilterView filterData index' >>= updateFilterData
   , div [Props.className "cardToolbarFrame"] [
       toolbarHeader "frame"
-    , proxyInfoComponent [Just "withDate"]
+    , proxyInfoComponent proxyInfo [Just "withDate"]
     , div [Props._id "mainView", Props.className (if cardViewState /= NoCard then "CardViewOpen" else "CardViewClose")] [
         div [Props._id "indexView"] [
           toolbarHeader "cardList"
@@ -161,7 +162,7 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
 
     mainStageView :: CardViewState -> Widget HTML CardManagerEvent
     mainStageView  NoCard                  = div [] []
-    mainStageView (Card card cardEntry)    = cardView card cardEntry <#> handleCardEvents
+    mainStageView (Card card cardEntry)    = cardView proxyInfo card cardEntry <#> handleCardEvents
     mainStageView (CardForm cardFormInput) = createCardView inputCard allTags userPasswordGeneratorSettings <#> (maybe (NavigateCardsEvent $ viewCardStateUpdate) outputEvent)
       where
 

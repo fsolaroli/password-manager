@@ -5,11 +5,12 @@ import Concur.Core.FRP (Signal, fireOnce, loopW)
 import Concur.React (HTML)
 import Concur.React.DOM (a, a_, button, div, h3, li', li_, p_, span, text, textarea, ul)
 import Concur.React.Props as Props
-import Control.Alt (($>), (<#>), (<|>))
+import Control.Alt (($>), (<|>))
 import Control.Alternative ((*>))
 import Control.Applicative (pure)
-import Control.Bind (bind, discard, (=<<))
+import Control.Bind (bind, discard)
 import Data.Array (null)
+import Data.Eq ((==))
 import Data.Function (($))
 import Data.Functor ((<$), (<$>))
 import Data.HeytingAlgebra (not, (&&))
@@ -17,15 +18,14 @@ import Data.Maybe (Maybe(..))
 import Data.Semigroup ((<>))
 import Data.Set (isEmpty, toUnfoldable)
 import Data.Unit (unit)
+import DataModel.AppState (ProxyInfo(..))
 import DataModel.CardVersions.Card (Card(..), CardField(..), CardValues(..), FieldType(..))
 import DataModel.IndexVersions.Index (CardEntry)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (liftAff)
-import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import Functions.Card (getFieldType)
 import Functions.Clipboard (copyToClipboard)
-import Functions.State (isOffline)
 import MarkdownIt (renderString)
 import Views.Components (dynamicWrapper, entropyMeter)
 import Views.OverlayView (OverlayColor(..), OverlayStatus(..), overlay)
@@ -42,10 +42,10 @@ data CardEvent = Edit    CardEntry Card
 
 -- -----------------------------------
 
-cardView :: Card -> CardEntry -> Widget HTML CardEvent
-cardView card@(Card r) cardEntry = do
+cardView :: ProxyInfo -> Card -> CardEntry -> Widget HTML CardEvent
+cardView proxyInfo card@(Card r) cardEntry = do
   res <- div [Props._id "cardView"] [
-    cardActions =<< (liftEffect isOffline <#> not)
+    cardActions (proxyInfo == Online)
   , cardContent r.content
   ]
   case res of
@@ -55,11 +55,11 @@ cardView card@(Card r) cardEntry = do
       , cardContent r.content
       , confirmationWidget "Are you sure you want to delete this card?"
       ]
-      if confirmation then pure res else cardView card cardEntry
+      if confirmation then pure res else cardView proxyInfo card cardEntry
     _ -> pure res
 
   where
-    cardActions ::Boolean -> Widget HTML CardEvent
+    cardActions :: Boolean -> Widget HTML CardEvent
     cardActions enabled = div [Props.className "cardActions"] [
         simpleButton   "exit"    "exit"     false        (Exit                  )
       , simpleButton   "edit"    "edit"    (not enabled) (Edit    cardEntry card)

@@ -1,16 +1,17 @@
 module Test.DebugCodec where
 
+import Prelude
+
 import Data.Codec.Argonaut as CA
 import Data.Codec.Argonaut.Common as CAC
 import Data.Codec.Argonaut.Record as CAR
 import Data.Codec.Argonaut.Variant as CAV
 import Data.Either (Either(..))
-import Data.Function (($))
 import Data.HexString (hexStringCodec)
 import Data.Maybe (Maybe(..))
 import Data.Profunctor (dimap, wrapIso)
-import Data.Unit (unit)
 import Data.Variant as V
+import DataModel.AppState (DataOnLocalStorage(..), ProxyInfo(..))
 import DataModel.CardVersions.Card (Card(..), CardField(..), CardValues(..), cardVersionCodec)
 import DataModel.Credentials (Credentials)
 import DataModel.IndexVersions.Index (CardEntry(..), CardReference(..), Index(..))
@@ -29,13 +30,13 @@ import Web.File.File (File)
 -- data WidgetState = WidgetState OverlayInfo Page
 widgetStateCodec :: CA.JsonCodec WidgetState
 widgetStateCodec = dimap toVariant fromVariant $ CAV.variantMatch
-    { widgetState: Right (CA.object "WidgetState" $ CAR.record {overlayInfo: overlayInfoCodec, page: pageCodec})
+    { widgetState: Right (CA.object "WidgetState" $ CAR.record {overlayInfo: overlayInfoCodec, proxyInfo: proxyInfoCodec, page: pageCodec})
     }
   where
     toVariant = case _ of
-      WidgetState oi p -> V.inj (Proxy :: _ "widgetState") {page: p, overlayInfo: oi}
+      WidgetState oi p pi -> V.inj (Proxy :: _ "widgetState") {page: p, overlayInfo: oi, proxyInfo: pi}
     fromVariant = V.match
-      { widgetState: \{page, overlayInfo} -> WidgetState overlayInfo page
+      { widgetState: \{page, overlayInfo, proxyInfo} -> WidgetState overlayInfo page proxyInfo
       }
 
 -- type OverlayInfo   = { status :: OverlayStatus, color :: OverlayColor, message :: String }
@@ -182,6 +183,39 @@ donationInfoCodec =
     , nextDonationReminder: dateTimeCodec
     }
 
+-- data DataOnLocalStorage = WithData | NoData
+dataOnLocalStorageCodec :: CA.JsonCodec DataOnLocalStorage
+dataOnLocalStorageCodec = dimap toVariant fromVariant $ CAV.variantMatch
+    { withData : Left unit
+    , noData   : Left unit
+    }
+  where
+    toVariant = case _ of
+      WithData -> V.inj (Proxy :: _ "withData") unit
+      NoData   -> V.inj (Proxy :: _ "noData"  ) unit
+    fromVariant = V.match
+      { withData: \_ -> WithData
+      , noData  : \_ -> NoData
+      }
+
+-- data ProxyInfo = Static | Online | Offline DataOnLocalStorage
+proxyInfoCodec :: CA.JsonCodec ProxyInfo
+proxyInfoCodec = dimap toVariant fromVariant $ CAV.variantMatch
+    { static: Left unit
+    , online: Left unit
+    , offline: Right dataOnLocalStorageCodec
+    }
+  where
+    toVariant = case _ of
+      Static       -> V.inj (Proxy :: _ "static" ) unit
+      Online       -> V.inj (Proxy :: _ "online" ) unit
+      Offline dols -> V.inj (Proxy :: _ "offline") dols
+    fromVariant = V.match
+      { static:  \_ -> Static
+      , online:  \_ -> Online
+      , offline:       Offline
+      }
+
 -- type MainPageWidgetState = {
 --   index                         :: Index
 -- , credentials                   :: Credentials
@@ -273,7 +307,7 @@ userAreaStateCodec =
       }
     )
 
--- data UserAreaPage = Export | Import | Pin | Delete | Preferences | Donate | ChangePassword | About | None
+-- data UserAreaPage = Export | Import | Pin | LocalSync | Delete | Preferences | Donate | ChangePassword | About | None
 userAreaPageCodec :: CA.JsonCodec UserAreaPage
 userAreaPageCodec = dimap toVariant fromVariant $ CAV.variantMatch
     { export:         Left unit
@@ -285,6 +319,7 @@ userAreaPageCodec = dimap toVariant fromVariant $ CAV.variantMatch
     , donate:         Left unit
     , about:          Left unit
     , noPage:         Left unit
+    , deviceSync:     Left unit
     }
   where
     toVariant = case _ of
@@ -296,7 +331,8 @@ userAreaPageCodec = dimap toVariant fromVariant $ CAV.variantMatch
       ChangePassword -> V.inj (Proxy :: _ "changePassword") unit
       Donate         -> V.inj (Proxy :: _ "donate") unit
       About          -> V.inj (Proxy :: _ "about") unit
-      None           -> V.inj (Proxy :: _ "noPage") unit     
+      None           -> V.inj (Proxy :: _ "noPage") unit
+      DeviceSync     -> V.inj (Proxy :: _ "deviceSync") unit
     fromVariant = V.match
       { export:         \_ -> Export
       , import:         \_ -> Import
@@ -307,6 +343,7 @@ userAreaPageCodec = dimap toVariant fromVariant $ CAV.variantMatch
       , donate:         \_ -> Donate
       , about:          \_ -> About
       , noPage:         \_ -> None
+      , deviceSync:     \_ -> DeviceSync
       }
 
 
@@ -352,18 +389,21 @@ importStepCodec = dimap toVariant fromVariant $ CAV.variantMatch
       , confirm:   \_ -> Confirm
       }
 
--- data UserAreaSubmenu = Account | Data
+-- data UserAreaSubmenu = Account | Device | Data
 userAreaSubmenuCodec :: CA.JsonCodec UserAreaSubmenu
 userAreaSubmenuCodec = dimap toVariant fromVariant $ CAV.variantMatch
     { account: Left unit
+    , device:  Left unit
     , data:    Left unit
     }
   where
     toVariant = case _ of
       Account -> V.inj (Proxy :: _ "account") unit
+      Device  -> V.inj (Proxy :: _ "device" ) unit
       Data    -> V.inj (Proxy :: _ "data"   ) unit
     fromVariant = V.match
       { account: \_ -> Account
+      , device:  \_ -> Device
       , data:    \_ -> Data
       }
 

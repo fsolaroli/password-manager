@@ -13,6 +13,7 @@ import Data.Monoid ((<>))
 import Data.Newtype (unwrap)
 import Data.Show (class Show, show)
 import Data.Tuple (Tuple(..), uncurry)
+import DataModel.AppState (ProxyInfo)
 import DataModel.Credentials (emptyCredentials)
 import DataModel.IndexVersions.Index (emptyIndex)
 import DataModel.UserVersions.User (defaultUserPreferences)
@@ -39,7 +40,7 @@ data PageEvent = LoginPageEvent           LoginPageEvent
                | DonationPageEvent        DonationPageEvent
 
 appView :: WidgetState -> Widget HTML PageEvent
-appView widgetState@(WidgetState overlayInfo page) =
+appView widgetState@(WidgetState overlayInfo page proxyInfo)  =
   appPages <> debugState widgetState
   <|>
   overlay overlayInfo
@@ -47,20 +48,20 @@ appView widgetState@(WidgetState overlayInfo page) =
   where 
     appPages :: Widget HTML PageEvent
     appPages = div [Props.className "mainDiv"] [
-      headerPage page (Loading Nothing) []
-    , SignupPageEvent <$> headerPage page (Signup emptyDataForm) [ do
+      headerPage proxyInfo page (Loading Nothing) []
+    , SignupPageEvent <$> headerPage proxyInfo page (Signup emptyDataForm) [ do
         let credentials = case page of
                             Signup credentials' -> credentials'
                             _                   -> emptyDataForm
         
         (signupFormView credentials)
       ]
-    , LoginPageEvent <$> headerPage page (Login emptyLoginFormData) [
+    , LoginPageEvent <$> headerPage proxyInfo page (Login emptyLoginFormData) [
         loginPage $ case page of
           Login loginFormData -> loginFormData
           _                   -> emptyLoginFormData
       ]
-    , DonationPageEvent <$> headerPage page (Donation DonationOk) [ do
+    , DonationPageEvent <$> headerPage proxyInfo page (Donation DonationOk) [ do
         let donationLevel = case page of
                               Donation donationLevel' -> donationLevel'
                               _                       -> DonationOk
@@ -73,8 +74,8 @@ appView widgetState@(WidgetState overlayInfo page) =
                                         _                         -> Tuple emptyMainPageWidgetState false
         
         div [Props._id "homePage"] [
-          ( MainPageCardManagerEvent                         # uncurry) <$> cardsManagerView cardManagerState index (unwrap userPreferences).passwordGeneratorSettings donationLevel enableShortcuts
-        , ((MainPageUserAreaEvent # flip $ cardManagerState) # uncurry) <$> userAreaView userAreaState userPreferences credentials donationInfo pinExists
+          ( MainPageCardManagerEvent                         # uncurry) <$> cardsManagerView cardManagerState index (unwrap userPreferences).passwordGeneratorSettings donationLevel proxyInfo enableShortcuts
+        , ((MainPageUserAreaEvent # flip $ cardManagerState) # uncurry) <$> userAreaView userAreaState userPreferences credentials donationInfo proxyInfo pinExists
         -- , ( DonationPageEvent                                         ) <$> donationReminder donationLevel
         ] 
       ]
@@ -108,12 +109,12 @@ pageClassName (Signup _)   = "signup"
 pageClassName (Main _)     = "main"
 pageClassName (Donation _) = "donation"
 
-headerPage :: forall a. Page -> Page -> Array (Widget HTML a) -> Widget HTML a
-headerPage currentPage page innerContent = do
+headerPage :: forall a. ProxyInfo -> Page -> Page -> Array (Widget HTML a) -> Widget HTML a
+headerPage proxyInfo currentPage page innerContent = do
   commitHash <- liftEffect $ currentCommit
   div [Props.classList (Just <$> ["page", pageClassName page, show $ location page currentPage])] [
     div [Props.className "content"] [
-      proxyInfoComponent []
+      proxyInfoComponent proxyInfo []
     , headerComponent
     , div [Props.className "body"] innerContent
     , otherComponent

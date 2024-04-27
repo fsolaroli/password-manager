@@ -17,7 +17,11 @@ import Effect.Aff (Fiber)
 import Functions.Donations (DonationLevel)
 import Functions.HashCash (TollChallenge)
 
-type Url = String
+type PathPrefix = String
+
+defaultPathPrefix :: PathPrefix
+defaultPathPrefix = "/api"
+
 type Path = String
 type SessionKey = HexString
 
@@ -32,8 +36,16 @@ type TollManager = {
 , currentChallenge :: Maybe  TollChallenge
 }
 
-data Proxy = OnlineProxy Url TollManager (Maybe SessionKey)
+data Proxy = DynamicProxy DynamicProxy
            | StaticProxy (Maybe BackendSessionState)
+
+data DynamicProxy = OnlineProxy PathPrefix TollManager (Maybe SessionKey) | OfflineProxy DataOnLocalStorage
+
+data DataOnLocalStorage = WithData | NoData
+derive instance eqDataOnLocalStorage :: Eq DataOnLocalStorage
+
+data ProxyInfo = Static | Online | Offline DataOnLocalStorage
+derive instance eqProxyInfo :: Eq ProxyInfo
 
 data ProxyResponse a = ProxyResponse Proxy a
 

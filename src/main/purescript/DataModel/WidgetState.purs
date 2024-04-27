@@ -6,6 +6,7 @@ import Data.Eq (class Eq)
 import Data.Map (Map)
 import Data.Maybe (Maybe)
 import Data.Tuple (Tuple)
+import DataModel.AppState (ProxyInfo)
 import DataModel.CardVersions.Card (Card)
 import DataModel.Credentials (Credentials)
 import DataModel.IndexVersions.Index (CardEntry, Index)
@@ -39,7 +40,7 @@ type UserAreaState = {
 , userAreaSubmenus :: Map UserAreaSubmenu Boolean
 }
 
-data UserAreaPage = Export | Import | Pin | Delete | Preferences | ChangePassword | Donate | About | None
+data UserAreaPage = Export | Import | Delete | Preferences | ChangePassword | Pin | DeviceSync | Donate | About | None
 derive instance eqUserAreaPage :: Eq UserAreaPage
 
 data ImportStep = Upload | Selection | Confirm
@@ -51,7 +52,7 @@ type ImportState = {
 , tag       :: Tuple Boolean String
 }
 
-data UserAreaSubmenu = Account | Data
+data UserAreaSubmenu = Account | Device | Data
 derive instance  eqUserAreaSubmenus :: Eq  UserAreaSubmenu
 derive instance ordUserAreaSubmenus :: Ord UserAreaSubmenu
 
@@ -68,7 +69,7 @@ type MainPageWidgetState = {
 , donationLevel      :: DonationLevel
 }
 
-data WidgetState = WidgetState OverlayInfo Page
+data WidgetState = WidgetState OverlayInfo Page ProxyInfo
 
 -- -------------------------------------
 

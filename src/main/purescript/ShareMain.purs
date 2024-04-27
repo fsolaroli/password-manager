@@ -9,7 +9,7 @@ import Data.HexString (Base(..), hex, toString)
 import Data.Maybe (Maybe(..))
 import Data.String (drop)
 import Data.Unit (Unit)
-import DataModel.AppState (Proxy(..))
+import DataModel.AppState (DynamicProxy(..), Proxy(..), defaultPathPrefix)
 import DataModel.SRPVersions.SRP (baseSRPConf, hashFuncSHA256)
 import Effect (Effect)
 import Foreign (unsafeToForeign)
@@ -23,7 +23,7 @@ import Web.HTML.Window (history, location)
 
 initialConnectionState :: ConnectionState
 initialConnectionState = {
-  proxy: OnlineProxy "/api" { toll: Nothing, currentChallenge: Nothing } Nothing
+  proxy: DynamicProxy $ OnlineProxy defaultPathPrefix { toll: Nothing, currentChallenge: Nothing } Nothing
 , hashFunc: hashFuncSHA256
 , srpConf: baseSRPConf
 , c: hex ""

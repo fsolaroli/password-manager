@@ -15,7 +15,7 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
 import DataModel.AppError (AppError(..))
-import DataModel.AppState (AppState, InvalidStateError(..), ProxyResponse(..))
+import DataModel.AppState (AppState, InvalidStateError(..), ProxyInfo, ProxyResponse(..))
 import DataModel.FragmentState as Fragment
 import DataModel.UserVersions.User (UserInfo(..))
 import DataModel.WidgetState (CardFormInput(..), CardViewState(..), Page(..), WidgetState(..))
@@ -31,9 +31,9 @@ import Views.DonationViews (DonationPageEvent(..))
 import Views.OverlayView (OverlayColor(..), hiddenOverlayInfo, spinnerOverlay)
 import Views.UserAreaView (userAreaInitialState)
 
-handleDonationPageEvent :: DonationPageEvent -> AppState -> Fragment.FragmentState -> Widget HTML OperationState
+handleDonationPageEvent :: DonationPageEvent -> AppState -> ProxyInfo -> Fragment.FragmentState -> Widget HTML OperationState
 
-handleDonationPageEvent donationPageEvent state@{username: Just username, password: Just password, index: Just index, userInfo: Just userInfo@(UserInfo {userPreferences, donationInfo}), pinEncryptedPassword, donationLevel: Just donationLevel} fragmentState = do
+handleDonationPageEvent donationPageEvent state@{username: Just username, password: Just password, index: Just index, userInfo: Just userInfo@(UserInfo {userPreferences, donationInfo}), pinEncryptedPassword, donationLevel: Just donationLevel} proxyInfo fragmentState = do
   let defaultPage = { index
                     , credentials:      {username, password}
                     , donationInfo
@@ -50,9 +50,9 @@ handleDonationPageEvent donationPageEvent state@{username: Just username, passwo
         newUserInfo                     <- runStep ((\now -> pure $ UserInfo ((unwrap userInfo) {donationInfo = do
                                                       nextDonationReminder <- adjust days now
                                                       pure {dateOfLastDonation: now, nextDonationReminder}})
-                                                    ) =<< liftEffect nowDateTime)                        (WidgetState (spinnerOverlay "Update user info" Black) (Main emptyMainPageWidgetState { index = index, donationLevel = DonationOk }))
-        ProxyResponse proxy stateUpdate <- runStep (updateUserInfo state newUserInfo)                    (WidgetState (spinnerOverlay "Update user info" Black) (Main emptyMainPageWidgetState { index = index, donationLevel = DonationOk }))
-        newDonationLevel                <- runStep (computeDonationLevel index newUserInfo # liftEffect) (WidgetState (spinnerOverlay "Update user info" Black) (Main emptyMainPageWidgetState { index = index, donationLevel = DonationOk }))
+                                                    ) =<< liftEffect nowDateTime)                        (WidgetState (spinnerOverlay "Update user info" Black) (Main emptyMainPageWidgetState { index = index, donationLevel = DonationOk }) proxyInfo)
+        ProxyResponse proxy stateUpdate <- runStep (updateUserInfo state newUserInfo)                    (WidgetState (spinnerOverlay "Update user info" Black) (Main emptyMainPageWidgetState { index = index, donationLevel = DonationOk }) proxyInfo)
+        newDonationLevel                <- runStep (computeDonationLevel index newUserInfo # liftEffect) (WidgetState (spinnerOverlay "Update user info" Black) (Main emptyMainPageWidgetState { index = index, donationLevel = DonationOk }) proxyInfo)
         
         let cardViewState = case fragmentState of
                         Fragment.AddCard card -> CardForm (NewCardFromFragment card)
@@ -67,14 +67,15 @@ handleDonationPageEvent donationPageEvent state@{username: Just username, passwo
                                             , donationLevel    = newDonationLevel
                                             }
             )
+            proxyInfo
           )
 
       # runExceptT
       >>= handleOperationResult state defaultErrorPage true Black
 
-    CloseDonationPage -> noOperation (Tuple state $ WidgetState hiddenOverlayInfo (Main defaultPage))
+    CloseDonationPage -> noOperation (Tuple state $ WidgetState hiddenOverlayInfo (Main defaultPage) proxyInfo)
 
-handleDonationPageEvent _ state _ = do
+handleDonationPageEvent _ state _ _ = do
   throwError $ InvalidStateError (CorruptedState "DonationPage")
   # runExceptT
   >>= handleOperationResult state defaultErrorPage true White
