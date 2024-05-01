@@ -111,12 +111,11 @@ div#homePage div#cardsManager div.cardToolbarFrame div#mainView div#card #cardFo
 	  box-sizing: border-box;
 	  min-width: 200px;
 	  max-width: 980px;
-	  width: 100%;
-	  margin: 0 auto;
-	  padding: 10px 45px 45px;
+	  width: calc(100% - 90px);
+	//   margin: 0 auto;
+	  margin: 10px 45px 45px;
 	  -ms-text-size-adjust: 100%;
 	  -webkit-text-size-adjust: 100%;
-	  margin: 0;
 	  // color: $main-text-color;
 	  color: var(--color-fg-default);
 	//   background-color: $accent-color-even-lighter;
