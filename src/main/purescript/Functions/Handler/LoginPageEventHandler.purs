@@ -40,6 +40,7 @@ import Functions.Timer (activateTimer)
 import Record (merge)
 import Views.AppView (emptyMainPageWidgetState)
 import Views.CardsManagerView (cardManagerInitialState)
+import Views.CreateCardView (emptyCardFormData)
 import Views.LoginFormView (LoginPageEvent(..), emptyLoginFormData)
 import Views.OverlayView (OverlayColor(..), OverlayStatus(..), hiddenOverlayInfo, spinnerOverlay)
 import Views.SignupFormView (emptyDataForm)
@@ -76,6 +77,7 @@ handleLoginPageEvent (LoginPinEvent pin) state@{hash, srpConf, username, pinEncr
   where
     initialPage = Login emptyLoginFormData {pin = pin, loginType = PinLogin}
 
+handleLoginPageEvent (UpdateForm loginFormData)          state proxyInfo _ = noOperation (Tuple state (WidgetState hiddenOverlayInfo (Login loginFormData)                                                           proxyInfo))
 
 handleLoginPageEvent (GoToSignupEvent cred)              state proxyInfo _ = noOperation (Tuple state (WidgetState hiddenOverlayInfo (Signup emptyDataForm     {username = cred.username, password = cred.password}) proxyInfo))
 
@@ -125,7 +127,7 @@ loadHomePageSteps state@{hash: hashFunc, proxy, srpConf, c: Just c, p: Just p, m
     Left  _ -> pure unit
 
   let cardViewState = case fragmentState of
-                        Fragment.AddCard card -> CardForm (NewCardFromFragment card)
+                        Fragment.AddCard card -> CardForm (emptyCardFormData {card = card}) (NewCardFromFragment card)
                         _                     -> NoCard
 
   pure $ Tuple 

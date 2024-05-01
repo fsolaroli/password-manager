@@ -11,6 +11,7 @@ import Control.Bind ((=<<), (>>=))
 import Control.Category ((<<<), (>>>))
 import Data.Array (foldl, fromFoldable, mapWithIndex)
 import Data.CommutativeRing (add)
+import Data.Either (either)
 import Data.Eq ((/=), (==))
 import Data.Function (flip, (#), ($))
 import Data.Functor ((<$>), (<$))
@@ -38,23 +39,24 @@ import Functions.Events (blur, focus, keyboardShortcut, select)
 import IndexFilterView (Filter(..), FilterData, FilterViewStatus(..), filteredEntries, getClassNameFromFilterStatus, indexFilterView, initialFilterData, shownEntries)
 import Views.CardViews (CardEvent(..), cardView)
 import Views.Components (proxyInfoComponent)
-import Views.CreateCardView (createCardView)
+import Views.CreateCardView (CardFormData, createCardView)
 import Views.DonationViews (donationIFrame)
 import Views.DonationViews as DonationEvent
 
-data CardManagerEvent = AddCardEvent       Card
-                      | CloneCardEvent     CardEntry
-                      | DeleteCardEvent    CardEntry
-                      | EditCardEvent      (Tuple CardEntry Card)
-                      | ArchiveCardEvent   CardEntry
-                      | RestoreCardEvent   CardEntry
-                      | OpenCardFormEvent  (Maybe (Tuple CardEntry Card))
+data CardManagerEvent = AddCardEvent        Card
+                      | CloneCardEvent      CardEntry
+                      | DeleteCardEvent     CardEntry
+                      | EditCardEvent       (Tuple CardEntry Card)
+                      | ArchiveCardEvent    CardEntry
+                      | RestoreCardEvent    CardEntry
+                      | OpenCardFormEvent   (Maybe (Tuple CardEntry Card))
                       | OpenUserAreaEvent
-                      | ShowShortcutsEvent Boolean
-                      | ShowDonationEvent  Boolean
-                      | ChangeFilterEvent  FilterData
-                      | NavigateCardsEvent NavigateCardsEvent
+                      | ShowShortcutsEvent  Boolean
+                      | ShowDonationEvent   Boolean
+                      | ChangeFilterEvent   FilterData
+                      | NavigateCardsEvent  NavigateCardsEvent
                       | UpdateDonationLevel Days
+                      | UpdateCardForm      CardFormData
 
 data NavigateCardsEvent = Move Int | Open (Maybe CardEntry) | Close (Maybe Int)
 
@@ -102,9 +104,9 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
 
     selectedEntry :: Maybe CardEntry
     selectedEntry = case cardViewState of
-      Card                 _ entry  -> Just entry
-      CardForm (ModifyCard _ entry) -> Just entry
-      _                             -> Nothing
+      Card                   _ entry  -> Just entry
+      CardForm _ (ModifyCard _ entry) -> Just entry
+      _                               -> Nothing
 
     getHighlightedEntry :: Maybe Int
     getHighlightedEntry = highlightedEntry <|> (selectedEntry >>= flip elemIndex sortedCards)
@@ -161,9 +163,9 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
       <> ((keyboardShortcut ["?"                  ] # liftAff) $>  ShowShortcutsEvent   true                                      )
 
     mainStageView :: CardViewState -> Widget HTML CardManagerEvent
-    mainStageView  NoCard                  = div [] []
-    mainStageView (Card card cardEntry)    = cardView proxyInfo card cardEntry <#> handleCardEvents
-    mainStageView (CardForm cardFormInput) = createCardView inputCard allTags userPasswordGeneratorSettings <#> (maybe (NavigateCardsEvent $ viewCardStateUpdate) outputEvent)
+    mainStageView  NoCard                               = div [] []
+    mainStageView (Card card cardEntry)                 = cardView proxyInfo card cardEntry <#> handleCardEvents
+    mainStageView (CardForm cardFormData cardFormInput) = createCardView cardFormData inputCard allTags userPasswordGeneratorSettings proxyInfo <#> (either UpdateCardForm (maybe (NavigateCardsEvent $ viewCardStateUpdate) outputEvent))
       where
 
         inputCard = case cardFormInput of

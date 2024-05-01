@@ -15,7 +15,7 @@ import Data.Function ((#), ($))
 import Data.Map (insert, lookup)
 import Data.Maybe (Maybe(..), isJust, isNothing)
 import Data.Newtype (unwrap)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), uncurry)
 import DataModel.AppError (AppError(..))
 import DataModel.AppState (AppState, CardsCache, InvalidStateError(..), ProxyInfo, ProxyResponse(..))
 import DataModel.CardVersions.Card as DataModel.CardVersions.Card
@@ -34,6 +34,7 @@ import Functions.Index (updateIndex)
 import Record (merge)
 import Views.AppView (emptyMainPageWidgetState)
 import Views.CardsManagerView (CardManagerEvent(..), NavigateCardsEvent(..))
+import Views.CreateCardView (CardFormData, emptyCardFormData)
 import Views.DonationViews as DonationEvent
 import Views.OverlayView (OverlayColor(..), hiddenOverlayInfo, spinnerOverlay)
 import Views.UserAreaView (userAreaInitialState)
@@ -81,6 +82,9 @@ handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just inde
                                                           , highlightedEntry = Nothing 
                                                           }
 
+    (UpdateCardForm cardFormData) ->
+      updateCardManagerState defaultPage cardManagerState { cardViewState = updateCardViewState cardManagerState.cardViewState cardFormData }
+
     (NavigateCardsEvent navigationEvent) ->
       case navigationEvent of
         Move             i -> updateCardManagerState defaultPage (cardManagerState {                                 highlightedEntry = Just i })
@@ -101,14 +105,14 @@ handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just inde
           >>= handleOperationResult state defaultErrorPage (isNothing $ lookup (reference entry) cardsCache) Black
     
     (OpenCardFormEvent maybeCard) ->
-      updateCardManagerState defaultPage cardManagerState { cardViewState = CardForm $ case maybeCard of
-                                                              Nothing                     -> NewCard
-                                                              Just (Tuple cardEntry card) -> ModifyCard card cardEntry
+      updateCardManagerState defaultPage cardManagerState { cardViewState = uncurry CardForm $ case maybeCard of
+                                                              Nothing                     -> Tuple  emptyCardFormData                 NewCard
+                                                              Just (Tuple cardEntry card) -> Tuple (emptyCardFormData {card = card}) (ModifyCard card cardEntry)
                                                           }
 
     (AddCardEvent card) ->
       do
-        res <- addCardSteps cardManagerState state card (loadingMainPage index cardManagerState {cardViewState = CardForm (NewCardFromFragment card)}) proxyInfo "Add card" 
+        res <- addCardSteps cardManagerState state card (loadingMainPage index cardManagerState {cardViewState = CardForm (emptyCardFormData {card = card}) (NewCardFromFragment card)}) proxyInfo "Add card" 
         pure res
       # runExceptT
       >>= handleOperationResult state defaultErrorPage true Black
@@ -146,7 +150,7 @@ handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just inde
 
     (EditCardEvent (Tuple oldCardEntry updatedCard)) ->
       do
-        editCardSteps cardManagerState state oldCardEntry updatedCard (loadingMainPage index cardManagerState {cardViewState = CardForm (ModifyCard updatedCard oldCardEntry) }) proxyInfo
+        editCardSteps cardManagerState state oldCardEntry updatedCard (loadingMainPage index cardManagerState {cardViewState = CardForm (emptyCardFormData {card = updatedCard}) (ModifyCard updatedCard oldCardEntry) }) proxyInfo
       
       # runExceptT
       >>= handleOperationResult state defaultErrorPage true Black
@@ -187,6 +191,9 @@ handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just inde
     doNothing :: MainPageWidgetState -> Widget HTML OperationState
     doNothing mainPageState =  noOperation (Tuple state (WidgetState hiddenOverlayInfo (Main mainPageState) proxyInfo))
 
+    updateCardViewState :: CardViewState -> CardFormData -> CardViewState
+    updateCardViewState (CardForm _ cardFormInput) cardFormData = CardForm cardFormData cardFormInput
+    updateCardViewState  cardViewState             _            = cardViewState
 
 handleCardManagerEvent _ _ state _ _ = do
   throwError $ InvalidStateError (CorruptedState "cardManagerEvent")

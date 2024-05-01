@@ -23,6 +23,7 @@ import DataModel.WidgetState (CardViewState(..)) as CardViewState
 import Functions.Donations (DonationLevel(..))
 import IndexFilterView (Filter(..), FilterData, FilterViewStatus(..))
 import Type.Proxy (Proxy(..))
+import Views.CreateCardView (CardFormData)
 import Views.OverlayView (OverlayColor(..), OverlayStatus(..), OverlayInfo)
 import Views.SignupFormView (SignupDataForm)
 import Web.File.File (File)
@@ -556,18 +557,18 @@ filterViewStatusCodec = dimap toVariant fromVariant $ CAV.variantMatch
 cardViewStateCodec :: CA.JsonCodec CardViewState
 cardViewStateCodec = dimap toVariant fromVariant $ CAV.variantMatch
     { noCard:   Left   unit
-    , card:     Right (CA.object "Card" (CAR.record {card: cardCodec, cardEntry: cardEntryCodec }))
-    , cardForm: Right  cardFormInputCodec
+    , card:     Right (CAR.object "Card" {card: cardCodec, cardEntry: cardEntryCodec })
+    , cardForm: Right (CAR.object "CardForm" {cardFormData: cardFormDataCodec, cardFormInput: cardFormInputCodec})
     }
   where
     toVariant = case _ of
-      CardViewState.NoCard       -> V.inj (Proxy :: _ "noCard"  ) unit
-      CardViewState.Card c ce    -> V.inj (Proxy :: _ "card"    ) {card: c, cardEntry: ce}
-      CardViewState.CardForm cfi -> V.inj (Proxy :: _ "cardForm") cfi
+      CardViewState.NoCard           -> V.inj (Proxy :: _ "noCard"  ) unit
+      CardViewState.Card c ce        -> V.inj (Proxy :: _ "card"    ) {card: c, cardEntry: ce}
+      CardViewState.CardForm cfd cfi -> V.inj (Proxy :: _ "cardForm") {cardFormData: cfd, cardFormInput: cfi}
     fromVariant = V.match
-      { noCard:   \_                 -> CardViewState.NoCard
-      , card:     \{card, cardEntry} -> CardViewState.Card card cardEntry
-      , cardForm:                       CardViewState.CardForm
+      { noCard:   \_                             -> CardViewState.NoCard
+      , card:     \{card, cardEntry}             -> CardViewState.Card card cardEntry
+      , cardForm: \{cardFormData, cardFormInput} -> CardViewState.CardForm cardFormData cardFormInput
       }
 
 -- data CardFormInput = NewCard | NewCardFromFragment Card | ModifyCard Card CardEntry
@@ -587,6 +588,18 @@ cardFormInputCodec = dimap toVariant fromVariant $ CAV.variantMatch
       , newCardFromFragment: (\cardEntry         -> NewCardFromFragment cardEntry)
       , modifyCard:          (\{card, cardEntry} -> ModifyCard card cardEntry)
       }
+
+-- type CardFormData = {
+--   newTag  :: String
+-- , preview :: Boolean
+-- , card    :: Card
+-- }
+cardFormDataCodec :: CA.JsonCodec CardFormData
+cardFormDataCodec = CAR.object "CardFormData"
+  { newTag: CA.string
+  , preview: CA.boolean
+  , card: cardCodec
+  }
 
 -- newtype UserPreferences = 
 --   UserPreferences

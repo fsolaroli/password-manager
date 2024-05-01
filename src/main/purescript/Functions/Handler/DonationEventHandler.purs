@@ -27,6 +27,7 @@ import Functions.Handler.GenericHandlerFunctions (OperationState, defaultErrorPa
 import Record (merge)
 import Views.AppView (emptyMainPageWidgetState)
 import Views.CardsManagerView (cardManagerInitialState)
+import Views.CreateCardView (emptyCardFormData)
 import Views.DonationViews (DonationPageEvent(..))
 import Views.OverlayView (OverlayColor(..), hiddenOverlayInfo, spinnerOverlay)
 import Views.UserAreaView (userAreaInitialState)
@@ -55,7 +56,7 @@ handleDonationPageEvent donationPageEvent state@{username: Just username, passwo
         newDonationLevel                <- runStep (computeDonationLevel index newUserInfo # liftEffect) (WidgetState (spinnerOverlay "Update user info" Black) (Main emptyMainPageWidgetState { index = index, donationLevel = DonationOk }) proxyInfo)
         
         let cardViewState = case fragmentState of
-                        Fragment.AddCard card -> CardForm (NewCardFromFragment card)
+                        Fragment.AddCard card -> CardForm (emptyCardFormData {card = card}) (NewCardFromFragment card)
                         _                     -> NoCard
 
         pure $ Tuple 

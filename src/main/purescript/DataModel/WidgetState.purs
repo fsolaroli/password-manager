@@ -13,6 +13,7 @@ import DataModel.IndexVersions.Index (CardEntry, Index)
 import DataModel.UserVersions.User (UserPreferences, DonationInfo)
 import Functions.Donations (DonationLevel)
 import IndexFilterView (FilterData)
+import Views.CreateCardView (CardFormData)
 import Views.OverlayView (OverlayInfo)
 import Views.SignupFormView (SignupDataForm)
 import Web.File.File (File)
@@ -76,7 +77,7 @@ data WidgetState = WidgetState OverlayInfo Page ProxyInfo
 data CardFormInput = NewCard | NewCardFromFragment Card | ModifyCard Card CardEntry
 derive instance eqCardFormInput :: Eq CardFormInput
 
-data CardViewState = NoCard | Card Card CardEntry | CardForm CardFormInput
+data CardViewState = NoCard | Card Card CardEntry | CardForm CardFormData CardFormInput
 derive instance eqCardViewState :: Eq CardViewState
 
 type CardManagerState = { 
