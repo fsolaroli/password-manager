@@ -5,7 +5,7 @@ import Concur.React (HTML, affAction)
 import Concur.React.DOM (button, dd, div, dl, dt, h3, h4, header, li, ol, span, text)
 import Concur.React.Props as Props
 import Control.Alt (($>), (<#>), (<|>))
-import Control.Alternative ((*>))
+import Control.Alternative (empty, (*>))
 import Control.Applicative (pure)
 import Control.Bind ((=<<), (>>=))
 import Control.Category ((<<<), (>>>))
@@ -92,7 +92,7 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
       ]
     , donationButton (donationLevel == DonationWarning) showDonationOverlay
     ]
-  ] <> (if enableShortcuts then shortcutsHandlers else (text ""))
+  ] <> (if enableShortcuts then shortcutsHandlers else empty)
     <> (shortcutsHelp     showShortcutsHelp)
   <#> (Tuple state >>> swap)
 
@@ -248,7 +248,7 @@ shortcutsHelp showShortcutsHelp = div [Props.classList [Just "shortcutsHelp", Ju
 -- ==================================================================                                                                                                                             
 
 donationButton :: Boolean -> Boolean -> Widget HTML CardManagerEvent
-donationButton false _           = text ""
+donationButton false _           = empty
 donationButton true  showOverlay =
   div [Props.classList [Just "donationButton"]] ([
     button [Props.onClick] [span [] [text "Support Clipperz"]] $> ShowDonationEvent true

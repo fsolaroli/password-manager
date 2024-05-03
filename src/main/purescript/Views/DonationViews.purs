@@ -7,6 +7,7 @@ import Concur.React.Props as Props
 import Control.Alt ((<#>), (<$))
 import Control.Alternative (pure)
 import Control.Bind (bind, (=<<))
+import Control.Plus (empty)
 import Data.CommutativeRing ((*))
 import Data.Either (Either, hush)
 import Data.Function (flip, ($))
@@ -46,4 +47,4 @@ donationPage DonationWarning =
     CloseDonationPage <$ div [Props.className "closeButton"] [ button [Props.onClick] [span [] [text "remove field"]] ] 
   , donationIFrame =<< (liftEffect $ donationIFrameURL "splash/")
   ]
-donationPage _ = text ""
+donationPage _ = empty

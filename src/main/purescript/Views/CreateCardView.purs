@@ -7,6 +7,7 @@ import Concur.React.Props as Props
 import Control.Alt (($>), (<#>), (<|>))
 import Control.Applicative (pure)
 import Control.Bind (bind, discard, (>>=))
+import Control.Plus (empty)
 import Control.Semigroupoid ((<<<))
 import Data.Array (delete, snoc, sort)
 import Data.Either (Either(..))
@@ -105,7 +106,7 @@ createCardView cardFormData@{card} originalCard allTags passwordGeneratorSetting
           , dynamicWrapper Nothing value $ textarea [Props.rows 1, Props.placeholder (if locked then "" else "value"), Props.value value, Props.onChange] []
           , (if locked
             then (entropyMeter value)
-            else (text "")
+            else  empty
             )
           ]
         ]

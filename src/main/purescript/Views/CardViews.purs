@@ -6,10 +6,9 @@ import Concur.React (HTML, affAction)
 import Concur.React.DOM (a, a_, button, div, h3, li', li_, p_, span, text, textarea, ul)
 import Concur.React.Props as Props
 import Control.Alt (($>), (<|>))
-import Control.Alternative ((*>))
+import Control.Alternative (empty, (*>))
 import Control.Applicative (pure)
 import Control.Bind (bind, discard)
-import Control.Promise (fromAff)
 import Data.Array (null)
 import Data.Eq ((==))
 import Data.Function (($))
@@ -23,8 +22,6 @@ import DataModel.AppState (ProxyInfo(..))
 import DataModel.CardVersions.Card (Card(..), CardField(..), CardValues(..), FieldType(..))
 import DataModel.IndexVersions.Index (CardEntry)
 import Effect.Aff (Milliseconds(..), delay)
-import Effect.Aff.Class (liftAff)
-import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import Functions.Card (getFieldType)
 import Functions.Clipboard (copyToClipboard)
@@ -91,10 +88,10 @@ secretSignal { creationDate, expirationDate, secretId } = li_ [] do
 cardContent :: forall a. CardValues -> Widget HTML a
 cardContent (CardValues {title: t, tags: ts, fields: fs, notes: n}) = div [Props._id "cardContent"] [
   h3  [Props.className "card_title"]  [text t]
-, if (isEmpty ts) then (text "") else div [Props.className "card_tags"] [ul [] $ (\s -> li' [text s]) <$> (toUnfoldable ts)]
-, if (null    fs) then (text "") else div [Props.className "card_fields"] $ cardField false <$> fs
+, if (isEmpty ts) then (empty) else div [Props.className "card_tags"] [ul [] $ (\s -> li' [text s]) <$> (toUnfoldable ts)]
+, if (null    fs) then (empty) else div [Props.className "card_fields"] $ cardField false <$> fs
 , div [Props.className "card_notes"] [
-    if (isEmpty ts && null fs) then (text "") else h3 [] [text "Notes"]
+    if (isEmpty ts && null fs) then (empty) else h3 [] [text "Notes"]
   , div [Props.className "markdown-body", Props.dangerouslySetInnerHTML { __html: unsafePerformEffect $ renderString n}] []
   ]
 ]
@@ -111,7 +108,7 @@ cardField showPassword f@(CardField {name, value, locked}) = do
       ]
     , if locked
       then (entropyMeter value)
-      else (text "")
+      else  empty
     ]
   , div [Props.className "fieldAction"] [
       getActionButton
