@@ -19,7 +19,6 @@ module Views.SimpleWebComponents
   , simpleButton
   , simpleCheckboxSignal
   , simpleCheckboxWidget
-  , simpleFileInputWidget
   , simpleInputWidget
   , simpleNumberInputWidget
   , simplePasswordInputWidget
@@ -106,22 +105,6 @@ simpleInputWidget className lbl disable placeholder value t =
     , Props.onChange
     ]
   ]
-
-simpleFileInputWidget :: String -> Widget HTML String -> Widget HTML String
-simpleFileInputWidget className lbl = do
-  label [Props.className className] [
-    span [Props.className "label"] [lbl]
-  , fromSyntheticEvent =<< input [
-      Props._type "file"
-    , Props.onChange
-    ]
-  ]
-
-  where 
-    fromSyntheticEvent :: forall r. SyntheticEvent_ (currentTarget :: NativeEventTarget | r) -> Widget HTML String
-    fromSyntheticEvent se = do
-      nve <- liftEffect $ currentTarget se
-      liftAff $ readFile nve
 
 simpleTextInputWidget :: String -> Widget HTML String -> String -> String -> Widget HTML String
 simpleTextInputWidget className lbl placeholder s = simpleInputWidget className lbl false placeholder s "text"

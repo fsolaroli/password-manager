@@ -2,13 +2,14 @@ module Views.CardViews where
 
 import Concur.Core (Widget)
 import Concur.Core.FRP (Signal, fireOnce, loopW)
-import Concur.React (HTML)
+import Concur.React (HTML, affAction)
 import Concur.React.DOM (a, a_, button, div, h3, li', li_, p_, span, text, textarea, ul)
 import Concur.React.Props as Props
 import Control.Alt (($>), (<|>))
 import Control.Alternative ((*>))
 import Control.Applicative (pure)
 import Control.Bind (bind, discard)
+import Control.Promise (fromAff)
 import Data.Array (null)
 import Data.Eq ((==))
 import Data.Function (($))
@@ -23,6 +24,7 @@ import DataModel.CardVersions.Card (Card(..), CardField(..), CardValues(..), Fie
 import DataModel.IndexVersions.Index (CardEntry)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (liftAff)
+import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import Functions.Card (getFieldType)
 import Functions.Clipboard (copyToClipboard)
@@ -116,8 +118,8 @@ cardField showPassword f@(CardField {name, value, locked}) = do
     ]
   ]
   case res of
-    ShowPassword -> cardField true         f <|> (liftAff $                          delay (Milliseconds 5000.0))
-    CopyValue    -> cardField showPassword f <|> (liftAff $ copyToClipboard value *> delay (Milliseconds 1000.0)) <|> overlay { status: Copy, color: Black, message: "copied" }
+    ShowPassword -> cardField true         f <|> (affAction $                          delay (Milliseconds 5000.0))
+    CopyValue    -> cardField showPassword f <|> (affAction $ copyToClipboard value *> delay (Milliseconds 1000.0)) <|> overlay { status: Copy, color: Black, message: "copied" }
     HidePassword -> pure unit
   cardField false f
 

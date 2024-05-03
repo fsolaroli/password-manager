@@ -1,7 +1,7 @@
 module Views.CardsManagerView where
 
 import Concur.Core (Widget)
-import Concur.React (HTML)
+import Concur.React (HTML, affAction)
 import Concur.React.DOM (button, dd, div, dl, dt, h3, h4, header, li, ol, span, text)
 import Concur.React.Props as Props
 import Control.Alt (($>), (<#>), (<|>))
@@ -31,7 +31,6 @@ import DataModel.CardVersions.Card (Card, emptyCard)
 import DataModel.IndexVersions.Index (CardEntry(..), Index(..))
 import DataModel.Password (PasswordGeneratorSettings)
 import DataModel.WidgetState (CardFormInput(..), CardManagerState, CardViewState(..))
-import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Functions.Donations (DonationLevel(..))
 import Functions.EnvironmentalVariables (donationIFrameURL)
@@ -152,15 +151,15 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
 
     shortcutsHandlers :: Widget HTML CardManagerEvent
     shortcutsHandlers =
-         ((keyboardShortcut ["*"                  ] # liftAff) *>                                             updateFilterData initialFilterData)
-      <> ((keyboardShortcut ["/"                  ] # liftAff) *> (select "searchInputField" # liftEffect) *> updateFilterData filterData {filterViewStatus = FilterViewOpen, filter = Search searchString})
-      <> ((keyboardShortcut ["j", "down"          ] # liftAff) $> (NavigateCardsEvent $ Move (increaseIndex (length sortedCards))))
-      <> ((keyboardShortcut ["k", "up"            ] # liftAff) $> (NavigateCardsEvent $ Move (decreaseIndex                     )))
-      <> ((keyboardShortcut ["l", "right", "enter"] # liftAff) $> (NavigateCardsEvent $ Open (getCardToOpen sortedCards         )))
-      <> ((keyboardShortcut ["h", "left" , "esc"  ] # liftAff) $> if showShortcutsHelp
-                                                             then  ShowShortcutsEvent   false
-                                                             else (NavigateCardsEvent $ Close getHighlightedEntry                ))
-      <> ((keyboardShortcut ["?"                  ] # liftAff) $>  ShowShortcutsEvent   true                                      )
+         ((keyboardShortcut ["*"                  ] # affAction) *>                                             updateFilterData initialFilterData)
+      <> ((keyboardShortcut ["/"                  ] # affAction) *> (select "searchInputField" # liftEffect) *> updateFilterData filterData {filterViewStatus = FilterViewOpen, filter = Search searchString})
+      <> ((keyboardShortcut ["j", "down"          ] # affAction) $> (NavigateCardsEvent $ Move (increaseIndex (length sortedCards))))
+      <> ((keyboardShortcut ["k", "up"            ] # affAction) $> (NavigateCardsEvent $ Move (decreaseIndex                     )))
+      <> ((keyboardShortcut ["l", "right", "enter"] # affAction) $> (NavigateCardsEvent $ Open (getCardToOpen sortedCards         )))
+      <> ((keyboardShortcut ["h", "left" , "esc"  ] # affAction) $> if showShortcutsHelp
+                                                               then  ShowShortcutsEvent   false
+                                                               else (NavigateCardsEvent $ Close getHighlightedEntry                ))
+      <> ((keyboardShortcut ["?"                  ] # affAction) $>  ShowShortcutsEvent   true                                      )
 
     mainStageView :: CardViewState -> Widget HTML CardManagerEvent
     mainStageView  NoCard                               = div [] []

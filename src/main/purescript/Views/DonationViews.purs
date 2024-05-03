@@ -1,7 +1,7 @@
 module Views.DonationViews where
 
 import Concur.Core (Widget)
-import Concur.React (HTML)
+import Concur.React (HTML, affAction)
 import Concur.React.DOM (button, div, iframe, span, text)
 import Concur.React.Props as Props
 import Control.Alt ((<#>), (<$))
@@ -17,7 +17,6 @@ import Data.Number (fromString)
 import Data.String.Regex (Regex, match, regex)
 import Data.String.Regex.Flags (noFlags)
 import Data.Time.Duration (Days(..))
-import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Functions.Donations (DonationLevel(..))
 import Functions.EnvironmentalVariables (donationIFrameURL)
@@ -34,7 +33,7 @@ donationIFrame :: String -> Widget HTML DonationPageEvent
 donationIFrame destinationPage = do
   res <-  iframe [Props.className "donationIframe", Props.src destinationPage] []
           <>
-          (liftAff getWindowMessage)
+          (affAction getWindowMessage)
   pure $ case ((flip match res =<< hush donationIFrameMessageRegex) <#> fromFoldable) of
     Just (_ : (Just monthsString) : Nil) -> case (fromString monthsString) of
       Just months -> UpdateDonationLevel (Days (months * 30.0))

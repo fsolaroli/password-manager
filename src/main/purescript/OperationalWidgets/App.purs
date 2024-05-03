@@ -1,7 +1,7 @@
 module OperationalWidgets.App ( app ) where
 
 import Concur.Core (Widget)
-import Concur.React (HTML)
+import Concur.React (HTML, affAction)
 import Control.Alt ((<|>))
 import Control.Alternative (pure, (*>))
 import Control.Bind (bind, (=<<), (>>=))
@@ -10,7 +10,6 @@ import Data.Tuple (Tuple(..))
 import DataModel.AppState (AppState, ProxyInfo)
 import DataModel.FragmentState as Fragment
 import DataModel.WidgetState (Page(..), WidgetState(..))
-import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Functions.Events (online)
 import Functions.Handler.CardManagerEventHandler (handleCardManagerEvent)
@@ -59,6 +58,6 @@ executeOperation (DonationPageEvent        event)      = handleDonationPageEvent
 
 updateProxy :: OperationState -> Widget HTML OperationState
 updateProxy (Tuple state' (WidgetState overlayInfo' page' _)) =
-  liftAff online *> do
+  affAction online *> do
     newProxy <- liftEffect $ computeProxy
     pure $ (Tuple state' {proxy = newProxy} (WidgetState overlayInfo' page' (getProxyInfoFromProxy newProxy)))

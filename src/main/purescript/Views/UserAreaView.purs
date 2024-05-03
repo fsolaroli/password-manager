@@ -1,7 +1,7 @@
 module Views.UserAreaView where
 
 import Concur.Core (Widget)
-import Concur.React (HTML)
+import Concur.React (HTML, affAction)
 import Concur.React.DOM (a, button, div, header, li, li', span, text, ul)
 import Concur.React.Props as Props
 import Control.Alt (($>), (<#>))
@@ -22,7 +22,6 @@ import DataModel.Credentials (Credentials)
 import DataModel.UserVersions.User (UserPreferences, DonationInfo)
 import DataModel.UserVersions.UserCodecs (iso8601DateFormatter)
 import DataModel.WidgetState (ImportState, UserAreaPage(..), UserAreaState, UserAreaSubmenu(..))
-import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Functions.EnvironmentalVariables (currentCommit, donationIFrameURL)
 import Functions.Events (keyboardShortcut)
@@ -66,7 +65,7 @@ userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenu
     , userAreaInternalView
     ])
     <> 
-    ((keyboardShortcut ["l o c k"] # liftAff) $> LockEvent)
+    ((keyboardShortcut ["l o c k"] # affAction) $> LockEvent)
   ) <#> (Tuple state >>> swap)
 
   where

@@ -58,6 +58,7 @@
   , "tuples"
   , "unfoldable"
   , "unsafe-coerce"
+  , "unsafe-reference"
   , "variant"
   , "web-clipboard"
   , "web-dom"

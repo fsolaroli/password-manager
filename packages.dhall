@@ -66,8 +66,10 @@ in  upstream
       , "transformers"
       , "tuples"
       ]
-    , repo = "https://github.com/clipperz/purescript-concur-core"
-    , version = "clipperz"
+    , repo = "https://github.com/purescript-concur/purescript-concur-core"
+    , version = "main"
+    -- , repo = "https://github.com/clipperz/purescript-concur-core"
+    -- , version = "clipperz"
     }
   with concur-react =
     { dependencies =
@@ -86,8 +88,10 @@ in  upstream
       , "web-dom"
       , "web-html"
       ]
-    , repo = "https://github.com/clipperz/purescript-concur-react"
-    , version = "clipperz"
+    , repo = "https://github.com/purescript-concur/purescript-concur-react"
+    , version = "main"
+    -- , repo = "https://github.com/clipperz/purescript-concur-react"
+    -- , version = "clipperz"
     }
   with formless =
     { dependencies =
