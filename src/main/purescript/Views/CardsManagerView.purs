@@ -1,6 +1,7 @@
 module Views.CardsManagerView where
 
 import Concur.Core (Widget)
+import Concur.Core.Patterns (Wire)
 import Concur.React (HTML, affAction)
 import Concur.React.DOM (button, dd, div, dl, dt, h3, h4, header, li, ol, span, text)
 import Concur.React.Props as Props
@@ -26,19 +27,21 @@ import Data.Set (Set, unions)
 import Data.Time.Duration (Days)
 import Data.Tuple (Tuple(..), swap)
 import Data.Unit (unit)
-import DataModel.AppState (ProxyInfo)
 import DataModel.CardVersions.Card (Card, emptyCard)
 import DataModel.IndexVersions.Index (CardEntry(..), Index(..))
 import DataModel.Password (PasswordGeneratorSettings)
+import DataModel.Proxy (ProxyInfo)
 import DataModel.WidgetState (CardFormInput(..), CardManagerState, CardViewState(..))
 import Effect.Class (liftEffect)
 import Functions.Donations (DonationLevel(..))
 import Functions.EnvironmentalVariables (donationIFrameURL)
 import Functions.Events (blur, focus, keyboardShortcut, select)
 import IndexFilterView (Filter(..), FilterData, FilterViewStatus(..), filteredEntries, getClassNameFromFilterStatus, indexFilterView, initialFilterData, shownEntries)
+import OperationalWidgets.Sync (SyncData)
 import Views.CardViews (CardEvent(..), cardView)
 import Views.Components (proxyInfoComponent)
 import Views.CreateCardView (CardFormData, createCardView)
+import Views.DeviceSyncView (EnableSync, syncProgressBar)
 import Views.DonationViews (donationIFrame)
 import Views.DonationViews as DonationEvent
 
@@ -70,12 +73,13 @@ cardManagerInitialState = {
 
 type EnableShortcuts = Boolean
 
-cardsManagerView :: CardManagerState -> Index -> PasswordGeneratorSettings -> DonationLevel -> ProxyInfo -> EnableShortcuts -> Widget HTML (Tuple CardManagerEvent CardManagerState)
-cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archived, searchString}, highlightedEntry, cardViewState, showShortcutsHelp, showDonationOverlay} index'@(Index {entries}) userPasswordGeneratorSettings donationLevel proxyInfo enableShortcuts = do
+cardsManagerView :: CardManagerState -> Index -> PasswordGeneratorSettings -> DonationLevel -> ProxyInfo -> EnableShortcuts -> EnableSync -> Maybe (Wire (Widget HTML) SyncData) -> Widget HTML (Tuple CardManagerEvent CardManagerState)
+cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archived, searchString}, highlightedEntry, cardViewState, showShortcutsHelp, showDonationOverlay} index'@(Index {entries}) userPasswordGeneratorSettings donationLevel proxyInfo enableShortcuts enableSync syncDataWire = do
   div [Props._id "cardsManager", Props.className $ "filterView_" <> getClassNameFromFilterStatus filterViewStatus] [
     indexFilterView filterData index' >>= updateFilterData
   , div [Props.className "cardToolbarFrame"] [
       toolbarHeader "frame"
+    , syncProgressBar enableSync syncDataWire
     , proxyInfoComponent proxyInfo [Just "withDate"]
     , div [Props._id "mainView", Props.className (if cardViewState /= NoCard then "CardViewOpen" else "CardViewClose")] [
         div [Props._id "indexView"] [

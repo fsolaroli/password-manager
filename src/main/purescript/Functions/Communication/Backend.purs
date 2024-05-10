@@ -1,6 +1,5 @@
 module Functions.Communication.Backend
-  ( ConnectionState
-  , Path
+  ( Path
   , SessionKey
   , Url
   , genericRequest
@@ -53,12 +52,12 @@ import Data.Tuple (Tuple(..))
 import Data.Unfoldable (fromMaybe)
 import Data.Unit (Unit, unit)
 import DataModel.AppError (AppError(..))
-import DataModel.AppState (BackendSessionState, DynamicProxy(..), Proxy(..), ProxyResponse(..))
+import DataModel.Communication.ConnectionState (ConnectionState)
 import DataModel.Communication.FromString (class FromString)
 import DataModel.Communication.FromString as BCFS
 import DataModel.Communication.Login (LoginStep2Response, loginStep1ResponseCodec, loginStep2ResponseCodec)
 import DataModel.Communication.ProtocolError (ProtocolError(..))
-import DataModel.SRPVersions.SRP (HashFunction, SRPConf)
+import DataModel.Proxy (BackendSessionState, DynamicProxy(..), Proxy(..), ProxyResponse(..))
 import DataModel.UserVersions.User (MasterKey, RequestUserCard(..), requestUserCardCodec)
 import Effect (Effect)
 import Effect.Aff (Aff, Fiber, forkAff, joinFiber)
@@ -78,14 +77,6 @@ foreign import _readUserCard :: Unit   -> String
 type Url = String
 type Path = String
 type SessionKey = HexString
-
-type ConnectionState = {
-  proxy    :: Proxy
-, hashFunc :: HashFunction
-, srpConf  :: SRPConf
-, c        :: HexString
-, p        :: HexString
-}
 
 loginStep1RequestCodec :: CA.JsonCodec {c :: HexString, aa :: HexString}
 loginStep1RequestCodec = 

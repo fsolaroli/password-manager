@@ -2,6 +2,11 @@ module Test.DebugCodec where
 
 import Prelude
 
+import Concur.Core (Widget)
+import Concur.Core.Patterns (Wire)
+import Concur.React (HTML)
+import Data.Argonaut.Core (Json, jsonEmptyString)
+import Data.Codec (codec')
 import Data.Codec.Argonaut as CA
 import Data.Codec.Argonaut.Common as CAC
 import Data.Codec.Argonaut.Record as CAR
@@ -11,17 +16,18 @@ import Data.HexString (hexStringCodec)
 import Data.Maybe (Maybe(..))
 import Data.Profunctor (dimap, wrapIso)
 import Data.Variant as V
-import DataModel.AppState (DataOnLocalStorage(..), ProxyInfo(..))
 import DataModel.CardVersions.Card (Card(..), CardField(..), CardValues(..), cardVersionCodec)
 import DataModel.Credentials (Credentials)
 import DataModel.IndexVersions.Index (CardEntry(..), CardReference(..), Index(..))
 import DataModel.Password (PasswordGeneratorSettings)
+import DataModel.Proxy (DataOnLocalStorage(..), ProxyInfo(..))
 import DataModel.UserVersions.User (UserPreferences(..), DonationInfo)
 import DataModel.UserVersions.UserCodecs (dateTimeCodec)
 import DataModel.WidgetState (CardFormInput(..), CardManagerState, CardViewState, ImportState, ImportStep(..), LoginFormData, LoginType(..), MainPageWidgetState, Page(..), UserAreaPage(..), UserAreaState, UserAreaSubmenu(..), WidgetState(..))
 import DataModel.WidgetState (CardViewState(..)) as CardViewState
 import Functions.Donations (DonationLevel(..))
 import IndexFilterView (Filter(..), FilterData, FilterViewStatus(..))
+import OperationalWidgets.Sync (SyncData)
 import Type.Proxy (Proxy(..))
 import Views.CreateCardView (CardFormData)
 import Views.OverlayView (OverlayColor(..), OverlayStatus(..), OverlayInfo)
@@ -226,6 +232,8 @@ proxyInfoCodec = dimap toVariant fromVariant $ CAV.variantMatch
 -- , cardManagerState              :: CardManagerState
 -- , userPreferences               :: UserPreferences
 -- , donationLevel :: DonationLevel
+-- , enableSync :: Boolean
+-- , syncDataWire :: Maybe ((Wire (Widget HTML) SyncData))
 -- }
 mainPageWidgetStateCodec :: CA.JsonCodec MainPageWidgetState
 mainPageWidgetStateCodec = 
@@ -239,8 +247,13 @@ mainPageWidgetStateCodec =
       , cardManagerState: cardManagerStateCodec
       , userPreferences:  userPreferencesCodec
       , donationLevel:    donationLevelCodec
+      , enableSync:       CA.boolean
+      , syncDataWire:     syncDataWireCodec
       }
     )
+
+syncDataWireCodec :: CA.JsonCodec (Maybe ((Wire (Widget HTML) SyncData)))
+syncDataWireCodec = codec' (\(_ :: Json) -> Right Nothing) (\(_ :: Maybe ((Wire (Widget HTML) SyncData))) -> jsonEmptyString)
 
 -- newtype Index = 
 --   Index {entries :: (List CardEntry), identifier :: HexString}

@@ -1,19 +1,24 @@
 module DataModel.WidgetState where
 
+import Concur.Core (Widget)
+import Concur.Core.Patterns (Wire)
+import Concur.React (HTML)
 import Data.Bounded (class Ord)
 import Data.Either (Either)
 import Data.Eq (class Eq)
 import Data.Map (Map)
 import Data.Maybe (Maybe)
 import Data.Tuple (Tuple)
-import DataModel.AppState (ProxyInfo)
 import DataModel.CardVersions.Card (Card)
 import DataModel.Credentials (Credentials)
 import DataModel.IndexVersions.Index (CardEntry, Index)
+import DataModel.Proxy (ProxyInfo)
 import DataModel.UserVersions.User (UserPreferences, DonationInfo)
 import Functions.Donations (DonationLevel)
 import IndexFilterView (FilterData)
+import OperationalWidgets.Sync (SyncData)
 import Views.CreateCardView (CardFormData)
+import Views.DeviceSyncView (EnableSync)
 import Views.OverlayView (OverlayInfo)
 import Views.SignupFormView (SignupDataForm)
 import Web.File.File (File)
@@ -64,10 +69,12 @@ type MainPageWidgetState = {
 , credentials        :: Credentials
 , donationInfo       :: Maybe DonationInfo
 , pinExists          :: Boolean
+, enableSync         :: EnableSync
 , userAreaState      :: UserAreaState
 , cardManagerState   :: CardManagerState
 , userPreferences    :: UserPreferences
 , donationLevel      :: DonationLevel
+, syncDataWire       :: Maybe ((Wire (Widget HTML) SyncData))
 }
 
 data WidgetState = WidgetState OverlayInfo Page ProxyInfo

@@ -27,8 +27,8 @@ import Data.Semigroup ((<>))
 import Data.Semiring ((*))
 import Data.Show (show)
 import Data.Unit (unit)
-import DataModel.AppState (DataOnLocalStorage(..), ProxyInfo(..))
 import Functions.Password (computePasswordEntropy, passwordStrengthClass, standardPasswordStrengthFunction)
+import DataModel.Proxy (DataOnLocalStorage(..), ProxyInfo(..))
 import Functions.State (_readStaticOfflineCopyTimestamp)
 
 newtype ClassName = ClassName String

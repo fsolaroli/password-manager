@@ -1,6 +1,7 @@
 module Views.UserAreaView where
 
 import Concur.Core (Widget)
+import Concur.Core.Patterns (Wire)
 import Concur.React (HTML, affAction)
 import Concur.React.DOM (a, button, div, header, li, li', span, text, ul)
 import Concur.React.Props as Props
@@ -17,18 +18,19 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Monoid ((<>))
 import Data.Time.Duration (Days)
 import Data.Tuple (Tuple(..), swap)
-import DataModel.AppState (ProxyInfo(..))
 import DataModel.Credentials (Credentials)
+import DataModel.Proxy (ProxyInfo(..))
 import DataModel.UserVersions.User (UserPreferences, DonationInfo)
 import DataModel.UserVersions.UserCodecs (iso8601DateFormatter)
 import DataModel.WidgetState (ImportState, UserAreaPage(..), UserAreaState, UserAreaSubmenu(..))
 import Effect.Class (liftEffect)
 import Functions.EnvironmentalVariables (currentCommit, donationIFrameURL)
 import Functions.Events (keyboardShortcut)
+import OperationalWidgets.Sync (SyncData)
 import Views.ChangePasswordView (changePasswordView)
 import Views.Components (Enabled(..), footerComponent)
 import Views.DeleteUserView (deleteUserView)
-import Views.DeviceSyncView (deviceSyncView)
+import Views.DeviceSyncView (EnableSync, deviceSyncView)
 import Views.DonationViews (donationIFrame)
 import Views.DonationViews as DonationEvent
 import Views.ExportView (ExportEvent, exportView)
@@ -46,14 +48,15 @@ data UserAreaEvent    = CloseUserAreaEvent
                       | ImportCardsEvent ImportState
                       | ExportEvent ExportEvent
                       | UpdateDonationLevel Days
+                      | UpdateSyncPreference Boolean
                       | LockEvent
                       | LogoutEvent
 
 userAreaInitialState :: UserAreaState
 userAreaInitialState = { showUserArea: false, userAreaOpenPage: None, importState: initialImportState, userAreaSubmenus: fromFoldable [(Tuple Account false), (Tuple Data false)]}
 
-userAreaView :: UserAreaState -> UserPreferences -> Credentials -> Maybe DonationInfo -> ProxyInfo -> Boolean -> Widget HTML (Tuple UserAreaEvent UserAreaState)
-userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenus} userPreferences credentials donationInfo proxyInfo pinExists = do
+userAreaView :: UserAreaState -> UserPreferences -> Credentials -> Maybe DonationInfo -> ProxyInfo -> Boolean -> EnableSync -> Maybe (Wire (Widget HTML) SyncData) -> Widget HTML (Tuple UserAreaEvent UserAreaState)
+userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenus} userPreferences credentials donationInfo proxyInfo pinExists enableSync syncDataWire = do
   commitHash <- liftEffect currentCommit
   ((div [Props._id "userPage", Props.className (if showUserArea then "open" else "closed")] [
       div [Props.onClick, Props.className "mask"] [] $> CloseUserAreaEvent
@@ -83,7 +86,7 @@ userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenu
         ]
       , subMenu Device  "Device" [
           subMenuElement Pin            (Enabled true   ) "Device PIN"
-        , subMenuElement DeviceSync      (Enabled true   ) "Device Sync" 
+        , subMenuElement DeviceSync     (Enabled true   ) "Device Sync" 
       ]
       , subMenuElement   Donate         (Enabled true)     "Donate" <#> OpenUserAreaPage
       , li' [a      [Props.className "link", Props.href "/about/app", Props.target "_blank"] [span [] [text "About"]]]
@@ -113,13 +116,13 @@ userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenu
     userAreaInternalView :: Widget HTML UserAreaEvent
     userAreaInternalView = 
       case userAreaOpenPage of
-        Preferences     -> frame (userPreferencesView userPreferences <#> UpdateUserPreferencesEvent)
-        ChangePassword  -> frame (changePasswordView  credentials     <#> ChangePasswordEvent)
-        Delete          -> frame (deleteUserView      credentials      $> DeleteAccountEvent)
-        Pin             -> frame (setPinView          pinExists       <#> SetPinEvent)
-        DeviceSync      -> frame (deviceSyncView)
-        Import          -> frame (importView          importState     <#> ImportCardsEvent)
-        Export          -> frame (exportView                          <#> ExportEvent)
+        Preferences     -> frame (userPreferencesView userPreferences     <#> UpdateUserPreferencesEvent)
+        ChangePassword  -> frame (changePasswordView  credentials         <#> ChangePasswordEvent)
+        Delete          -> frame (deleteUserView      credentials          $> DeleteAccountEvent)
+        Pin             -> frame (setPinView          pinExists           <#> SetPinEvent)
+        DeviceSync      -> frame (deviceSyncView enableSync syncDataWire  <#> UpdateSyncPreference)
+        Import          -> frame (importView          importState         <#> ImportCardsEvent)
+        Export          -> frame (exportView                              <#> ExportEvent)
         Donate          -> frame (donationUserArea)     
         About           -> frame (text "This is Clipperz")
         None            -> emptyUserComponent

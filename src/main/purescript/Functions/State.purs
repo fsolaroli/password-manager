@@ -1,5 +1,8 @@
 module Functions.State where
 
+import Concur.Core (Widget)
+import Concur.Core.Patterns (Wire)
+import Concur.React (HTML)
 import Control.Alt ((<#>))
 import Control.Applicative (pure)
 import Control.Bind (bind, (>>=))
@@ -15,14 +18,16 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.Traversable (sequence)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Unit (Unit)
-import DataModel.AppState (AppState, DataOnLocalStorage(..), DynamicProxy(..), Proxy(..), ProxyInfo(..), defaultPathPrefix)
+import DataModel.AppState (AppState)
 import DataModel.CardVersions.Card (Card)
 import DataModel.IndexVersions.Index (Index)
+import DataModel.Proxy (DataOnLocalStorage(..), DynamicProxy(..), Proxy(..), ProxyInfo(..), defaultPathPrefix)
 import DataModel.SRPVersions.SRP (HashFunction, SRPConf, baseSRPConf, hashFuncSHA256)
 import DataModel.UserVersions.User (MasterKey, UserInfo, UserInfoReferences)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Functions.Donations (DonationLevel)
+import OperationalWidgets.Sync (SyncData)
 import Record (merge)
 import Web.DOM (Element, Node)
 import Web.DOM.Element (fromNode, id)
@@ -56,8 +61,8 @@ getProxyInfoFromProxy = case _ of
   DynamicProxy (OnlineProxy  _ _ _             ) -> Online
   DynamicProxy (OfflineProxy dataOnLocalStorage) -> Offline dataOnLocalStorage
 
-computeInitialState :: Effect AppState
-computeInitialState = computeProxy >>= (\proxy -> pure $ merge baseState {proxy})
+computeInitialState :: Wire (Widget HTML) SyncData -> Effect AppState
+computeInitialState wire = computeProxy >>= (\proxy -> pure $ merge baseState {proxy, syncDataWire: wire})
 
 computeProxy :: Effect Proxy
 computeProxy = isStatic >>= case _ of
@@ -69,7 +74,6 @@ computeProxy = isStatic >>= case _ of
     computeDynamicProxy = (window >>= navigator >>= onLine) <#> case _ of 
       true  -> OnlineProxy defaultPathPrefix {toll: Nothing, currentChallenge: Nothing} Nothing
       false -> OfflineProxy NoData -- TODO: check local storage to determine data presence [fsolaroli - 25/04/2024]
-        
 
 resetState :: AppState -> AppState
 resetState state = merge baseState state
@@ -88,6 +92,7 @@ baseState ∷ { username :: Maybe String
             , userInfo :: Maybe UserInfo
             , index :: Maybe Index
             , donationLevel :: Maybe DonationLevel
+            , enableSync :: Boolean
             }
 baseState = { username: Nothing
             , password: Nothing
@@ -103,4 +108,5 @@ baseState = { username: Nothing
             , userInfo: Nothing
             , index: Nothing
             , donationLevel: Nothing
+            , enableSync: false
             }

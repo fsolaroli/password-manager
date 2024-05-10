@@ -1,6 +1,6 @@
 module Functions.Handler.GenericHandlerFunctions where
 
-import Concur.Core (Widget)
+import Concur.Core (Widget, liftWidget)
 import Concur.React (HTML, affAction)
 import Control.Alt ((<|>))
 import Control.Alternative ((*>), (<*))
@@ -37,7 +37,10 @@ operationDelay :: Effect Number
 operationDelay = _operationDelay unit
 
 runStep :: forall a. ExceptT AppError Aff a -> WidgetState -> ExceptT AppError (Widget HTML) a
-runStep step widgetState = ExceptT $ ((step # runExceptT # affAction) <* ((affAction <<< delay <<< Milliseconds) =<< (liftEffect operationDelay))) <|> (defaultView widgetState)
+runStep       step widgetState = ExceptT    $ ((step # runExceptT # affAction) <* ((affAction <<< delay <<< Milliseconds) =<< (liftEffect operationDelay))) <|> (defaultView widgetState)
+
+runWidgetStep :: forall a. Widget HTML a -> WidgetState -> ExceptT AppError (Widget HTML) a
+runWidgetStep step widgetState = liftWidget $ ( step                           <* ((affAction <<< delay <<< Milliseconds) =<< (liftEffect operationDelay))) <|> (defaultView widgetState)
 
 defaultView :: forall a. WidgetState -> Widget HTML a
 defaultView widgetState = (unsafeCoerce unit <$ appView widgetState)

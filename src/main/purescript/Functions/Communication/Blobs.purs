@@ -19,11 +19,12 @@ import Data.Show (show)
 import Data.String.Common (joinWith)
 import Data.Unit (Unit)
 import DataModel.AppError (AppError(..))
-import DataModel.AppState (ProxyResponse(..))
+import DataModel.Communication.ConnectionState (ConnectionState)
 import DataModel.Communication.ProtocolError (ProtocolError(..))
+import DataModel.Proxy (ProxyResponse(..))
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
-import Functions.Communication.Backend (ConnectionState, isStatusCodeOk, genericRequest)
+import Functions.Communication.Backend (isStatusCodeOk, genericRequest)
 import Functions.Communication.BlobFromArrayBuffer (blobFromArrayBuffer)
 import Functions.EncodeDecode (decryptJson)
 import Web.XHR.FormData (EntryName(..), FileName(..), appendBlob, new)
@@ -31,7 +32,7 @@ import Web.XHR.FormData (EntryName(..), FileName(..), appendBlob, new)
 -- ----------------------------------------------------------------------------
 
 getBlob :: ConnectionState -> HexString -> ExceptT AppError Aff (ProxyResponse ArrayBuffer)
-getBlob connectionState hash = do
+getBlob connectionState hash = do  -- TODO: add lookup in localStorage [fsolaroli - 9/5/2024]
   let url = joinWith "/" ["blobs", toString Hex hash]
   ProxyResponse proxy response <- genericRequest connectionState url GET Nothing RF.arrayBuffer
   if isStatusCodeOk response.status

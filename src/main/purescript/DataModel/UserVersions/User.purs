@@ -2,6 +2,7 @@ module DataModel.UserVersions.User where
 
 import Control.Alternative (pure)
 import Control.Bind (bind)
+import Control.Category ((<<<))
 import Data.Codec.Argonaut as CA
 import Data.Codec.Argonaut.Common as CAC
 import Data.Codec.Argonaut.Record as CAR
@@ -12,6 +13,9 @@ import Data.Eq (class Eq)
 import Data.Function (($))
 import Data.HexString (HexString, hexStringCodec)
 import Data.Identifier (Identifier, computeIdentifier)
+import Data.Lens (Lens')
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Profunctor (dimap, wrapIso)
@@ -23,6 +27,7 @@ import DataModel.Password (PasswordGeneratorSettings, standardPasswordGeneratorS
 import DataModel.SRPVersions.SRP (SRPVersion, srpVersionCodec)
 import Effect.Aff (Aff)
 import Type.Proxy (Proxy(..))
+import Type.Proxy as Proxy
 
 
 data MasterKeyEncodingVersion = MasterKeyEncodingVersion_1 | MasterKeyEncodingVersion_2 | MasterKeyEncodingVersion_3
@@ -42,6 +47,8 @@ masterKeyEncodingVersionCodec = dimap toVariant fromVariant $ CAV.variantMatch
       , masterKeyEncodingVersion_2: \_ -> MasterKeyEncodingVersion_2
       , masterKeyEncodingVersion_3: \_ -> MasterKeyEncodingVersion_3
       }
+
+derive instance eqMasterKeyEncodingVersion :: Eq MasterKeyEncodingVersion
 
 type MasterKey = Tuple HexString MasterKeyEncodingVersion
 masterKeyCodec :: CA.JsonCodec MasterKey
@@ -86,6 +93,7 @@ requestUserCardCodec = wrapIso RequestUserCard $
     }
 
 derive instance newtypeRequestUserCard :: Newtype RequestUserCard _
+derive instance eqRequestUserCard      :: Eq RequestUserCard
 
 -- --------------------------------------------------------------------------
 
@@ -139,3 +147,11 @@ prepareUserInfo :: IndexReference -> UserPreferences -> Aff UserInfo
 prepareUserInfo indexReference userPreferences = do
   identifier <- computeIdentifier
   pure $ UserInfo {indexReference, userPreferences, identifier, donationInfo: Nothing}
+
+-- ==================================================================
+
+_userInfoReference_reference :: Lens' UserInfoReferences HexString
+_userInfoReference_reference = prop (Proxy.Proxy :: _ "reference")
+
+_indexReference_refence :: Lens' UserInfo HexString
+_indexReference_refence = _Newtype <<< prop (Proxy.Proxy :: _ "indexReference") <<< _Newtype <<< prop (Proxy.Proxy :: _ "reference")

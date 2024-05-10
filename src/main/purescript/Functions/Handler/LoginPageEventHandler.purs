@@ -19,24 +19,27 @@ import Data.Ord ((<))
 import Data.Show (show)
 import Data.Tuple (Tuple(..))
 import Data.Unit (unit)
-import DataModel.AppError (AppError(..))
-import DataModel.AppState (AppState, InvalidStateError(..), ProxyInfo, ProxyResponse(..))
+import DataModel.AppError (AppError(..), InvalidStateError(..))
+import DataModel.AppState (AppState)
 import DataModel.Communication.ProtocolError (ProtocolError(..))
 import DataModel.Credentials (Credentials, emptyCredentials)
 import DataModel.FragmentState as Fragment
+import DataModel.Proxy (ProxyInfo, ProxyResponse(..), defaultOnlineProxy)
 import DataModel.WidgetState (CardFormInput(..), CardViewState(..), LoginType(..), Page(..), WidgetState(..))
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Functions.Communication.Login (PrepareLoginResult, loginStep1, loginStep2, prepareLogin)
 import Functions.Communication.Users (extractUserInfoReference, getUserInfo)
+import Functions.DeviceSync (computeSyncOperations, getSyncOptionFromLocalStorage)
 import Functions.Donations (DonationLevel(..), computeDonationLevel)
 import Functions.EncodeDecode (importCryptoKeyAesGCM)
-import Functions.Handler.GenericHandlerFunctions (OperationState, defaultView, noOperation, handleOperationResult, runStep)
+import Functions.Handler.GenericHandlerFunctions (OperationState, defaultView, handleOperationResult, noOperation, runStep, runWidgetStep)
 import Functions.Index (getIndex)
 import Functions.Pin (decryptPassphraseWithPin, deleteCredentials, makeKey)
 import Functions.SRP (checkM2)
 import Functions.State (getProxyInfoFromProxy)
 import Functions.Timer (activateTimer)
+import OperationalWidgets.Sync (addPendingOperations, updateConnectionState)
 import Record (merge)
 import Views.AppView (emptyMainPageWidgetState)
 import Views.CardsManagerView (cardManagerInitialState)
@@ -116,12 +119,12 @@ loginSteps cred state@{proxy, hash: hashFunc, srpConf} fragmentState page proxyI
 
 loadHomePageSteps :: AppState -> Page -> ProxyInfo -> Fragment.FragmentState -> ExceptT AppError (Widget HTML) OperationState
 
-loadHomePageSteps state@{hash: hashFunc, proxy, srpConf, c: Just c, p: Just p, masterKey: Just (Tuple _ masterKeyEncodingVersion), userInfoReferences: Just userInfoReferences} page proxyInfo fragmentState = do
+loadHomePageSteps state@{hash: hashFunc, proxy, srpConf, c: Just c, p: Just p, masterKey: Just (Tuple _ masterKeyEncodingVersion), userInfoReferences: Just userInfoReferences, syncDataWire} page proxyInfo fragmentState = do
   let connectionState = {proxy, hashFunc, srpConf, c, p}
 
-  ProxyResponse proxy'  userInfo <- runStep (getUserInfo connectionState                                userInfoReferences (masterKeyEncodingVersion)) (WidgetState {status: Spinner, color: Black, message: "Get user info"} page proxyInfo)
-  ProxyResponse proxy'' index    <- runStep (getIndex    connectionState{ proxy = proxy'} (unwrap userInfo).indexReference                           ) (WidgetState {status: Spinner, color: Black, message: "Get index"    } page proxyInfo)
-  donationLevel                  <- runStep (computeDonationLevel index userInfo # liftEffect                                                        ) (WidgetState {status: Spinner, color: Black, message: "Get index"    } page proxyInfo)
+  ProxyResponse proxy'  userInfo <- runStep       (getUserInfo connectionState                                userInfoReferences (masterKeyEncodingVersion)) (WidgetState {status: Spinner, color: Black, message: "Get user info"      } page proxyInfo)
+  ProxyResponse proxy'' index    <- runStep       (getIndex    connectionState{ proxy = proxy'} (unwrap userInfo).indexReference                           ) (WidgetState {status: Spinner, color: Black, message: "Get index"          } page proxyInfo)
+  donationLevel                  <- runStep       (computeDonationLevel index userInfo # liftEffect                                                        ) (WidgetState {status: Spinner, color: Black, message: "Get index"          } page proxyInfo)                                                     
   case (unwrap (unwrap userInfo).userPreferences).automaticLock of
     Right n -> liftEffect (activateTimer n)
     Left  _ -> pure unit
@@ -129,14 +132,21 @@ loadHomePageSteps state@{hash: hashFunc, proxy, srpConf, c: Just c, p: Just p, m
   let cardViewState = case fragmentState of
                         Fragment.AddCard card -> CardForm (emptyCardFormData {card = card}) (NewCardFromFragment card)
                         _                     -> NoCard
+  enableSync                     <- runStep      (getSyncOptionFromLocalStorage c # liftEffect                                                            ) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} page proxyInfo)
+
+  let updatedState = state {proxy = proxy'', index = Just index, userInfo = Just userInfo, donationLevel = Just donationLevel, enableSync = enableSync}
+
+  syncOperations                 <- runStep       (computeSyncOperations updatedState                                                                     ) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} page proxyInfo)
+  _                              <- runWidgetStep (updateConnectionState syncDataWire {c, p, srpConf, hashFunc, proxy: defaultOnlineProxy}                ) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} page proxyInfo)
+  _                              <- runWidgetStep (addPendingOperations  syncDataWire syncOperations                                                      ) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} page proxyInfo)
 
   pure $ Tuple 
-    (state {proxy = proxy'', index = Just index, userInfo = Just userInfo, donationLevel = Just donationLevel})
+    updatedState
     (WidgetState 
       hiddenOverlayInfo
       case donationLevel of
         DonationWarning -> (Donation donationLevel)
-        _               -> (Main emptyMainPageWidgetState { index = index, cardManagerState = cardManagerInitialState { cardViewState = cardViewState }, donationLevel = donationLevel })
+        _               -> (Main emptyMainPageWidgetState { index = index, cardManagerState = cardManagerInitialState { cardViewState = cardViewState }, donationLevel = donationLevel, syncDataWire = Just syncDataWire, enableSync = enableSync })
       proxyInfo
     )
 
