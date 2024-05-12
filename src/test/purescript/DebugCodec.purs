@@ -193,7 +193,7 @@ donationInfoCodec =
 -- data DataOnLocalStorage = WithData (List CardEntry) | NoData
 dataOnLocalStorageCodec :: CA.JsonCodec DataOnLocalStorage
 dataOnLocalStorageCodec = dimap toVariant fromVariant $ CAV.variantMatch
-    { withData : Right (CAC.list cardEntryCodec)
+    { withData : Right (CAC.list hexStringCodec)
     , noData   : Left unit
     }
   where

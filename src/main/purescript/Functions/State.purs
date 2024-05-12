@@ -1,21 +1,24 @@
 module Functions.State where
 
 import Concur.Core (Widget)
-import Concur.Core.Patterns (Wire)
+import Concur.Core.Patterns (Wire(..))
 import Concur.React (HTML)
 import Control.Alt ((<#>))
 import Control.Applicative (pure)
 import Control.Bind (bind, (>>=))
+import Control.Category ((<<<))
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Data.Array (filter, catMaybes, head)
 import Data.Eq ((==))
 import Data.Function ((#), ($))
 import Data.Functor ((<$>))
 import Data.HexString (HexString)
+import Data.List (List(..), (:))
 import Data.Map (Map)
 import Data.Map.Internal (empty)
 import Data.Maybe (Maybe(..), isJust)
-import Data.Traversable (sequence)
+import Data.Newtype (un)
+import Data.Traversable (fold, sequence)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Unit (Unit)
 import DataModel.AppState (AppState)
@@ -27,7 +30,7 @@ import DataModel.UserVersions.User (MasterKey, UserInfo, UserInfoReferences)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Functions.Donations (DonationLevel)
-import OperationalWidgets.Sync (SyncData)
+import OperationalWidgets.Sync (SyncData, SyncOperation(..))
 import Record (merge)
 import Web.DOM (Element, Node)
 import Web.DOM.Element (fromNode, id)
@@ -73,12 +76,19 @@ computeInitialState wire = computeProxy >>= (\proxy -> pure $ merge baseState {p
     computeDynamicProxy :: Effect DynamicProxy
     computeDynamicProxy = (window >>= navigator >>= onLine) <#> case _ of 
       true  -> OnlineProxy defaultPathPrefix {toll: Nothing, currentChallenge: Nothing} Nothing
-      false -> OfflineProxy NoData -- TODO: check local storage to determine data presence [fsolaroli - 25/04/2024]
+      false -> OfflineProxy NoData
 
 updateProxy :: AppState -> Effect Proxy
-updateProxy state = DynamicProxy <$> ((window >>= navigator >>= onLine) <#> case _ of 
-      true  -> OnlineProxy defaultPathPrefix {toll: Nothing, currentChallenge: Nothing} Nothing
-      false -> OfflineProxy NoData
+updateProxy state = DynamicProxy <$> ((window >>= navigator >>= onLine) >>= case _, state of 
+      false, {enableSync: true, syncDataWire} ->
+          ((un Wire syncDataWire).value) <#> (\syncData ->
+            fold (syncData.pendingOperations <#> (case _ of
+              SaveBlob ref -> ref : Nil
+              _            ->       Nil
+            ))
+          ) <#>  (OfflineProxy <<< WithData)
+      false, _ -> OfflineProxy NoData                                                              # pure
+      true,  _ -> OnlineProxy defaultPathPrefix {toll: Nothing, currentChallenge: Nothing} Nothing # pure
 )
 
 resetState :: AppState -> AppState

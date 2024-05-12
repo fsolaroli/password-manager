@@ -190,6 +190,11 @@ div#homePage {
                                     color: $main-color;
                                 }
                             }
+
+							&.disabled {
+								color: #eee;
+								cursor: default;
+							}
                         }
                     }
                 }

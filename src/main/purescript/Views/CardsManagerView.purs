@@ -16,8 +16,9 @@ import Data.Either (either)
 import Data.Eq ((/=), (==))
 import Data.Function (flip, (#), ($))
 import Data.Functor ((<$>), (<$))
+import Data.HexString (HexString)
 import Data.HeytingAlgebra (not)
-import Data.List (List, elemIndex, index, length)
+import Data.List (List(..), elem, elemIndex, index, length)
 import Data.List as List
 import Data.Maybe (Maybe(..), maybe)
 import Data.Ord (max, min)
@@ -28,9 +29,9 @@ import Data.Time.Duration (Days)
 import Data.Tuple (Tuple(..), swap)
 import Data.Unit (unit)
 import DataModel.CardVersions.Card (Card, emptyCard)
-import DataModel.IndexVersions.Index (CardEntry(..), Index(..))
+import DataModel.IndexVersions.Index (CardEntry(..), CardReference(..), Index(..))
 import DataModel.Password (PasswordGeneratorSettings)
-import DataModel.Proxy (ProxyInfo)
+import DataModel.Proxy (DataOnLocalStorage(..), ProxyInfo(..))
 import DataModel.WidgetState (CardFormInput(..), CardManagerState, CardViewState(..))
 import Effect.Class (liftEffect)
 import Functions.Donations (DonationLevel(..))
@@ -87,7 +88,7 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
         , div [Props.className "addCard"] [
             button [Props.onClick, Props.className "addCard" ] [span [] [text "add card"]] $> OpenCardFormEvent Nothing
           ]
-        , (indexView sortedCards getHighlightedEntry) <#> (NavigateCardsEvent <<< Open <<< Just)
+        , (indexView sortedCards (getDisabledCards proxyInfo) getHighlightedEntry) <#> (NavigateCardsEvent <<< Open <<< Just)
         , donationButton (donationLevel == DonationInfo) showDonationOverlay
         ]
       , div [Props._id "card"] [
@@ -110,6 +111,10 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
       Card                   _ entry  -> Just entry
       CardForm _ (ModifyCard _ entry) -> Just entry
       _                               -> Nothing
+
+    getDisabledCards :: ProxyInfo -> List HexString
+    getDisabledCards (Offline (WithData refList)) = refList
+    getDisabledCards _                            = Nil
 
     getHighlightedEntry :: Maybe Int
     getHighlightedEntry = highlightedEntry <|> (selectedEntry >>= flip elemIndex sortedCards)
@@ -272,10 +277,12 @@ donationButton true  showOverlay =
 
 -- ==================================================================                                                                                                                             
 
-indexView :: List CardEntry -> Maybe Int -> Widget HTML CardEntry
-indexView sortedCards selectedEntry = ol [] (
-  flip mapWithIndex (fromFoldable sortedCards) (\index cardEntry@(CardEntry { title, archived: archived' }) -> 
-    li [Props.classList [archivedClass archived', selectedClass index], cardEntry <$ Props.onClick] [
+indexView :: List CardEntry -> List HexString-> Maybe Int -> Widget HTML CardEntry
+indexView sortedCards disabledCards selectedEntry = ol [] (
+  flip mapWithIndex (fromFoldable sortedCards) (\index cardEntry@(CardEntry { title, archived: archived', cardReference: CardReference { reference: ref } }) -> do
+    let disabled = elem ref disabledCards
+
+    li ([Props.classList [archivedClass archived', selectedClass index, disabledClass disabled]] <> if disabled then []  else [cardEntry <$ Props.onClick]) [
       text title
     ]
   )
@@ -284,3 +291,4 @@ indexView sortedCards selectedEntry = ol [] (
   where
     archivedClass archived' = if archived'                   then Just "archived" else Nothing
     selectedClass index     = if selectedEntry == Just index then Just "selected" else Nothing
+    disabledClass disabled  = if disabled                    then Just "disabled" else Nothing
