@@ -32,7 +32,7 @@ type TollManager = {
 data Proxy = DynamicProxy DynamicProxy
            | StaticProxy (Maybe BackendSessionState)
 
-data DynamicProxy = OnlineProxy PathPrefix TollManager (Maybe SessionKey) | OfflineProxy DataOnLocalStorage
+data DynamicProxy = OnlineProxy PathPrefix TollManager (Maybe SessionKey) | OfflineProxy (Maybe BackendSessionState) DataOnLocalStorage
 
 defaultOnlineProxy :: Proxy
 defaultOnlineProxy = DynamicProxy (OnlineProxy defaultPathPrefix {toll: Nothing, currentChallenge: Nothing} Nothing)

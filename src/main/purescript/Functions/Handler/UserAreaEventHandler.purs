@@ -41,7 +41,7 @@ import DataModel.Communication.ConnectionState (ConnectionState)
 import DataModel.Credentials (emptyCredentials)
 import DataModel.FragmentState as Fragment
 import DataModel.IndexVersions.Index (CardEntry(..), CardReference(..), Index(..), _cardReference_reference, addToIndex)
-import DataModel.Proxy (ProxyInfo, ProxyResponse(..), defaultOnlineProxy, discardResult)
+import DataModel.Proxy (DataOnLocalStorage(..), DynamicProxy(..), Proxy(..), ProxyInfo, ProxyResponse(..), defaultOnlineProxy, discardResult)
 import DataModel.UserVersions.User (IndexReference(..), UserInfo(..), _indexReference_refence, _userInfoReference_reference)
 import DataModel.WidgetState (CardManagerState, CardViewState(..), ImportStep(..), LoginType(..), Page(..), UserAreaPage(..), UserAreaState, WidgetState(..), MainPageWidgetState)
 import Effect.Aff.Class (liftAff)
@@ -382,8 +382,10 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
   
     (LogoutEvent) ->
       let page = Main defaultPage
-      in
-        logoutSteps (state {username = Nothing}) "Logout" page proxyInfo
+      in 
+        do
+          username_ <- runStep (liftEffect $ window >>= localStorage >>= getItem (makeKey "user")) (WidgetState (spinnerOverlay "Logout" White) page proxyInfo)
+          logoutSteps (state {username = username_}) "Logout" page proxyInfo
         # runExceptT
         >>= handleOperationResult state defaultErrorPage true White
 
@@ -428,15 +430,17 @@ downloadBlobsSteps referenceList connectionState page proxyInfo =
 logoutSteps :: AppState -> String -> Page -> ProxyInfo -> ExceptT AppError (Widget HTML) OperationState
 logoutSteps state@{username, hash: hashFunc, proxy, srpConf} message page proxyInfo =
   do
-    let connectionState = {proxy, hashFunc, srpConf, c: hex "", p: hex ""}
-    passphrase <- runStep (do 
-                            _   <- genericRequest connectionState "logout" POST Nothing RF.ignore
-                            res <- liftEffect $ window >>= localStorage >>= getItem (makeKey "passphrase")
-                            pure res
-                          ) (WidgetState (spinnerOverlay message White) page proxyInfo)
+    proxy' <- case proxy of
+      DynamicProxy (OfflineProxy _ _) -> pure $ DynamicProxy $ OfflineProxy Nothing NoData
+      _ -> do 
+        let connectionState = {proxy, hashFunc, srpConf, c: hex "", p: hex ""}
+        _ <- runStep (genericRequest connectionState "logout" POST Nothing RF.ignore) (WidgetState (spinnerOverlay message White) page proxyInfo)
+        pure $ defaultOnlineProxy
+
+    passphrase <- runStep (liftEffect $ window >>= localStorage >>= getItem (makeKey "passphrase")) (WidgetState (spinnerOverlay message White) page proxyInfo)
     
     pure $ Tuple 
-            ((resetState state) {username = username, pinEncryptedPassword = hex <$> passphrase})
+            ((resetState state) {username = username, pinEncryptedPassword = hex <$> passphrase, proxy = proxy'})
             (WidgetState
               hiddenOverlayInfo
               (Login emptyLoginFormData { credentials = emptyCredentials {username = fromMaybe "" username}

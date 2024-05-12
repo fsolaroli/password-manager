@@ -60,9 +60,9 @@ isStatic = isJust <$> runMaybeT do
 
 getProxyInfoFromProxy :: Proxy -> ProxyInfo
 getProxyInfoFromProxy = case _ of
-  StaticProxy   _                                -> Static
-  DynamicProxy (OnlineProxy  _ _ _             ) -> Online
-  DynamicProxy (OfflineProxy dataOnLocalStorage) -> Offline dataOnLocalStorage
+  StaticProxy   _                                  -> Static
+  DynamicProxy (OnlineProxy  _ _ _               ) -> Online
+  DynamicProxy (OfflineProxy _ dataOnLocalStorage) -> Offline dataOnLocalStorage
 
 computeInitialState :: Wire (Widget HTML) SyncData -> Effect AppState
 computeInitialState wire = computeProxy >>= (\proxy -> pure $ merge baseState {proxy, syncDataWire: wire})
@@ -76,7 +76,7 @@ computeInitialState wire = computeProxy >>= (\proxy -> pure $ merge baseState {p
     computeDynamicProxy :: Effect DynamicProxy
     computeDynamicProxy = (window >>= navigator >>= onLine) <#> case _ of 
       true  -> OnlineProxy defaultPathPrefix {toll: Nothing, currentChallenge: Nothing} Nothing
-      false -> OfflineProxy NoData
+      false -> OfflineProxy Nothing NoData
 
 updateProxy :: AppState -> Effect Proxy
 updateProxy state = DynamicProxy <$> ((window >>= navigator >>= onLine) >>= case _, state of 
@@ -86,8 +86,8 @@ updateProxy state = DynamicProxy <$> ((window >>= navigator >>= onLine) >>= case
               SaveBlob ref -> ref : Nil
               _            ->       Nil
             ))
-          ) <#>  (OfflineProxy <<< WithData)
-      false, _ -> OfflineProxy NoData                                                              # pure
+          ) <#>  (OfflineProxy Nothing <<< WithData)
+      false, _ -> OfflineProxy Nothing NoData                                                      # pure
       true,  _ -> OnlineProxy defaultPathPrefix {toll: Nothing, currentChallenge: Nothing} Nothing # pure
 )
 

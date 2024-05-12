@@ -115,8 +115,8 @@ createHeaders (DynamicProxy (OnlineProxy _ { toll, currentChallenge } sessionKey
                                                                                               Just (Right t) -> [t]
                                                                                               _              -> [ ]
   in tollChallengeHeader <> tollCostHeader <> tollReceiptHeader <> sessionHeader
-createHeaders (DynamicProxy (OfflineProxy _)) = []
-createHeaders (StaticProxy _)                 = []
+createHeaders (DynamicProxy (OfflineProxy _ _)) = []
+createHeaders (StaticProxy _)                   = []
 
 -- ----------------------------------------------------------------------------
 
@@ -144,12 +144,12 @@ manageGenericRequestAndResponse connectionState@{proxy, hashFunc, srpConf} path 
   case proxy of
     (DynamicProxy (OnlineProxy baseUrl tollManager _)) ->
       case tollManager.toll of
-        Just (Left fiber)           ->  do
-                                          toll <- liftAff $ joinFiber fiber
-                                          manageGenericRequestAndResponse connectionState {proxy = updateToll { toll: Just $ Right toll } proxy} path method body responseFormat 
-        _                           ->  withExceptT ProtocolError (doOnlineRequest  baseUrl) >>= manageOnlineResponse
-    (DynamicProxy (OfflineProxy _)) ->  throwError $ UnhandledCondition "Implement offline mode" -- TODO: implement access to local storage [fsolaroli - 25/04/2024]
-    (StaticProxy session)           ->  withExceptT ProtocolError (doOfflineRequest session)
+        Just (Left fiber)             ->  do
+                                            toll <- liftAff $ joinFiber fiber
+                                            manageGenericRequestAndResponse connectionState {proxy = updateToll { toll: Just $ Right toll } proxy} path method body responseFormat 
+        _                             ->  withExceptT ProtocolError (doOnlineRequest  baseUrl) >>= manageOnlineResponse
+    (DynamicProxy (OfflineProxy _ _)) ->  throwError $ UnhandledCondition "Implement offline mode" -- TODO: implement access to local storage [fsolaroli - 25/04/2024]
+    (StaticProxy session)             ->  withExceptT ProtocolError (doOfflineRequest session)
   
   where
     doOnlineRequest :: String -> ExceptT ProtocolError Aff (AXW.Response a)
@@ -319,13 +319,13 @@ updateToll :: forall r1 r2.
   => Nub    r2 ( currentChallenge :: Maybe TollChallenge, toll :: Maybe (Either (Fiber HexString) HexString))
   => Record r1 -> Proxy -> Proxy
 updateToll tollManager (DynamicProxy (OnlineProxy baseUrl oldTollManager sessionKey)) = DynamicProxy $ OnlineProxy baseUrl (merge tollManager oldTollManager) sessionKey
-updateToll _           offline@(DynamicProxy (OfflineProxy _)) = offline
-updateToll _           static @(StaticProxy _)                 = static
+updateToll _           offline@(DynamicProxy (OfflineProxy _ _)) = offline
+updateToll _           static @(StaticProxy _)                   = static
 
 updateSession :: Maybe HexString -> Proxy -> Proxy
 updateSession sessionKey (DynamicProxy (OnlineProxy baseUrl tollManager _)) = DynamicProxy $ OnlineProxy baseUrl tollManager sessionKey
-updateSession _          offline@(DynamicProxy (OfflineProxy _)) = offline
-updateSession _          static @(StaticProxy _)                 = static
+updateSession _          offline@(DynamicProxy (OfflineProxy _ _)) = offline
+updateSession _          static @(StaticProxy _)                   = static
 
 extractChallenge :: Array ResponseHeader -> Maybe TollChallenge
 extractChallenge headers =
