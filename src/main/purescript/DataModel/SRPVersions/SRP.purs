@@ -7,6 +7,7 @@ import Data.BigInt (BigInt, fromInt)
 import Data.Codec.Argonaut as CA
 import Data.Codec.Argonaut.Variant as CAV
 import Data.Either (Either(..))
+import Data.Eq (class Eq)
 import Data.Function (($))
 import Data.HexString (hex, toBigInt)
 import Data.List (List(..), (:))
@@ -34,6 +35,8 @@ srpVersionCodec = dimap toVariant fromVariant $ CAV.variantMatch
     fromVariant = V.match
       { v_6a: \_ -> SRPVersion_6a
       }
+
+derive instance eqSRPVersion :: Eq SRPVersion
 
 -- --------------------------------------------
 

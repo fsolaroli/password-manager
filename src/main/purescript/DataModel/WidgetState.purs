@@ -1,5 +1,8 @@
 module DataModel.WidgetState where
 
+import Concur.Core (Widget)
+import Concur.Core.Patterns (Wire)
+import Concur.React (HTML)
 import Data.Bounded (class Ord)
 import Data.Either (Either)
 import Data.Eq (class Eq)
@@ -9,9 +12,13 @@ import Data.Tuple (Tuple)
 import DataModel.CardVersions.Card (Card)
 import DataModel.Credentials (Credentials)
 import DataModel.IndexVersions.Index (CardEntry, Index)
+import DataModel.Proxy (ProxyInfo)
 import DataModel.UserVersions.User (UserPreferences, DonationInfo)
 import Functions.Donations (DonationLevel)
 import IndexFilterView (FilterData)
+import OperationalWidgets.Sync (SyncData)
+import Views.CreateCardView (CardFormData)
+import Views.DeviceSyncView (EnableSync)
 import Views.OverlayView (OverlayInfo)
 import Views.SignupFormView (SignupDataForm)
 import Web.File.File (File)
@@ -39,7 +46,7 @@ type UserAreaState = {
 , userAreaSubmenus :: Map UserAreaSubmenu Boolean
 }
 
-data UserAreaPage = Export | Import | Pin | Delete | Preferences | ChangePassword | Donate | About | None
+data UserAreaPage = Export | Import | Delete | Preferences | ChangePassword | Pin | DeviceSync | Donate | About | None
 derive instance eqUserAreaPage :: Eq UserAreaPage
 
 data ImportStep = Upload | Selection | Confirm
@@ -51,7 +58,7 @@ type ImportState = {
 , tag       :: Tuple Boolean String
 }
 
-data UserAreaSubmenu = Account | Data
+data UserAreaSubmenu = Account | Device | Data
 derive instance  eqUserAreaSubmenus :: Eq  UserAreaSubmenu
 derive instance ordUserAreaSubmenus :: Ord UserAreaSubmenu
 
@@ -62,20 +69,22 @@ type MainPageWidgetState = {
 , credentials        :: Credentials
 , donationInfo       :: Maybe DonationInfo
 , pinExists          :: Boolean
+, enableSync         :: EnableSync
 , userAreaState      :: UserAreaState
 , cardManagerState   :: CardManagerState
 , userPreferences    :: UserPreferences
 , donationLevel      :: DonationLevel
+, syncDataWire       :: Maybe ((Wire (Widget HTML) SyncData))
 }
 
-data WidgetState = WidgetState OverlayInfo Page
+data WidgetState = WidgetState OverlayInfo Page ProxyInfo
 
 -- -------------------------------------
 
 data CardFormInput = NewCard | NewCardFromFragment Card | ModifyCard Card CardEntry
 derive instance eqCardFormInput :: Eq CardFormInput
 
-data CardViewState = NoCard | Card Card CardEntry | CardForm CardFormInput
+data CardViewState = NoCard | Card Card CardEntry | CardForm CardFormData CardFormInput
 derive instance eqCardViewState :: Eq CardViewState
 
 type CardManagerState = { 

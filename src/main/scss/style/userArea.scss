@@ -2,6 +2,17 @@
 @import "hide.scss";
 @import "../structure/mixin.scss";
 
+div.syncProgressBar {
+	width: 100%;
+	height: 30px;
+	border: 2px solid white;
+
+	.completedOperation {
+		background-color: green;
+		height: 100%;
+	}
+}
+
 div#userPage {
     div.panel {
         background-color: black;

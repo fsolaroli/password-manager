@@ -4,8 +4,9 @@ self.addEventListener('install', function(event) {
 	event.waitUntil(precache());
 });
 
-self.addEventListener('update', function(event) {
-	if (window.navigator.onLine) {
+self.addEventListener('message', function(event) {
+	if (event.data === 'update') {
+		console.log("updated index.html");
 		event.waitUntil(precache());
 	}
 })

@@ -1,7 +1,7 @@
 module Test.Debug where
 
 import Concur.Core (Widget)
-import Concur.React (HTML)
+import Concur.React (HTML, affAction)
 import Concur.React.DOM (button, span, text)
 import Concur.React.Props as Props
 import Control.Alt (void)
@@ -15,7 +15,6 @@ import Data.Monoid ((<>))
 import Data.Unit (Unit, unit)
 import DataModel.WidgetState (WidgetState)
 import Effect.Aff (Aff)
-import Effect.Aff.Class (liftAff)
 import Effect.Aff.Compat (EffectFnAff, fromEffectFnAff)
 import Effect.Class (liftEffect)
 import Functions.Clipboard (copyToClipboard)
@@ -34,7 +33,7 @@ debugState widgetState = do
   commit <- liftEffect $ currentCommit
   let jsonEncodedState = stringify $ CA.encode widgetStateCodec widgetState
   _ <-  if   commit == "development" 
-        then ((button [Props._id "DEBUG", Props.onClick] [span [] [text "DEBUG"]] # void) <> (liftAff copyState)) *> (liftAff $ copyToClipboard jsonEncodedState)
+        then ((button [Props._id "DEBUG", Props.onClick] [span [] [text "DEBUG"]] # void) <> (affAction copyState)) *> (affAction $ copyToClipboard jsonEncodedState)
         else emptyEl
   debugState widgetState
 

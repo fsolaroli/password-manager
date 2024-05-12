@@ -1,7 +1,7 @@
 module Views.PasswordGenerator where
   
 import Concur.Core (Widget)
-import Concur.React (HTML)
+import Concur.React (HTML, affAction)
 import Concur.React.DOM (button, div, h4, header, input, label, span, text, textarea)
 import Concur.React.Props as Props
 import Control.Alt ((<|>))
@@ -25,7 +25,6 @@ import Data.Tuple (Tuple(..))
 import DataModel.AsyncValue (AsyncValue(..))
 import DataModel.Password (PasswordGeneratorSettings, CharacterSet(..), defaultCharacterSets)
 import Effect.Aff (Milliseconds(..), delay)
-import Effect.Aff.Class (liftAff)
 import Functions.Clipboard (copyToClipboard)
 import Functions.Password (randomPassword)
 import Views.Components (dynamicWrapper, entropyMeter)
@@ -66,7 +65,7 @@ composedWidget settings isOpen av = do
     ApprovedSuggestion     pwsd -> pure (Tuple pwsd (Just settings))
   where 
     computePassword :: PasswordGeneratorSettings -> Widget HTML String
-    computePassword s' = liftAff $ randomPassword s'.length s'.characters
+    computePassword s' = affAction $ randomPassword s'.length s'.characters
 
     widget :: PasswordGeneratorSettings -> Boolean -> AsyncValue String -> Widget HTML ComposedWidgetAction
     widget s _ v = div [Props.className "passwordGeneratorForm"] [
@@ -106,13 +105,13 @@ suggestionWidget av =
           , entropyMeter s
         ]
         <>
-        (CopyPassword   s <$  (button [Props.className "copy", Props.title "copy", Props.onClick] [span [] [text "copy"]] *> (liftAff $ copyToClipboard s)))
+        (CopyPassword   s <$  (button [Props.className "copy", Props.title "copy", Props.onClick] [span [] [text "copy"]] *> (affAction $ copyToClipboard s)))
         <>
         (InsertPassword s <$  button [Props.className "setPassword", Props.title "insert", Props.disabled b, Props.onClick] [span [] [text "set password"]])
       
       case res of
         PasswordChange p       -> suggestionWidget $ Done p
-        CopyPassword p         -> (suggestionWidget $ Done p) <|> (liftAff $ (Left p) <$ delay (Milliseconds 1000.0)) <|> overlay { status: OverlayStatus.Copy, color: Black, message: "copied" }
+        CopyPassword p         -> (suggestionWidget $ Done p) <|> (affAction $ (Left p) <$ delay (Milliseconds 1000.0)) <|> overlay { status: OverlayStatus.Copy, color: Black, message: "copied" }
         UpdatePassword         -> suggestionWidget $ Done ""
         InsertPassword newPswd -> pure $ Right newPswd 
 

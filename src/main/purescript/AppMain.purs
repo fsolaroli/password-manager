@@ -1,6 +1,8 @@
 module AppMain ( main ) where
 
+import Concur.Core.Patterns (local)
 import Concur.React.Run (runWidgetInDom)
+import Control.Alt ((<#>), (<|>))
 import Control.Alternative (pure)
 import Control.Bind (bind, discard, (=<<), (>>=))
 import Control.Category ((<<<))
@@ -9,7 +11,7 @@ import Data.Array (catMaybes)
 import Data.Bifunctor (lmap)
 import Data.Codec.Argonaut (JsonDecodeError(..), decode)
 import Data.Either (Either(..), note)
-import Data.Function (($))
+import Data.Function ((#), ($))
 import Data.Functor ((<$>))
 import Data.HexString (HexString, hex)
 import Data.Map (fromFoldable, lookup)
@@ -23,11 +25,13 @@ import DataModel.CardVersions.CurrentCardVersions (currentCardCodecVersion)
 import DataModel.FragmentState (FragmentState)
 import DataModel.FragmentState as Fragment
 import Effect (Effect)
+import Effect.Class (liftEffect)
 import Foreign (unsafeToForeign)
 import Functions.Pin (makeKey)
 import Functions.State (computeInitialState)
 import JSURI (decodeURI)
 import OperationalWidgets.App (app)
+import OperationalWidgets.Sync (baseSyncData, syncLocalStorage)
 import Record (merge)
 import Web.HTML (Window, window)
 import Web.HTML.History (DocumentTitle(..), URL(..), replaceState)
@@ -37,14 +41,15 @@ import Web.Storage.Storage (getItem)
 
 main :: Effect Unit
 main = do
-  appState      <- computeInitialState
   fragmentState <- parseFragment <$> (window >>= location >>= hash)
   
   credentials   <- getCredentialsFromLocalStorage
 
   window >>= removeFragment
   
-  runWidgetInDom "app" $ app (merge credentials appState) fragmentState
+  runWidgetInDom "app" $ local baseSyncData \wire -> do
+    appState    <- computeInitialState wire # liftEffect <#> merge credentials
+    app appState fragmentState <|> syncLocalStorage wire
 
 -- ---------------------------------------------
 

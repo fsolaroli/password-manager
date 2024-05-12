@@ -3,11 +3,15 @@ module DataModel.CardVersions.Card where
 import Control.Alt ((<#>), (<$>))
 import Control.Alternative (pure)
 import Control.Bind (bind)
+import Control.Category ((<<<), (>>>))
 import Data.Codec.Argonaut as CA
 import Data.Codec.Argonaut.Variant as CAV
 import Data.Either (Either(..))
 import Data.Eq (class Eq, eq)
 import Data.Function (($))
+import Data.Lens (Lens', lens', view)
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.List.Types (List(..))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
@@ -131,3 +135,21 @@ defaultCards :: List Card
 defaultCards = Nil
 
 data FieldType = Email | Url | Passphrase | None
+
+
+-- ==================================================================
+
+_content :: Lens' Card CardValues
+_content = _Newtype <<< prop (Proxy :: _ "content")
+
+_title :: Lens' Card String
+_title = _content <<< _Newtype <<< prop (Proxy :: _ "title")
+
+_tags :: Lens' Card (Set String)
+_tags = _content <<< _Newtype <<< prop (Proxy :: _ "tags")
+
+_fields :: Lens' Card (Array CardField)
+_fields = _content <<< _Newtype <<< prop (Proxy :: _ "fields")
+
+_notes :: Lens' Card String
+_notes = _content <<< _Newtype <<< prop (Proxy :: _ "notes")

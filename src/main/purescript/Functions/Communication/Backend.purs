@@ -1,6 +1,5 @@
 module Functions.Communication.Backend
-  ( ConnectionState
-  , Path
+  ( Path
   , SessionKey
   , Url
   , genericRequest
@@ -53,12 +52,12 @@ import Data.Tuple (Tuple(..))
 import Data.Unfoldable (fromMaybe)
 import Data.Unit (Unit, unit)
 import DataModel.AppError (AppError(..))
-import DataModel.AppState (BackendSessionState, Proxy(..), ProxyResponse(..))
+import DataModel.Communication.ConnectionState (ConnectionState)
 import DataModel.Communication.FromString (class FromString)
 import DataModel.Communication.FromString as BCFS
 import DataModel.Communication.Login (LoginStep2Response, loginStep1ResponseCodec, loginStep2ResponseCodec)
 import DataModel.Communication.ProtocolError (ProtocolError(..))
-import DataModel.SRPVersions.SRP (HashFunction, SRPConf)
+import DataModel.Proxy (BackendSessionState, DynamicProxy(..), Proxy(..), ProxyResponse(..))
 import DataModel.UserVersions.User (MasterKey, RequestUserCard(..), requestUserCardCodec)
 import Effect (Effect)
 import Effect.Aff (Aff, Fiber, forkAff, joinFiber)
@@ -78,14 +77,6 @@ foreign import _readUserCard :: Unit   -> String
 type Url = String
 type Path = String
 type SessionKey = HexString
-
-type ConnectionState = {
-  proxy    :: Proxy
-, hashFunc :: HashFunction
-, srpConf  :: SRPConf
-, c        :: HexString
-, p        :: HexString
-}
 
 loginStep1RequestCodec :: CA.JsonCodec {c :: HexString, aa :: HexString}
 loginStep1RequestCodec = 
@@ -115,7 +106,7 @@ tollReceiptHeaderName :: String
 tollReceiptHeaderName = "clipperz-hashcash-tollreceipt"
 
 createHeaders :: Proxy -> Array RequestHeader
-createHeaders (OnlineProxy _ { toll, currentChallenge } sessionKey) =
+createHeaders (DynamicProxy (OnlineProxy _ { toll, currentChallenge } sessionKey)) =
   let 
     tollChallengeHeader = (\t   -> RequestHeader tollHeaderName        (show t.toll)) <$> fromMaybe currentChallenge
     tollCostHeader      = (\t   -> RequestHeader tollCostHeaderName    (show t.cost)) <$> fromMaybe currentChallenge
@@ -124,7 +115,8 @@ createHeaders (OnlineProxy _ { toll, currentChallenge } sessionKey) =
                                                                                               Just (Right t) -> [t]
                                                                                               _              -> [ ]
   in tollChallengeHeader <> tollCostHeader <> tollReceiptHeader <> sessionHeader
-createHeaders (StaticProxy _) = []
+createHeaders (DynamicProxy (OfflineProxy _ _)) = []
+createHeaders (StaticProxy _)                   = []
 
 -- ----------------------------------------------------------------------------
 
@@ -150,13 +142,14 @@ requestWithoutAuthorization connectionState path method body responseFormat =
 manageGenericRequestAndResponse :: forall a. FromString a => ConnectionState -> Path -> Method -> Maybe RequestBody -> RF.ResponseFormat a -> ExceptT AppError Aff (ProxyResponse (AXW.Response a))
 manageGenericRequestAndResponse connectionState@{proxy, hashFunc, srpConf} path method body responseFormat = do
   case proxy of
-    (OnlineProxy baseUrl tollManager _) ->
+    (DynamicProxy (OnlineProxy baseUrl tollManager _)) ->
       case tollManager.toll of
-        Just (Left fiber) -> do
-                              toll <- liftAff $ joinFiber fiber
-                              manageGenericRequestAndResponse connectionState {proxy = updateToll { toll: Just $ Right toll } proxy} path method body responseFormat 
-        _                 ->  withExceptT ProtocolError (doOnlineRequest  baseUrl) >>= manageOnlineResponse
-    (StaticProxy session) ->  withExceptT ProtocolError (doOfflineRequest session)
+        Just (Left fiber)             ->  do
+                                            toll <- liftAff $ joinFiber fiber
+                                            manageGenericRequestAndResponse connectionState {proxy = updateToll { toll: Just $ Right toll } proxy} path method body responseFormat 
+        _                             ->  withExceptT ProtocolError (doOnlineRequest  baseUrl) >>= manageOnlineResponse
+    (DynamicProxy (OfflineProxy _ _)) ->  throwError $ UnhandledCondition "Implement offline mode" -- TODO: implement access to local storage [fsolaroli - 25/04/2024]
+    (StaticProxy session)             ->  withExceptT ProtocolError (doOfflineRequest session)
   
   where
     doOnlineRequest :: String -> ExceptT ProtocolError Aff (AXW.Response a)
@@ -325,12 +318,14 @@ updateToll :: forall r1 r2.
      Union  r1 ( currentChallenge :: Maybe TollChallenge, toll :: Maybe (Either (Fiber HexString) HexString)) r2
   => Nub    r2 ( currentChallenge :: Maybe TollChallenge, toll :: Maybe (Either (Fiber HexString) HexString))
   => Record r1 -> Proxy -> Proxy
-updateToll tollManager (OnlineProxy baseUrl oldTollManager sessionKey) = OnlineProxy baseUrl (merge tollManager oldTollManager) sessionKey
-updateToll _           offline@(StaticProxy _)                         = offline
+updateToll tollManager (DynamicProxy (OnlineProxy baseUrl oldTollManager sessionKey)) = DynamicProxy $ OnlineProxy baseUrl (merge tollManager oldTollManager) sessionKey
+updateToll _           offline@(DynamicProxy (OfflineProxy _ _)) = offline
+updateToll _           static @(StaticProxy _)                   = static
 
 updateSession :: Maybe HexString -> Proxy -> Proxy
-updateSession sessionKey (OnlineProxy baseUrl tollManager _) = OnlineProxy baseUrl tollManager sessionKey
-updateSession _          offline@(StaticProxy _)             = offline
+updateSession sessionKey (DynamicProxy (OnlineProxy baseUrl tollManager _)) = DynamicProxy $ OnlineProxy baseUrl tollManager sessionKey
+updateSession _          offline@(DynamicProxy (OfflineProxy _ _)) = offline
+updateSession _          static @(StaticProxy _)                   = static
 
 extractChallenge :: Array ResponseHeader -> Maybe TollChallenge
 extractChallenge headers =
