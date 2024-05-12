@@ -110,7 +110,7 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
     
     (UpdateDonationLevel days) -> handleDonationPageEvent (DonationEvent.UpdateDonationLevel days) state proxyInfo f
 
-    (UpdateUserPreferencesEvent newUserPreferences) -> --TODO: update user preferences in local storage [fsolaroli - 9/5/2024]
+    (UpdateUserPreferencesEvent newUserPreferences) ->
       let page = Main defaultPage { userPreferences = newUserPreferences }
       in do
         ProxyResponse proxy' stateUpdateInfo <- runStep (updateUserPreferences state newUserPreferences) (WidgetState (spinnerOverlay "Update user preferences" White) page proxyInfo)
@@ -122,11 +122,11 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
 
         syncOperations <- runStep (if (not enableSync) then (pure Nil) else do
                             user <- computeRemoteUserCard c p s stateUpdateInfo.masterKey srpConf
-                            pure  ( (SaveUser     user                                                )
+                            pure  ( (SaveBlob   $ view _indexReference_refence      stateUpdateInfo.userInfo          )
+                                  : (SaveBlob   $ view _userInfoReference_reference stateUpdateInfo.userInfoReferences)
+                                  : (SaveUser     user                                                )
                                   : (DeleteBlob $ view _userInfoReference_reference userInfoReferences)
                                   : (DeleteBlob $ view _indexReference_refence      userInfo          )
-                                  : (SaveBlob   $ view _userInfoReference_reference stateUpdateInfo.userInfoReferences)
-                                  : (SaveBlob   $ view _indexReference_refence      stateUpdateInfo.userInfo          )
                                   :  Nil
                                   )
                           ) (WidgetState (spinnerOverlay "Compute data to sync" White) (Main defaultPage) proxyInfo)
@@ -149,7 +149,7 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
         
         syncOperations <- runStep (if (not enableSync) then (pure Nil) else do
                             user <- computeRemoteUserCard userUpdateInfo.c userUpdateInfo.p userUpdateInfo.s userUpdateInfo.masterKey srpConf
-                            pure $ (DeleteUser c) : (SaveUser user) : Nil
+                            pure $ (SaveUser user) : (DeleteUser c) : Nil
                           ) (WidgetState (spinnerOverlay "Compute data to sync" White) page proxyInfo)
   
         _              <- runWidgetStep (addPendingOperations  syncDataWire syncOperations) (WidgetState (spinnerOverlay "Compute data to sync" White) page proxyInfo)
@@ -314,11 +314,11 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
 
             syncOperations <- runStep (if (not enableSync) then (pure Nil) else do
                                 user <- computeRemoteUserCard c p s stateUpdateInfo.masterKey srpConf
-                                pure $  ( (SaveUser     user                                                )
+                                pure $  ( (SaveBlob   $ view _indexReference_refence      stateUpdateInfo.userInfo          )
+                                        : (SaveBlob   $ view _userInfoReference_reference stateUpdateInfo.userInfoReferences)
+                                        : (SaveUser     user                                                )
                                         : (DeleteBlob $ view _userInfoReference_reference userInfoReferences)
                                         : (DeleteBlob $ view _indexReference_refence      userInfo          )
-                                        : (SaveBlob   $ view _userInfoReference_reference stateUpdateInfo.userInfoReferences)
-                                        : (SaveBlob   $ view _indexReference_refence      stateUpdateInfo.userInfo          )
                                         :  Nil
                                         ) <> ((SaveBlob <<< view _cardReference_reference) <$> (entries # fromFoldable))
                               ) (WidgetState (spinnerOverlay "Compute data to sync" White) (Main defaultPage) proxyInfo)

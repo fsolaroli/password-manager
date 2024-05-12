@@ -78,15 +78,15 @@ footerComponent commit =
 
 proxyInfoComponent :: ProxyInfo -> Array (Maybe String) -> forall a. Widget HTML a
 proxyInfoComponent proxyInfo classes = case proxyInfo of
-  Online            ->  empty
-  Static            ->  div [Props.classList ([Just "proxyInfo", Just "STATIC"] <> classes)] [
-                          span [Props.className "proxyDescription"] [text $ "Static offline copy"]
-                        , span [Props.className "proxyDetails"]     [text $ _readStaticOfflineCopyTimestamp unit]
-                        ]
-  Offline WithData  ->  div [Props.classList ([Just "proxyInfo", Just "OFFLINE WITH_DATA"] <> classes)] [
-                          span [Props.className "proxyDescription"] [text $ "No network connection"]
-                        , span [Props.className "proxyDetails"]     [text $ ""] -- TODO: read timestamp of last saved data in localstorage (index) [fsolaroli - 25/04/2024]
-                        ]
-  Offline NoData    ->  div [Props.classList ([Just "proxyInfo", Just "OFFLINE NO_DATA"] <> classes)] [
-                          span [Props.className "proxyDescription"] [text $ "No network connection, no local storage data available"]
-                        ]
+  Online               ->  empty
+  Static               ->  div [Props.classList ([Just "proxyInfo", Just "STATIC"] <> classes)] [
+                             span [Props.className "proxyDescription"] [text $ "Static offline copy"]
+                           , span [Props.className "proxyDetails"]     [text $ _readStaticOfflineCopyTimestamp unit]
+                           ]
+  Offline (WithData _) ->  div [Props.classList ([Just "proxyInfo", Just "OFFLINE WITH_DATA"] <> classes)] [
+                            span [Props.className "proxyDescription"] [text $ "No network connection"]
+                          , span [Props.className "proxyDetails"]     [text $ ""] -- TODO: read timestamp of last saved data in localstorage (index) [fsolaroli - 25/04/2024]
+                          ]
+  Offline NoData       ->  div [Props.classList ([Just "proxyInfo", Just "OFFLINE NO_DATA"] <> classes)] [
+                             span [Props.className "proxyDescription"] [text $ "No network connection, no local storage data available"]
+                           ]

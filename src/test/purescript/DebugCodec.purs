@@ -190,18 +190,18 @@ donationInfoCodec =
     , nextDonationReminder: dateTimeCodec
     }
 
--- data DataOnLocalStorage = WithData | NoData
+-- data DataOnLocalStorage = WithData (List CardEntry) | NoData
 dataOnLocalStorageCodec :: CA.JsonCodec DataOnLocalStorage
 dataOnLocalStorageCodec = dimap toVariant fromVariant $ CAV.variantMatch
-    { withData : Left unit
+    { withData : Right (CAC.list cardEntryCodec)
     , noData   : Left unit
     }
   where
     toVariant = case _ of
-      WithData -> V.inj (Proxy :: _ "withData") unit
-      NoData   -> V.inj (Proxy :: _ "noData"  ) unit
+      WithData missing -> V.inj (Proxy :: _ "withData") missing
+      NoData           -> V.inj (Proxy :: _ "noData"  ) unit
     fromVariant = V.match
-      { withData: \_ -> WithData
+      { withData:       WithData
       , noData  : \_ -> NoData
       }
 

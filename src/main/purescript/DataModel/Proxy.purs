@@ -4,8 +4,10 @@ module DataModel.Proxy where
 import Data.Either (Either)
 import Data.Eq (class Eq)
 import Data.HexString (HexString)
+import Data.List (List)
 import Data.Maybe (Maybe(..))
 import Data.Unit (Unit, unit)
+import DataModel.IndexVersions.Index (CardEntry)
 import Effect.Aff (Fiber)
 import Functions.HashCash (TollChallenge)
 
@@ -36,7 +38,9 @@ data DynamicProxy = OnlineProxy PathPrefix TollManager (Maybe SessionKey) | Offl
 defaultOnlineProxy :: Proxy
 defaultOnlineProxy = DynamicProxy (OnlineProxy defaultPathPrefix {toll: Nothing, currentChallenge: Nothing} Nothing)
 
-data DataOnLocalStorage = WithData | NoData
+type MissingEntries = List CardEntry
+
+data DataOnLocalStorage = WithData MissingEntries | NoData
 derive instance eqDataOnLocalStorage :: Eq DataOnLocalStorage
 
 data ProxyInfo = Static | Online | Offline DataOnLocalStorage

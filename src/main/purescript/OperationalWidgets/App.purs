@@ -3,13 +3,14 @@ module OperationalWidgets.App ( app ) where
 import Concur.Core (Widget)
 import Concur.React (HTML, affAction)
 import Control.Alt ((<|>))
-import Control.Alternative (pure, (*>))
+import Control.Alternative (empty, pure, (*>))
 import Control.Bind (bind, (=<<), (>>=))
+import Data.Eq ((==))
 import Data.Function (($))
 import Data.Tuple (Tuple(..))
 import DataModel.AppState (AppState)
 import DataModel.FragmentState as Fragment
-import DataModel.Proxy (ProxyInfo)
+import DataModel.Proxy (ProxyInfo(..))
 import DataModel.WidgetState (Page(..), WidgetState(..))
 import Effect.Class (liftEffect)
 import Functions.Events (online)
@@ -19,7 +20,7 @@ import Functions.Handler.GenericHandlerFunctions (OperationState)
 import Functions.Handler.LoginPageEventHandler (handleLoginPageEvent)
 import Functions.Handler.SignupPageEventHandler (getLoginFormData, handleSignupPageEvent)
 import Functions.Handler.UserAreaEventHandler (handleUserAreaEvent)
-import Functions.State (computeProxy, getProxyInfoFromProxy)
+import Functions.State (getProxyInfoFromProxy, updateProxy)
 import Views.AppView (PageEvent(..), appView)
 import Views.LoginFormView (LoginPageEvent(..))
 import Views.OverlayView (hiddenOverlayInfo)
@@ -40,13 +41,18 @@ app appState@{proxy} fragmentState = case fragmentState of
       appLoop =<< executeOperation event state proxyInfo fragmentState
 
     appLoop :: OperationState -> Widget HTML a
-    appLoop operationState@(Tuple state widgetState@(WidgetState _ _ proxyInfo')) = do
+    appLoop (Tuple state widgetState@(WidgetState overlayInfo page proxyInfo')) = do
       ( ( do
           resultEvent <- appView widgetState
           executeOperation resultEvent state proxyInfo' fragmentState
         )
         <|>
-          updateProxy operationState
+        ( if (proxyInfo' == Static)
+          then empty
+          else affAction online *> do
+                newProxy <- liftEffect $ updateProxy state
+                pure $ (Tuple state {proxy = newProxy} (WidgetState overlayInfo page (getProxyInfoFromProxy newProxy)))
+        )  
       )
       >>= appLoop
 
@@ -57,8 +63,8 @@ executeOperation (MainPageCardManagerEvent event s)    = handleCardManagerEvent 
 executeOperation (MainPageUserAreaEvent    event s s') = handleUserAreaEvent     event s s'
 executeOperation (DonationPageEvent        event)      = handleDonationPageEvent event
 
-updateProxy :: OperationState -> Widget HTML OperationState
-updateProxy (Tuple state' (WidgetState overlayInfo' page' _)) =
-  affAction online *> do
-    newProxy <- liftEffect $ computeProxy
-    pure $ (Tuple state' {proxy = newProxy} (WidgetState overlayInfo' page' (getProxyInfoFromProxy newProxy)))
+-- updateProxy :: OperationState -> Widget HTML OperationState
+-- updateProxy (Tuple state (WidgetState overlayInfo' page' _)) =
+--   affAction online *> do
+--     newProxy <- liftEffect $ updateProxy state
+--     pure $ (Tuple state {proxy = newProxy} (WidgetState overlayInfo' page' (getProxyInfoFromProxy newProxy)))

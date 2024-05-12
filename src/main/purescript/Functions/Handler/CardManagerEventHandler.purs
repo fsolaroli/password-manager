@@ -139,12 +139,12 @@ handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just inde
 
         syncOperations <- runStep (if (not enableSync) then (pure Nil) else do
                             user <- computeRemoteUserCard c p s stateUpdateInfo.masterKey srpConf
-                            pure  ( (SaveUser     user                                                )
+                            pure  ( (SaveBlob   $ view _indexReference_refence      stateUpdateInfo.userInfo          )
+                                  : (SaveBlob   $ view _userInfoReference_reference stateUpdateInfo.userInfoReferences)
+                                  : (SaveUser     user                                                )
                                   : (DeleteBlob $ view _userInfoReference_reference userInfoReferences)
                                   : (DeleteBlob $ view _indexReference_refence      userInfo          )
                                   : (DeleteBlob $ view _cardReference_reference     cardEntry         )
-                                  : (SaveBlob   $ view _userInfoReference_reference stateUpdateInfo.userInfoReferences)
-                                  : (SaveBlob   $ view _indexReference_refence      stateUpdateInfo.userInfo          )
                                   :  Nil
                                   )
                           ) (WidgetState (spinnerOverlay "Compute data to sync" Black) (Main defaultPage) proxyInfo)
@@ -240,12 +240,12 @@ addCardSteps cardManagerState state@{index: Just index, userInfo: Just userInfo@
 
   syncOperations <- runStep (if (not enableSync) then (pure Nil) else do
                       user <- computeRemoteUserCard c p s stateUpdateInfo.masterKey srpConf
-                      pure  ( (SaveUser     user                                                )
+                      pure  ( (SaveBlob   $ view _cardReference_reference     newCardEntry                      )
+                            : (SaveBlob   $ view _indexReference_refence      stateUpdateInfo.userInfo          )
+                            : (SaveBlob   $ view _userInfoReference_reference stateUpdateInfo.userInfoReferences)
+                            : (SaveUser     user                                            )
                             : (DeleteBlob $ view _userInfoReference_reference userInfoReferences)
                             : (DeleteBlob $ view _indexReference_refence      userInfo          )
-                            : (SaveBlob   $ view _userInfoReference_reference stateUpdateInfo.userInfoReferences)
-                            : (SaveBlob   $ view _indexReference_refence      stateUpdateInfo.userInfo          )
-                            : (SaveBlob   $ view _cardReference_reference     newCardEntry                      )
                             :  Nil
                             )
                     ) (WidgetState (spinnerOverlay "Compute data to sync" Black) page proxyInfo)
@@ -283,13 +283,13 @@ editCardSteps cardManagerState state@{index: Just index, proxy, srpConf, hash: h
 
   syncOperations <- runStep (if (not enableSync) then (pure Nil) else do
                       user <- computeRemoteUserCard c p s stateUpdateInfo.masterKey srpConf
-                      pure  ( (SaveUser     user                                                )
+                      pure  ( (SaveBlob   $ view _cardReference_reference     cardEntry                         )
+                            : (SaveBlob   $ view _indexReference_refence      stateUpdateInfo.userInfo          )
+                            : (SaveBlob   $ view _userInfoReference_reference stateUpdateInfo.userInfoReferences)
+                            : (SaveUser     user                                                )
                             : (DeleteBlob $ view _userInfoReference_reference userInfoReferences)
                             : (DeleteBlob $ view _indexReference_refence      userInfo          )
                             : (DeleteBlob $ view _cardReference_reference     oldCardEntry      )
-                            : (SaveBlob   $ view _userInfoReference_reference stateUpdateInfo.userInfoReferences)
-                            : (SaveBlob   $ view _indexReference_refence      stateUpdateInfo.userInfo          )
-                            : (SaveBlob   $ view _cardReference_reference     cardEntry                         )
                             :  Nil
                             )
                     ) (WidgetState (spinnerOverlay "Compute data to sync" Black) page proxyInfo)

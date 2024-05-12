@@ -66,9 +66,9 @@ handleDonationPageEvent donationPageEvent state@{c: Just c, p: Just p, s: Just s
         
         syncOperations <- runStep (if (not enableSync) then (pure Nil) else do
                             user <- computeRemoteUserCard c p s stateUpdate.masterKey srpConf
-                            pure  ( (SaveUser     user                                                )
+                            pure  ( (SaveBlob   $ view _userInfoReference_reference stateUpdate.userInfoReferences)
+                                  : (SaveUser     user                                                )
                                   : (DeleteBlob $ view _userInfoReference_reference userInfoReferences)
-                                  : (SaveBlob   $ view _userInfoReference_reference stateUpdate.userInfoReferences)
                                   :  Nil
                                   )
                           ) (WidgetState (spinnerOverlay "Compute data to sync" Black) page proxyInfo)

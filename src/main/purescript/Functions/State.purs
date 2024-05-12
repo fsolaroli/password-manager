@@ -64,16 +64,22 @@ getProxyInfoFromProxy = case _ of
 computeInitialState :: Wire (Widget HTML) SyncData -> Effect AppState
 computeInitialState wire = computeProxy >>= (\proxy -> pure $ merge baseState {proxy, syncDataWire: wire})
 
-computeProxy :: Effect Proxy
-computeProxy = isStatic >>= case _ of
-  true  -> StaticProxy Nothing # pure
-  false -> DynamicProxy <$> computeDynamicProxy
-
   where
+    computeProxy :: Effect Proxy
+    computeProxy = isStatic >>= case _ of
+      true  -> StaticProxy Nothing # pure
+      false -> DynamicProxy <$> computeDynamicProxy
+
     computeDynamicProxy :: Effect DynamicProxy
     computeDynamicProxy = (window >>= navigator >>= onLine) <#> case _ of 
       true  -> OnlineProxy defaultPathPrefix {toll: Nothing, currentChallenge: Nothing} Nothing
       false -> OfflineProxy NoData -- TODO: check local storage to determine data presence [fsolaroli - 25/04/2024]
+
+updateProxy :: AppState -> Effect Proxy
+updateProxy state = DynamicProxy <$> ((window >>= navigator >>= onLine) <#> case _ of 
+      true  -> OnlineProxy defaultPathPrefix {toll: Nothing, currentChallenge: Nothing} Nothing
+      false -> OfflineProxy NoData
+)
 
 resetState :: AppState -> AppState
 resetState state = merge baseState state
