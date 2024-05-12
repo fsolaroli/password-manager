@@ -93,6 +93,15 @@ in  upstream
     -- , repo = "https://github.com/clipperz/purescript-concur-react"
     -- , version = "clipperz"
     }
+  with concur-signals =
+    { dependencies =
+      [ "free"
+      , "lazy"
+      , "react"
+      ]
+    , repo = "https://github.com/purescript-concur/purescript-concur-signals"
+    , version = "main"
+    }
   with formless =
     { dependencies =
       [ "aff"

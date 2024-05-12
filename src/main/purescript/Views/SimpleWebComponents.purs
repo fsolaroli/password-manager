@@ -35,7 +35,6 @@ module Views.SimpleWebComponents
 
 import Concur.Core (Widget)
 import Concur.Core.FRP (Signal, display, loopS, loopW)
-import Concur.Core.Props (handleProp)
 import Concur.React (HTML)
 import Concur.React.DOM (button, div, input, label, li, span, text, textarea, ul)
 import Concur.React.Props as Props
@@ -456,4 +455,8 @@ dragAndDropAndRemoveList widgets = do
             Just es -> pure $ catMaybes $ hush <$> es
 
   
-  
+-- copied from a previous version of Concur library: #TODO: use the supported version from the Concur library
+-- | Use `handleProp` to handle an event manually
+handleProp :: forall p a b .  (a -> Effect Unit) -> Props.Props p a -> Props.Props p b
+handleProp _ (Props.PrimProp p) = Props.PrimProp p
+handleProp f (Props.Handler g) = Props.PrimProp (g f)
