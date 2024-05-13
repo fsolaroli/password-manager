@@ -8,6 +8,7 @@ import Concur.React.Props as Props
 import Control.Alt (($>))
 import Control.Alternative (empty)
 import Data.CommutativeRing ((*), (+))
+import Data.Eq ((/=))
 import Data.EuclideanRing ((/))
 import Data.Function (($))
 import Data.Int (toNumber)
@@ -15,12 +16,13 @@ import Data.List (length, null)
 import Data.Maybe (Maybe(..))
 import Data.Semigroup ((<>))
 import Data.Show (show)
+import DataModel.Proxy (ProxyInfo(..))
 import OperationalWidgets.Sync (SyncData)
 
 type EnableSync = Boolean
 
-deviceSyncView :: EnableSync -> Maybe (Wire (Widget HTML) SyncData) -> Widget HTML EnableSync
-deviceSyncView enableSync syncDataWire = div [Props._id "deviceSync"] [
+deviceSyncView :: EnableSync -> ProxyInfo -> Maybe (Wire (Widget HTML) SyncData) -> Widget HTML EnableSync
+deviceSyncView enableSync proxyInfo syncDataWire = div [Props._id "deviceSync"] [
   form [] [
     h1 [] [ text "Device Sync" ]
   , div [Props.className "description"] [
@@ -34,12 +36,15 @@ deviceSyncView enableSync syncDataWire = div [Props._id "deviceSync"] [
           true  -> do
             syncProgressBar enableSync syncDataWire
             <>
-            button [Props.onClick $> false] [text "Remove synched data"]
+            button [Props.onClick $> false, Props.disabled disabled] [text "Remove synched data"]
           false -> do
-            button [Props.onClick $> true]  [text "Synch"]
+            button [Props.onClick $> true,  Props.disabled disabled] [text "Synch"]
       ]
   ]
 ]
+
+  where
+    disabled = proxyInfo /= Online
 
 syncProgressBar :: forall a. EnableSync -> Maybe (Wire (Widget HTML) SyncData) -> Widget HTML a
 syncProgressBar true (Just wire) = with wire \{completedOperations, pendingOperations} -> do

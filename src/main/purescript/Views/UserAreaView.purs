@@ -116,13 +116,15 @@ userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenu
     userAreaInternalView :: Widget HTML UserAreaEvent
     userAreaInternalView = 
       case userAreaOpenPage of
-        Preferences     -> frame (userPreferencesView userPreferences     <#> UpdateUserPreferencesEvent)
-        ChangePassword  -> frame (changePasswordView  credentials         <#> ChangePasswordEvent)
-        Delete          -> frame (deleteUserView      credentials          $> DeleteAccountEvent)
-        Pin             -> frame (setPinView          pinExists           <#> SetPinEvent)
-        DeviceSync      -> frame (deviceSyncView enableSync syncDataWire  <#> UpdateSyncPreference)
-        Import          -> frame (importView          importState         <#> ImportCardsEvent)
-        Export          -> frame (exportView                              <#> ExportEvent)
+        Preferences     -> frame (userPreferencesView userPreferences <#> UpdateUserPreferencesEvent)
+        ChangePassword  -> frame (changePasswordView  credentials     <#> ChangePasswordEvent)
+        Delete          -> frame (deleteUserView      credentials      $> DeleteAccountEvent)
+        Pin             -> frame (setPinView          pinExists       <#> SetPinEvent)
+        DeviceSync      -> frame (deviceSyncView      enableSync 
+                                                      proxyInfo
+                                                      syncDataWire    <#> UpdateSyncPreference)
+        Import          -> frame (importView          importState     <#> ImportCardsEvent)
+        Export          -> frame (exportView                          <#> ExportEvent)
         Donate          -> frame (donationUserArea)     
         About           -> frame (text "This is Clipperz")
         None            -> emptyUserComponent
