@@ -23,7 +23,8 @@ self.addEventListener('fetch', function(event) {
 	var request = event.request;
 	if (request.method === 'GET' && (
 		request.url.split('/').at(-1) === "index.html" || //".../api/static/index.html"
-		request.url.split('/').at(-2) === "app"           //".../app/"
+		request.url.split('/').at(-2) === "app"        || //".../app/"
+		request.url.split('/').at(-2) === "epsilon"       //".../versions/epsilon/"
 	)) {
 		// `fetch()` will use the cache when possible, to this examples
 		// depends on cache-busting URL parameter to avoid the cache.
