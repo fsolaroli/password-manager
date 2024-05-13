@@ -40,6 +40,8 @@ self.addEventListener('fetch', function(event) {
 		  });
 		})
 	  );
+	} else {
+		console.log("Cannot serve request: " + request)
 	}
 	// Any other handlers come here. Without calls to `event.respondWith()` the
 	// request will be handled without the ServiceWorker.
