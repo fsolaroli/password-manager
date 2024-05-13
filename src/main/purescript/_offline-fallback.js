@@ -2,6 +2,7 @@ var CACHE = 'offline-fallback'
 
 self.addEventListener('install', function(event) {
 	event.waitUntil(precache());
+	return self.skipWaiting();
 });
 
 self.addEventListener('message', function(event) {
@@ -20,7 +21,10 @@ function precache() {
 self.addEventListener('fetch', function(event) {
 	// Only fall back for HTML documents.
 	var request = event.request;
-	if (request.method === 'GET' && request.headers.get('accept').includes('text/html') && ["index.html", "app/"].includes(request.url.split('/').at(-1))) {
+	if (request.method === 'GET' && (
+		request.url.split('/').at(-1) === "index.html" || //".../api/static/index.html"
+		request.url.split('/').at(-2) === "app"           //".../app/"
+	)) {
 	  // `fetch()` will use the cache when possible, to this examples
 	  // depends on cache-busting URL parameter to avoid the cache.
 	  event.respondWith(
