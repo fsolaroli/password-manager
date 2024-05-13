@@ -20,7 +20,7 @@ function precache() {
 self.addEventListener('fetch', function(event) {
 	// Only fall back for HTML documents.
 	var request = event.request;
-	if (request.method === 'GET' && request.headers.get('accept').includes('text/html') && request.url.split('/').at(-1) === "index.html") {
+	if (request.method === 'GET' && request.headers.get('accept').includes('text/html') && ["index.html", "app/"].includes(request.url.split('/').at(-1))) {
 	  // `fetch()` will use the cache when possible, to this examples
 	  // depends on cache-busting URL parameter to avoid the cache.
 	  event.respondWith(
