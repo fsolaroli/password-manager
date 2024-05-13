@@ -3,14 +3,13 @@ module Views.DeviceSyncView where
 import Concur.Core (Widget)
 import Concur.Core.Patterns (Wire, with)
 import Concur.React (HTML)
-import Concur.React.DOM (div, form, h1, h2, input, label, text)
+import Concur.React.DOM (button, div, form, h1, h2, p, strong, text)
 import Concur.React.Props as Props
 import Control.Alt (($>))
 import Control.Alternative (empty)
 import Data.CommutativeRing ((*), (+))
 import Data.EuclideanRing ((/))
 import Data.Function (($))
-import Data.HeytingAlgebra (not)
 import Data.Int (toNumber)
 import Data.List (length, null)
 import Data.Maybe (Maybe(..))
@@ -20,24 +19,43 @@ import OperationalWidgets.Sync (SyncData)
 
 type EnableSync = Boolean
 
-deviceSyncView :: EnableSync -> Maybe (Wire (Widget HTML) SyncData) -> Widget HTML EnableSync -- TODO: implement sync ui [fsolaroli - 27/04/2024]
-deviceSyncView enableSync syncDataWire = div [] [
-  h1 [] [text "Device Sync"]
-, form [] [
-    label [] [
-      input [Props._type "checkbox", Props.checked enableSync, Props.onChange $> (not enableSync)]
+deviceSyncView :: EnableSync -> Maybe (Wire (Widget HTML) SyncData) -> Widget HTML EnableSync
+deviceSyncView enableSync syncDataWire = div [Props._id "deviceSync"] [
+  form [] [
+    h1 [] [ text "Device Sync" ]
+  , div [Props.className "description"] [
+      p [] [
+        text "You may sync all your ", strong [] [text "encrypted"], text " data in the local storage of the current browser you are using. "
+      , text "This will allow you to access them even without an internet."
+      ]
     ]
+  , div [Props.className "content"] [
+        case enableSync of
+          true  -> do
+            syncProgressBar enableSync syncDataWire
+            <>
+            button [Props.onClick $> false] [text "Remove synched data"]
+          false -> do
+            button [Props.onClick $> true]  [text "Synch"]
+      ]
   ]
-, syncProgressBar enableSync syncDataWire
 ]
 
 syncProgressBar :: forall a. EnableSync -> Maybe (Wire (Widget HTML) SyncData) -> Widget HTML a
 syncProgressBar true (Just wire) = with wire \{completedOperations, pendingOperations} -> do
-  if null pendingOperations
-  then
-    h2 [] [text "Local Storage is synced!"]
-  else
-    div [Props.className "syncProgressBar"] [
-      div [Props.className "completedOperation", Props.style {width: show ((toNumber completedOperations) / (toNumber $ completedOperations + length pendingOperations) * 100.0) <> "%"}] []
-    ]
+  let syncCompleted   = null pendingOperations
+      totalOperations = completedOperations + length pendingOperations
+      percentageCompleted = if syncCompleted
+                            then 100.0
+                            else (toNumber completedOperations) / (toNumber totalOperations) * 100.0
+    
+  ((h2 [] [ if syncCompleted 
+            then text "All data synced!"
+            else text (show completedOperations <> "/" <> (show $ totalOperations) <> " operations completed")
+  ])
+  <>
+  div [Props.classList [Just "syncProgressBar", if syncCompleted then Just "syncCompleted" else Nothing]] [
+    div [Props.className "completedOperation", Props.style {width: show percentageCompleted <> "%"}] []
+  ])
+
 syncProgressBar _ _ = empty

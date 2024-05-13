@@ -2,17 +2,6 @@
 @import "hide.scss";
 @import "../structure/mixin.scss";
 
-div.syncProgressBar {
-	width: 100%;
-	height: 30px;
-	border: 2px solid white;
-
-	.completedOperation {
-		background-color: green;
-		height: 100%;
-	}
-}
-
 div#userPage {
     div.panel {
         background-color: black;
@@ -324,7 +313,7 @@ div#userPage {
             }
         }
 
-		#pinPage {
+		#pinPage, #deviceSync {
 			
 			.description {
 				padding: 10px 0px 20px 0px;
@@ -357,6 +346,31 @@ div#userPage {
 					margin-top: 8px;
 					font-size: 18pt;
 					padding: 6px 10px;
+				}
+			}
+
+			div.syncProgressBar {
+				width: 100%;
+				height: 30px;
+				// border: 2px solid white;
+				background-color: red;
+				// border: none;
+				margin-top: 10px;
+
+				&.syncCompleted {
+					height: 3px;
+					.completedOperation > p {
+						visibility: hidden;
+						display: none;
+					}
+				}
+			
+				.completedOperation {
+					display: flex;
+					background-color: green;
+					height: 100%;
+					color: $core-alternate-color;
+					justify-content: flex-end;
 				}
 			}
 		}
