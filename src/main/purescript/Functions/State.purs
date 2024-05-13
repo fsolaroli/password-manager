@@ -79,7 +79,7 @@ computeInitialState wire = computeProxy >>= (\proxy -> pure $ merge baseState {p
       false -> OfflineProxy Nothing NoData
 
 updateProxy :: AppState -> Effect Proxy
-updateProxy state = DynamicProxy <$> ((window >>= navigator >>= onLine) >>= case _, state of 
+updateProxy state@{proxy: DynamicProxy _} = DynamicProxy <$> ((window >>= navigator >>= onLine) >>= case _, state of 
       false, {enableSync: true, syncDataWire} ->
           ((un Wire syncDataWire).value) <#> (\syncData ->
             fold (syncData.pendingOperations <#> (case _ of
@@ -90,6 +90,7 @@ updateProxy state = DynamicProxy <$> ((window >>= navigator >>= onLine) >>= case
       false, _ -> OfflineProxy Nothing NoData                                                      # pure
       true,  _ -> OnlineProxy defaultPathPrefix {toll: Nothing, currentChallenge: Nothing} Nothing # pure
 )
+updateProxy {proxy} = pure proxy
 
 resetState :: AppState -> AppState
 resetState state = merge baseState state

@@ -37,7 +37,7 @@ import Functions.Handler.GenericHandlerFunctions (OperationState, defaultView, h
 import Functions.Index (getIndex)
 import Functions.Pin (decryptPassphraseWithPin, deleteCredentials, makeKey)
 import Functions.SRP (checkM2)
-import Functions.State (getProxyInfoFromProxy)
+import Functions.State (getProxyInfoFromProxy, updateProxy)
 import Functions.Timer (activateTimer)
 import OperationalWidgets.Sync (addPendingOperations, updateConnectionState)
 import Record (merge)
@@ -140,14 +140,16 @@ loadHomePageSteps state@{hash: hashFunc, proxy, srpConf, c: Just c, p: Just p, m
   _                              <- runWidgetStep (updateConnectionState syncDataWire {c, p, srpConf, hashFunc, proxy: defaultOnlineProxy}                ) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} page proxyInfo)
   _                              <- runWidgetStep (addPendingOperations  syncDataWire syncOperations                                                      ) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} page proxyInfo)
 
+  proxy''' <- runStep (updateProxy updatedState # liftEffect) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} page proxyInfo)
+
   pure $ Tuple 
-    updatedState
+    updatedState { proxy = proxy'''}
     (WidgetState 
       hiddenOverlayInfo
       case donationLevel of
         DonationWarning -> (Donation donationLevel)
         _               -> (Main emptyMainPageWidgetState { index = index, cardManagerState = cardManagerInitialState { cardViewState = cardViewState }, donationLevel = donationLevel, syncDataWire = Just syncDataWire, enableSync = enableSync })
-      proxyInfo
+      (getProxyInfoFromProxy proxy''')
     )
 
 loadHomePageSteps _ _ _ _  = do
@@ -158,7 +160,7 @@ type MaxPinAttemptsReached = Boolean
 handlePinResult :: AppState -> Page -> OverlayColor -> Either AppError OperationState -> Widget HTML (Tuple Page (Either AppError OperationState))
 handlePinResult state@{proxy} page color either = do
   let proxyInfo       = getProxyInfoFromProxy proxy
-
+ 
   storage <- liftEffect $ window >>= localStorage
   newPage <- case either of
     Right _ -> ( do
