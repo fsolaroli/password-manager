@@ -225,6 +225,14 @@ div#homePage {
                                     background-color: $accent-color-lighter;
                                 }
 
+								&:disabled {
+									cursor: default;
+									background-color: #eee;
+									&:hover {
+										background-color: #eee;
+									}
+								}
+
 								&.exit {
 									&::before {
 										content: "back";
