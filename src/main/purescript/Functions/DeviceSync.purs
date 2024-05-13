@@ -65,12 +65,10 @@ computeSyncOperations {c: Just c, p: Just p, s: Just s, masterKey: Just masterKe
 computeSyncOperations _ = throwError $ InvalidStateError (CorruptedState "State corrupted")
 
 computeDeleteOperations :: AppState -> ExceptT AppError Aff (List SyncOperation)
-computeDeleteOperations {c: Just c, userInfoReferences: Just userInfoReferences, userInfo: Just userInfo, index: Just index, enableSync} =
-  pure $ if enableSync
-        then    DeleteUser c
-              : DeleteBlob userInfoReferences.reference
-              : DeleteBlob (unwrap (unwrap userInfo).indexReference).reference
-              : ((DeleteBlob <<< view _cardReference_reference) <$> view _entries index)
-        else    Nil
+computeDeleteOperations {c: Just c, userInfoReferences: Just userInfoReferences, userInfo: Just userInfo, index: Just index} =
+  pure  $ DeleteUser c
+        : DeleteBlob userInfoReferences.reference
+        : DeleteBlob (unwrap (unwrap userInfo).indexReference).reference
+        : ((DeleteBlob <<< view _cardReference_reference) <$> view _entries index)
       
 computeDeleteOperations _ = throwError $ InvalidStateError (CorruptedState "State corrupted")
