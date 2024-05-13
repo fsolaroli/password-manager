@@ -57,6 +57,9 @@ module.exports = (env) => {
 				htmlMatchPattern: [/index.html$/],
 				scriptMatchPattern: [/app-bundle(.[a-zA-Z0-9]+)?.js/],
 			}),
+			new CopyPlugin({
+				patterns: [path.resolve(__dirname, 'src', "main", "purescript", "_offline-fallback.js")],
+			}),
 			...(env.production ? [] : [
 				// password generator html package configuration
 				new HtmlWebpackPlugin({
@@ -69,9 +72,6 @@ module.exports = (env) => {
 				new HtmlInlineScriptPlugin({
 					htmlMatchPattern: [/passwordGenerator_index.html$/],
 					scriptMatchPattern: [/passwordGenerator-bundle(.[a-zA-Z0-9]+)?.js/],
-				}),
-				new CopyPlugin({
-					patterns: [path.resolve(__dirname, 'src', "main", "purescript", "_offline-fallback.js")],
 				}),
 				// share html package configuration
 				new HtmlWebpackPlugin({
