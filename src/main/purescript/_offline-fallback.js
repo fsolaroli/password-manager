@@ -7,7 +7,7 @@ self.addEventListener('install', function(event) {
 
 self.addEventListener('message', function(event) {
 	if (event.data === 'update') {
-		console.log("updated index.html");
+		// console.log("updated index.html");
 		event.waitUntil(precache());
 	}
 })
@@ -43,7 +43,7 @@ self.addEventListener('fetch', function(event) {
 			})
 		);
 	} else {
-		console.log("Cannot serve request [" + request.method + ": " + request.url + "]")
+		// console.log("Cannot serve request [" + request.method + ": " + request.url + "]")
 	}
 	// Any other handlers come here. Without calls to `event.respondWith()` the
 	// request will be handled without the ServiceWorker.
