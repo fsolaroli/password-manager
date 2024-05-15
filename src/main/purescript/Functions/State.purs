@@ -79,18 +79,25 @@ computeInitialState wire = computeProxy >>= (\proxy -> pure $ merge baseState {p
       false -> OfflineProxy Nothing NoData
 
 updateProxy :: AppState -> Effect Proxy
-updateProxy state@{proxy: DynamicProxy _} = DynamicProxy <$> ((window >>= navigator >>= onLine) >>= case _, state of 
+updateProxy state@{proxy: DynamicProxy dynamicProxy} = DynamicProxy <$> ((window >>= navigator >>= onLine) >>= case _, state of 
       false, {enableSync: true, syncDataWire} ->
           ((un Wire syncDataWire).value) <#> (\syncData ->
             fold (syncData.pendingOperations <#> (case _ of
               SaveBlob ref -> ref : Nil
               _            ->       Nil
             ))
-          ) <#>  (OfflineProxy Nothing <<< WithData)
-      false, _ -> OfflineProxy Nothing NoData                                                      # pure
-      true,  _ -> OnlineProxy defaultPathPrefix {toll: Nothing, currentChallenge: Nothing} Nothing # pure
+          ) <#>  (withDataOnLocalStorage <<< WithData)
+      false, _ -> withDataOnLocalStorage NoData # pure
+      true,  _ -> dynamicProxy                  # pure
 )
+  where
+    withDataOnLocalStorage :: DataOnLocalStorage -> DynamicProxy
+    withDataOnLocalStorage dataOnLocalStorage = case dynamicProxy of
+      OfflineProxy backendSessionState _ -> OfflineProxy backendSessionState dataOnLocalStorage
+      onlineProxy                        -> onlineProxy
+
 updateProxy {proxy} = pure proxy
+
 
 resetState :: AppState -> AppState
 resetState state = merge baseState state
