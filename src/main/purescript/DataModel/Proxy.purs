@@ -50,5 +50,8 @@ data ProxyResponse a = ProxyResponse Proxy a
 discardResult :: forall a. ProxyResponse a -> ProxyResponse Unit
 discardResult (ProxyResponse proxy _) = ProxyResponse proxy unit
 
+getProxy :: forall a. ProxyResponse a -> Proxy
+getProxy (ProxyResponse proxy _) = proxy
+
 responseValue :: forall a. ProxyResponse a -> a
 responseValue (ProxyResponse _ a) = a

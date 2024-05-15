@@ -16,19 +16,19 @@ import Data.Lens (view)
 import Data.List (List(..), (:))
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), fst)
 import DataModel.AppError (AppError(..), InvalidStateError(..))
 import DataModel.AppState (AppState)
 import DataModel.FragmentState as Fragment
 import DataModel.Proxy (ProxyInfo, ProxyResponse(..))
-import DataModel.UserVersions.User (UserInfo(..), _userInfoReference_reference)
+import DataModel.UserVersions.User (UserInfo(..), _userInfo_identifier, _userInfo_reference)
 import DataModel.WidgetState (CardFormInput(..), CardViewState(..), Page(..), WidgetState(..))
 import Effect.Class (liftEffect)
 import Effect.Now (nowDateTime)
 import Functions.Communication.Users (asMaybe, computeRemoteUserCard, updateUserInfo)
 import Functions.Donations (DonationLevel(..), computeDonationLevel)
 import Functions.Handler.GenericHandlerFunctions (OperationState, defaultErrorPage, handleOperationResult, noOperation, runStep, runWidgetStep)
-import OperationalWidgets.Sync (SyncOperation(..), addPendingOperations)
+import OperationalWidgets.Sync (SyncOperation(..), addPendingOperation)
 import Record (merge)
 import Views.AppView (emptyMainPageWidgetState)
 import Views.CardsManagerView (cardManagerInitialState)
@@ -39,7 +39,7 @@ import Views.UserAreaView (userAreaInitialState)
 
 handleDonationPageEvent :: DonationPageEvent -> AppState -> ProxyInfo -> Fragment.FragmentState -> Widget HTML OperationState
 
-handleDonationPageEvent donationPageEvent state@{c: Just c, p: Just p, s: Just s, srpConf, username: Just username, password: Just password, index: Just index, userInfo: Just userInfo@(UserInfo {userPreferences, donationInfo}), userInfoReferences: Just userInfoReferences, pinEncryptedPassword, enableSync, syncDataWire, donationLevel: Just donationLevel} proxyInfo fragmentState = do
+handleDonationPageEvent donationPageEvent state@{c: Just c, p: Just p, s: Just s, srpConf, username: Just username, password: Just password, index: Just index, masterKey: Just masterKey, userInfo: Just userInfo@(UserInfo {userPreferences, donationInfo}), userInfoReferences: Just userInfoReferences, pinEncryptedPassword, enableSync, syncDataWire, donationLevel: Just donationLevel} proxyInfo fragmentState = do
   let defaultPage = { index
                     , credentials:      {username, password}
                     , donationInfo
@@ -65,15 +65,15 @@ handleDonationPageEvent donationPageEvent state@{c: Just c, p: Just p, s: Just s
         newDonationLevel                <- runStep (computeDonationLevel index newUserInfo # liftEffect) (WidgetState (spinnerOverlay "Update user info" Black) page proxyInfo)
         
         syncOperations <- runStep (if (not enableSync) then (pure Nil) else do
-                            user <- computeRemoteUserCard c p s stateUpdate.masterKey srpConf
-                            pure  ( (SaveBlob   $ view _userInfoReference_reference stateUpdate.userInfoReferences)
+                            user <- computeRemoteUserCard srpConf c p s (fst masterKey) stateUpdate.masterKey
+                            pure  ( (SaveBlobFromRef   $ view _userInfo_reference stateUpdate.userInfoReferences)
                                   : (SaveUser     user                                                )
-                                  : (DeleteBlob $ view _userInfoReference_reference userInfoReferences)
+                                  : (DeleteBlob (view _userInfo_reference userInfoReferences) (view _userInfo_identifier userInfo))
                                   :  Nil
                                   )
                           ) (WidgetState (spinnerOverlay "Compute data to sync" Black) page proxyInfo)
   
-        _              <- runWidgetStep (addPendingOperations syncDataWire syncOperations) (WidgetState (spinnerOverlay "Compute data to sync" Black) page proxyInfo)
+        _              <- runWidgetStep (addPendingOperation syncDataWire syncOperations) (WidgetState (spinnerOverlay "Compute data to sync" Black) page proxyInfo)
 
 
         let cardViewState = case fragmentState of

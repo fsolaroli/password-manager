@@ -40,9 +40,9 @@ import DataModel.CardVersions.CurrentCardVersions (currentCardCodecVersion)
 import DataModel.Communication.ConnectionState (ConnectionState)
 import DataModel.Credentials (emptyCredentials)
 import DataModel.FragmentState as Fragment
-import DataModel.IndexVersions.Index (CardEntry(..), CardReference(..), Index(..), _cardReference_reference, addToIndex)
+import DataModel.IndexVersions.Index (CardEntry(..), CardReference(..), Index(..), _card_reference, _index_identifier, addToIndex)
 import DataModel.Proxy (DataOnLocalStorage(..), DynamicProxy(..), Proxy(..), ProxyInfo, ProxyResponse(..), defaultOnlineProxy, discardResult)
-import DataModel.UserVersions.User (IndexReference(..), UserInfo(..), _indexReference_refence, _userInfoReference_reference)
+import DataModel.UserVersions.User (IndexReference(..), UserInfo(..), _index_reference, _userInfo_identifier, _userInfo_reference)
 import DataModel.WidgetState (CardManagerState, CardViewState(..), ImportStep(..), LoginType(..), Page(..), UserAreaPage(..), UserAreaState, WidgetState(..), MainPageWidgetState)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
@@ -62,7 +62,7 @@ import Functions.State (resetState)
 import Functions.Time (formatDateTimeToDate, getCurrentDateTime)
 import Functions.Timer (activateTimer, stopTimer)
 import Functions.User (changeUserPassword)
-import OperationalWidgets.Sync (SyncOperation(..), addPendingOperations, updateConnectionState)
+import OperationalWidgets.Sync (SyncOperation(..), addPendingOperation, updateConnectionState)
 import Record (merge)
 import Views.DonationViews as DonationEvent
 import Views.ExportView (ExportEvent(..))
@@ -121,17 +121,17 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
           Right n -> liftEffect $ activateTimer n
 
         syncOperations <- runStep (if (not enableSync) then (pure Nil) else do
-                            user <- computeRemoteUserCard c p s stateUpdateInfo.masterKey srpConf
-                            pure  ( (SaveBlob   $ view _indexReference_refence      stateUpdateInfo.userInfo          )
-                                  : (SaveBlob   $ view _userInfoReference_reference stateUpdateInfo.userInfoReferences)
+                            user <- computeRemoteUserCard srpConf c p s (fst masterKey) stateUpdateInfo.masterKey
+                            pure  ( (SaveBlobFromRef   $ view _index_reference      stateUpdateInfo.userInfo          )
+                                  : (SaveBlobFromRef   $ view _userInfo_reference stateUpdateInfo.userInfoReferences)
                                   : (SaveUser     user                                                )
-                                  : (DeleteBlob $ view _userInfoReference_reference userInfoReferences)
-                                  : (DeleteBlob $ view _indexReference_refence      userInfo          )
+                                  : (DeleteBlob (view _userInfo_reference userInfoReferences) (view _userInfo_identifier userInfo))
+                                  : (DeleteBlob (view _index_reference      userInfo        ) (view _index_identifier index))
                                   :  Nil
                                   )
                           ) (WidgetState (spinnerOverlay "Compute data to sync" White) (Main defaultPage) proxyInfo)
   
-        _              <- runWidgetStep (addPendingOperations syncDataWire syncOperations) (WidgetState (spinnerOverlay "Compute data to sync" White) (Main defaultPage) proxyInfo)
+        _              <- runWidgetStep (addPendingOperation syncDataWire syncOperations) (WidgetState (spinnerOverlay "Compute data to sync" White) (Main defaultPage) proxyInfo)
 
         pure (Tuple 
           (merge (asMaybe stateUpdateInfo) state {proxy = proxy'})
@@ -148,11 +148,11 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
         ProxyResponse proxy' userUpdateInfo <- runStep (changeUserPassword state newPassword) (WidgetState (spinnerOverlay "Update password" White) page proxyInfo)
         
         syncOperations <- runStep (if (not enableSync) then (pure Nil) else do
-                            user <- computeRemoteUserCard userUpdateInfo.c userUpdateInfo.p userUpdateInfo.s userUpdateInfo.masterKey srpConf
+                            user <- computeRemoteUserCard srpConf userUpdateInfo.c userUpdateInfo.p userUpdateInfo.s (fst masterKey) userUpdateInfo.masterKey
                             pure $ (SaveUser user) : (DeleteUser c) : Nil
                           ) (WidgetState (spinnerOverlay "Compute data to sync" White) page proxyInfo)
   
-        _              <- runWidgetStep (addPendingOperations  syncDataWire syncOperations) (WidgetState (spinnerOverlay "Compute data to sync" White) page proxyInfo)
+        _              <- runWidgetStep (addPendingOperation  syncDataWire syncOperations) (WidgetState (spinnerOverlay "Compute data to sync" White) page proxyInfo)
         _              <- runWidgetStep (updateConnectionState syncDataWire { c: userUpdateInfo.c
                                                                             , p: userUpdateInfo.p
                                                                             , srpConf, hashFunc
@@ -208,7 +208,7 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
                         runStep       (computeSyncOperations   updatedState            ) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} (Main defaultPage) proxyInfo)
                      else 
                         runStep       (computeDeleteOperations updatedState            ) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} (Main defaultPage) proxyInfo)
-      _              <- runWidgetStep (addPendingOperations syncDataWire syncOperations) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} (Main defaultPage) proxyInfo)
+      _              <- runWidgetStep (addPendingOperation syncDataWire syncOperations) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} (Main defaultPage) proxyInfo)
       pure (Tuple 
               updatedState
               (WidgetState
@@ -232,7 +232,7 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
         _                         <- runStep       (liftEffect $ window >>= localStorage >>= deleteCredentials                           ) (WidgetState (spinnerOverlay "Delete local data" White) page proxyInfo)    
         syncOperations            <- runStep       (computeDeleteOperations state                                                        ) (WidgetState (spinnerOverlay "Delete local data" White) page proxyInfo)
         _                         <- runStep       (updateSyncPreference c false # liftEffect                                            ) (WidgetState (spinnerOverlay "Delete local data" White) page proxyInfo)
-        _                         <- runWidgetStep (addPendingOperations syncDataWire syncOperations                                     ) (WidgetState (spinnerOverlay "Delete local data" White) page proxyInfo)
+        _                         <- runWidgetStep (addPendingOperation syncDataWire syncOperations                                     ) (WidgetState (spinnerOverlay "Delete local data" White) page proxyInfo)
 
         
         pure $ Tuple 
@@ -313,17 +313,17 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
             ProxyResponse proxy'' stateUpdateInfo            <- runStep (updateIndex (state {proxy = proxy'}) updatedIndex) (WidgetState (spinnerOverlay "Update index" White) page proxyInfo)
 
             syncOperations <- runStep (if (not enableSync) then (pure Nil) else do
-                                user <- computeRemoteUserCard c p s stateUpdateInfo.masterKey srpConf
-                                pure $  ( (SaveBlob   $ view _indexReference_refence      stateUpdateInfo.userInfo          )
-                                        : (SaveBlob   $ view _userInfoReference_reference stateUpdateInfo.userInfoReferences)
+                                user <- computeRemoteUserCard srpConf c p s (fst masterKey) stateUpdateInfo.masterKey
+                                pure $  ( (SaveBlobFromRef   $ view _index_reference      stateUpdateInfo.userInfo          )
+                                        : (SaveBlobFromRef   $ view _userInfo_reference stateUpdateInfo.userInfoReferences)
                                         : (SaveUser     user                                                )
-                                        : (DeleteBlob $ view _userInfoReference_reference userInfoReferences)
-                                        : (DeleteBlob $ view _indexReference_refence      userInfo          )
+                                        : (DeleteBlob (view _userInfo_reference userInfoReferences) (view _userInfo_identifier userInfo))
+                                        : (DeleteBlob (view _index_reference      userInfo          ) (view _index_identifier index))
                                         :  Nil
-                                        ) <> ((SaveBlob <<< view _cardReference_reference) <$> (entries # fromFoldable))
+                                        ) <> ((SaveBlobFromRef <<< view _card_reference) <$> (entries # fromFoldable))
                               ) (WidgetState (spinnerOverlay "Compute data to sync" White) (Main defaultPage) proxyInfo)
       
-            _              <- runWidgetStep (addPendingOperations syncDataWire syncOperations) (WidgetState (spinnerOverlay "Compute data to sync" White) (Main defaultPage) proxyInfo)
+            _              <- runWidgetStep (addPendingOperation syncDataWire syncOperations) (WidgetState (spinnerOverlay "Compute data to sync" White) (Main defaultPage) proxyInfo)
 
 
             pure (Tuple 
@@ -350,7 +350,7 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
         let references              =         userInfoReferences.reference : indexRef : ((\(CardEntry {cardReference: CardReference {reference}}) -> reference) <$> (unwrap index).entries)
 
         ProxyResponse proxy' blobs <-          downloadBlobsSteps references connectionState page proxyInfo
-        remoteUserCard             <- runStep (computeRemoteUserCard c p s masterKey srpConf)                                                                                  (WidgetState (spinnerOverlay "Compute user card" White) page proxyInfo)
+        remoteUserCard             <- runStep (computeRemoteUserCard srpConf c p s (hex "") masterKey)                                                                                  (WidgetState (spinnerOverlay "Compute user card" White) page proxyInfo)
         ProxyResponse proxy'' doc  <- runStep (getBasicHTML connectionState{proxy = proxy'})                                                                 (WidgetState (spinnerOverlay "Download html"     White) page proxyInfo)
         documentToDownload         <- runStep (appendCardsDataInPlace doc blobs remoteUserCard >>= (liftEffect <<< prepareHTMLBlob))                         (WidgetState (spinnerOverlay "Create document"   White) page proxyInfo)
         date                       <- runStep (liftEffect $ formatDateTimeToDate <$> getCurrentDateTime)                                                     (WidgetState (spinnerOverlay ""                  White) page proxyInfo)

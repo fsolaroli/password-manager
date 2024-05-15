@@ -83,7 +83,7 @@ updateProxy state@{proxy: DynamicProxy dynamicProxy} = DynamicProxy <$> ((window
       false, {enableSync: true, syncDataWire} ->
           ((un Wire syncDataWire).value) <#> (\syncData ->
             fold (syncData.pendingOperations <#> (case _ of
-              SaveBlob ref -> ref : Nil
+              SaveBlobFromRef ref -> ref : Nil
               _            ->       Nil
             ))
           ) <#>  (withDataOnLocalStorage <<< WithData)

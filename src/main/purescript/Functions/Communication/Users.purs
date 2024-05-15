@@ -42,10 +42,10 @@ import Functions.Communication.Blobs (deleteBlob, getBlob, postBlob)
 import Functions.EncodeDecode (decryptArrayBuffer, decryptJson, encryptArrayBuffer, encryptJson, exportCryptoKeyToHex, generateCryptoKeyAesGCM, importCryptoKeyAesGCM)
 import Functions.SRP (prepareV)
 
-computeRemoteUserCard :: HexString -> HexString -> HexString -> MasterKey -> SRPConf -> ExceptT AppError Aff RequestUserCard
-computeRemoteUserCard c p s masterKey srpConf = do
+computeRemoteUserCard :: SRPConf -> HexString -> HexString -> HexString -> HexString -> MasterKey -> ExceptT AppError Aff RequestUserCard
+computeRemoteUserCard srpConf c p s originMasterKey masterKey = do
   v <- withExceptT (show >>> SRPError >>> ProtocolError) $ ExceptT (prepareV srpConf (toArrayBuffer s) (toArrayBuffer p))
-  pure $ RequestUserCard { c, v, s, srpVersion: currentSRPVersion, originMasterKey: Nothing, masterKey }
+  pure $ RequestUserCard { c, v, s, srpVersion: currentSRPVersion, originMasterKey: Just originMasterKey, masterKey }
 
 updateUserCard :: ConnectionState -> HexString -> UserCard -> ExceptT AppError Aff (ProxyResponse Unit)
 updateUserCard connectionState c newUserCard = do
@@ -66,8 +66,9 @@ deleteUserCard connectionState c = do
 
 -- ------------
 
-computeMasterKey :: UserInfoReferences -> CryptoKey -> Aff MasterKey
-computeMasterKey {reference: userInfoHash, key: userInfoKey} masterPassword = do
+computeMasterKey :: UserInfoReferences -> HexString -> Aff MasterKey
+computeMasterKey {reference: userInfoHash, key: userInfoKey} p = do
+  masterPassword <- importCryptoKeyAesGCM (toArrayBuffer p) # liftAff
   unencryptedMasterKeyContent <- concatArrayBuffers ((userInfoHash : userInfoKey : Nil) <#> toArrayBuffer) # liftEffect
   encryptedMasterKeyContent   <- encryptArrayBuffer masterPassword unencryptedMasterKeyContent
   pure $ Tuple (fromArrayBuffer encryptedMasterKeyContent) currentMasterKeyEncodingVersion
@@ -139,7 +140,7 @@ updateUserInfo { c: Just c, p: Just p, masterKey: Just (Tuple originMasterKey _)
   ProxyResponse proxy'   newUserInfoReferences <-           postUserInfo connectionState newUserInfo
   ProxyResponse proxy''  _                     <-           deleteUserInfo connectionState {proxy = proxy'} oldUserInfo userInfoReferences
 
-  newMasterKey        :: MasterKey             <- liftAff $ computeMasterKey newUserInfoReferences =<< (importCryptoKeyAesGCM (toArrayBuffer p) # liftAff)
+  newMasterKey        :: MasterKey             <- liftAff $ computeMasterKey newUserInfoReferences p
   ProxyResponse proxy''' _                     <-           updateUserCard connectionState{proxy = proxy''} c (UserCard { masterKey: newMasterKey, originMasterKey })
 
   pure $ ProxyResponse proxy''' { userInfo: newUserInfo, masterKey: newMasterKey, userInfoReferences: newUserInfoReferences }

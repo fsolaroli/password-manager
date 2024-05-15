@@ -12,6 +12,7 @@ import Data.Function ((#), ($))
 import Data.Functor ((<$>))
 import Data.HTTP.Method (Method(..))
 import Data.HexString (Base(..), HexString, hex, toArrayBuffer, toString)
+import Data.Identifier (Identifier)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Semigroup ((<>))
@@ -61,7 +62,7 @@ postBlob connectionState blob blobReference blobIdentifier = do
   )
   genericRequest connectionState url POST (Just body) RF.ignore
 
-deleteBlob :: ConnectionState -> HexString -> HexString -> ExceptT AppError Aff (ProxyResponse Unit)
+deleteBlob :: ConnectionState -> HexString -> Identifier -> ExceptT AppError Aff (ProxyResponse Unit)
 deleteBlob connectionState blobReference blobIdentifier = do
   let url = joinWith "/" ["blobs", toString Hex blobReference]
   body <- formData <$> (liftEffect $ do

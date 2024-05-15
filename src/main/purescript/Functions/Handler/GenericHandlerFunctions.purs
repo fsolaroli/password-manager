@@ -1,6 +1,7 @@
 module Functions.Handler.GenericHandlerFunctions where
 
 import Concur.Core (Widget, liftWidget)
+import Concur.Core.Patterns (Wire)
 import Concur.React (HTML, affAction)
 import Control.Alt ((<|>))
 import Control.Alternative ((*>), (<*))
@@ -12,6 +13,7 @@ import Data.Either (Either, either)
 import Data.Function ((#), ($))
 import Data.Functor ((<$))
 import Data.Int (toNumber)
+import Data.List (List)
 import Data.Show (show)
 import Data.Time.Duration (Milliseconds(..))
 import Data.Tuple (Tuple(..))
@@ -24,6 +26,7 @@ import Effect.Aff (Aff, delay)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
 import Functions.State (getProxyInfoFromProxy)
+import OperationalWidgets.Sync (SyncData, SyncOperation, addPendingOperation)
 import Unsafe.Coerce (unsafeCoerce)
 import Views.AppView (appView)
 import Views.LoginFormView (emptyLoginFormData)
@@ -41,6 +44,9 @@ runStep       step widgetState = ExceptT    $ ((step # runExceptT # affAction) <
 
 runWidgetStep :: forall a. Widget HTML a -> WidgetState -> ExceptT AppError (Widget HTML) a
 runWidgetStep step widgetState = liftWidget $ ( step                           <* ((affAction <<< delay <<< Milliseconds) =<< (liftEffect operationDelay))) <|> (defaultView widgetState)
+
+syncLocalStorage :: Wire (Widget HTML) SyncData -> List SyncOperation -> WidgetState -> ExceptT AppError (Widget HTML) Unit
+syncLocalStorage syncDataWire syncOperations message = runWidgetStep (addPendingOperation syncDataWire syncOperations) message
 
 defaultView :: forall a. WidgetState -> Widget HTML a
 defaultView widgetState = (unsafeCoerce unit <$ appView widgetState)

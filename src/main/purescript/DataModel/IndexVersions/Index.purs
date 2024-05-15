@@ -123,5 +123,11 @@ removeFromIndex cardEntry (Index {entries}) =
 _entries :: Lens' Index (List CardEntry)
 _entries = _Newtype <<< prop (Proxy :: _ "entries")
 
-_cardReference_reference :: Lens' CardEntry HexString
-_cardReference_reference = _Newtype <<< prop (Proxy :: _ "cardReference") <<< _Newtype <<< prop (Proxy :: _ "reference")
+_index_identifier :: Lens' Index Identifier
+_index_identifier = _Newtype <<< prop (Proxy :: _ "identifier")
+
+_card_reference :: Lens' CardEntry HexString
+_card_reference = _Newtype <<< prop (Proxy :: _ "cardReference") <<< _Newtype <<< prop (Proxy :: _ "reference")
+
+_card_identifier :: Lens' CardEntry Identifier
+_card_identifier = _Newtype <<< prop (Proxy :: _ "cardReference") <<< _Newtype <<< prop (Proxy :: _ "identifier")

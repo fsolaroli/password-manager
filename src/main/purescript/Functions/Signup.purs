@@ -61,8 +61,8 @@ prepareSignupParameters srpConf form = runExceptT $ do
   userInfoHash         :: ArrayBuffer <- liftAff $ srpConf.hash (encryptedUserInfo : Nil)
 
   userInfoCryptoKeyHex :: HexString   <- liftAff $ exportCryptoKeyToHex userInfoCryptoKey
-  masterPassword       :: CryptoKey   <- liftAff $ importCryptoKeyAesGCM pAb
-  masterKey            :: MasterKey   <- liftAff $ computeMasterKey {reference: fromArrayBuffer userInfoHash, key: userInfoCryptoKeyHex} masterPassword
+  -- masterPassword       :: CryptoKey   <- liftAff $ importCryptoKeyAesGCM pAb
+  masterKey            :: MasterKey   <- liftAff $ computeMasterKey {reference: fromArrayBuffer userInfoHash, key: userInfoCryptoKeyHex} (fromArrayBuffer pAb)
 
   pure  { user:
             RequestUserCard

@@ -39,7 +39,7 @@ import Functions.Pin (decryptPassphraseWithPin, deleteCredentials, makeKey)
 import Functions.SRP (checkM2)
 import Functions.State (getProxyInfoFromProxy, updateProxy)
 import Functions.Timer (activateTimer)
-import OperationalWidgets.Sync (addPendingOperations, updateConnectionState)
+import OperationalWidgets.Sync (addPendingOperation, updateConnectionState)
 import Record (merge)
 import Views.AppView (emptyMainPageWidgetState)
 import Views.CardsManagerView (cardManagerInitialState)
@@ -138,7 +138,7 @@ loadHomePageSteps state@{hash: hashFunc, proxy, srpConf, c: Just c, p: Just p, m
 
   syncOperations                 <- runStep       (computeSyncOperations updatedState                                                                     ) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} page proxyInfo)
   _                              <- runWidgetStep (updateConnectionState syncDataWire {c, p, srpConf, hashFunc, proxy: defaultOnlineProxy}                ) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} page proxyInfo)
-  _                              <- runWidgetStep (addPendingOperations  syncDataWire syncOperations                                                      ) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} page proxyInfo)
+  _                              <- runWidgetStep (addPendingOperation  syncDataWire syncOperations                                                      ) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} page proxyInfo)
 
   proxy''' <- runStep (updateProxy updatedState # liftEffect) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} page proxyInfo)
 

@@ -31,7 +31,7 @@ import Functions.Pin (makeKey)
 import Functions.State (computeInitialState)
 import JSURI (decodeURI)
 import OperationalWidgets.App (app)
-import OperationalWidgets.Sync (baseSyncData, syncLocalStorage)
+import OperationalWidgets.Sync (baseSyncData, executeLocalStorageSynOperations)
 import Record (merge)
 import Web.HTML (Window, window)
 import Web.HTML.History (DocumentTitle(..), URL(..), replaceState)
@@ -49,7 +49,7 @@ main = do
   
   runWidgetInDom "app" $ local baseSyncData \wire -> do
     appState    <- computeInitialState wire # liftEffect <#> merge credentials
-    app appState fragmentState <|> syncLocalStorage wire
+    app appState fragmentState <|> executeLocalStorageSynOperations wire
 
 -- ---------------------------------------------
 

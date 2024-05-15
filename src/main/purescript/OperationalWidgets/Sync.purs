@@ -11,12 +11,13 @@ import Control.Plus (empty)
 import Data.Argonaut.Core (stringify)
 import Data.Codec (encode)
 import Data.Either (Either(..))
-import Data.Eq (class Eq, (/=))
+import Data.Eq (class Eq, (/=), (==))
 import Data.Function ((#), ($))
 import Data.HexString (Base(..), HexString, fromArrayBuffer, toString)
+import Data.Identifier (Identifier)
 import Data.Lens (Lens', addOver, set, setJust)
 import Data.Lens.Record (prop)
-import Data.List (List(..), deleteAt, elemIndex, (:))
+import Data.List (List(..), deleteAt, findIndex, (:))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (un, unwrap)
 import Data.Semigroup ((<>))
@@ -55,24 +56,28 @@ _pendingOperations = prop (Proxy :: _ "pendingOperations")
 _connectionState :: Lens' SyncData (Maybe ConnectionState)
 _connectionState = prop (Proxy :: _ "connectionState")
 
-addPendingOperations :: Wire (Widget HTML) SyncData -> List SyncOperation -> Widget HTML Unit
-addPendingOperations syncDataWire syncOperations = ((un Wire syncDataWire).value # liftEffect) >>= ((\syncData -> syncData.pendingOperations <> syncOperations) >>> send (mapWire _pendingOperations syncDataWire))
+addPendingOperation :: Wire (Widget HTML) SyncData -> List SyncOperation -> Widget HTML Unit
+addPendingOperation syncDataWire syncOperations = ((un Wire syncDataWire).value # liftEffect) >>= ((\syncData -> syncData.pendingOperations <> syncOperations) >>> send (mapWire _pendingOperations syncDataWire))
 
 updateConnectionState :: Wire (Widget HTML) SyncData -> ConnectionState -> Widget HTML Unit
 updateConnectionState syncDataWire connectionState = send (mapWire _connectionState syncDataWire) (Just connectionState)
 
-data SyncOperation = SaveBlob HexString | DeleteBlob HexString | SaveUser RequestUserCard | DeleteUser HexString -- TODO: change SaveBlob to take also {ref, blob}
+type Reference = HexString
+type Blob      = HexString 
+
+data SyncOperation = SaveBlobFromRef HexString | SaveBlob Reference Identifier Blob | DeleteBlob HexString Identifier | SaveUser RequestUserCard | DeleteUser HexString
 
 instance showSyncOperation :: Show SyncOperation where
-  show (SaveBlob ref)   = "SaveBlob "   <> show ref
-  show (DeleteBlob ref) = "DeleteBlob " <> show ref
-  show (SaveUser user)  = "SaveUser "   <> show (unwrap user).c
-  show (DeleteUser ref) = "DeleteUser " <> show ref
+  show (SaveBlobFromRef ref) = "SaveBlobFromRef " <> show ref
+  show (SaveBlob ref _ _)    = "SaveBlob "        <> show ref
+  show (DeleteBlob ref _)      = "DeleteBlob "      <> show ref
+  show (SaveUser user)       = "SaveUser "        <> show (unwrap user).c
+  show (DeleteUser ref)      = "DeleteUser "      <> show ref
 
 derive instance eqSyncOperation :: Eq SyncOperation
 
-syncLocalStorage :: forall a. Wire (Widget HTML) SyncData -> Widget HTML a 
-syncLocalStorage wire = with wire \syncData -> affAction (delay $ Milliseconds 0.1) *> do
+executeLocalStorageSynOperations :: forall a. Wire (Widget HTML) SyncData -> Widget HTML a 
+executeLocalStorageSynOperations wire = with wire \syncData -> affAction (delay $ Milliseconds 0.1) *> do
   ((onLine =<< navigator =<< window) # liftEffect)  >>= case _ of
     true  -> case syncData of
       {connectionState:   Nothing} -> empty
@@ -86,7 +91,7 @@ syncLocalStorage wire = with wire \syncData -> affAction (delay $ Milliseconds 0
   where
     syncOperation :: SyncData -> Widget HTML SyncData
     syncOperation syncData@{pendingOperations: (head : tail), connectionState: Just connectionState} = case head of
-      SaveBlob   ref  -> do
+      SaveBlobFromRef   ref  -> do
         getBlob connectionState ref # runExceptT # affAction >>= case _ of
           Right (ProxyResponse proxy blob) -> do
             (setItem ("blob_" <> toString Hex ref) (toString Hex (fromArrayBuffer blob)) =<< localStorage =<< window) # liftEffect
@@ -94,13 +99,18 @@ syncLocalStorage wire = with wire \syncData -> affAction (delay $ Milliseconds 0
                             <<< set     _pendingOperations   tail 
                             <<< setJust _connectionState    (set _proxy proxy connectionState)  
           Left (ProtocolError (ResponseError 404)) ->
-            case elemIndex (DeleteBlob ref) tail  of
+            case findIndex (deleteSameRef ref) tail  of
               Just i  -> pure $ syncData  #   addOver _completedOperations 2 
                                           <<< set     _pendingOperations  (fromMaybe tail $ deleteAt i tail) 
               Nothing -> empty
           _ -> empty
 
-      DeleteBlob ref  -> do
+      SaveBlob ref _ blob -> do
+        (setItem ("blob_" <> toString Hex ref) (toString Hex blob) =<< localStorage =<< window) # liftEffect
+        pure $ syncData #   addOver _completedOperations 1 
+                        <<< set     _pendingOperations   tail
+
+      DeleteBlob ref _ -> do
         (removeItem ("blob_" <> toString Hex ref) =<< localStorage =<< window) # liftEffect
         pure $ syncData #   addOver _completedOperations 1 
                         <<< set     _pendingOperations   tail
@@ -117,3 +127,7 @@ syncLocalStorage wire = with wire \syncData -> affAction (delay $ Milliseconds 0
       
     syncOperation _ = empty
     
+    deleteSameRef :: HexString -> SyncOperation -> Boolean
+    deleteSameRef ref = case _ of
+      DeleteBlob ref' _ -> ref' == ref
+      _                 -> false
