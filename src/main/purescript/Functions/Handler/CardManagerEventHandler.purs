@@ -15,9 +15,10 @@ import Data.Function (flip, (#), ($), (>>>))
 import Data.HexString (fromArrayBuffer)
 import Data.Identifier (computeIdentifier)
 import Data.Lens (set, view)
-import Data.List (List(..), (:))
+import Data.List (List(..), singleton, (:))
 import Data.Map (delete, insert, lookup)
 import Data.Maybe (Maybe(..), isJust, isNothing)
+import Data.Monoid ((<>))
 import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..), fst, uncurry)
 import DataModel.AppError (AppError(..), InvalidStateError(..))
@@ -25,11 +26,11 @@ import DataModel.AppState (AppState, CardsCache)
 import DataModel.CardVersions.Card as DataModel.CardVersions.Card
 import DataModel.Communication.ConnectionState (ConnectionState)
 import DataModel.FragmentState as Fragment
-import DataModel.IndexVersions.Index (CardEntry(..), _card_identifier, _card_reference, _index_identifier, addToIndex, reference, removeFromIndex)
+import DataModel.IndexVersions.Index (CardEntry(..), Index, _card_identifier, _card_reference, _index_identifier, addToIndex, reference, removeFromIndex)
 import DataModel.Proxy (ProxyInfo, ProxyResponse(..))
 import DataModel.SRPVersions.SRP (hashFuncSHA256)
 import DataModel.UserVersions.User (UserInfo(..), _indexReference, _index_reference, _userInfo_identifier, _userInfo_reference)
-import DataModel.WidgetState (CardFormInput(..), CardManagerState, CardViewState(..), Page(..), WidgetState(..), MainPageWidgetState)
+import DataModel.WidgetState (CardFormInput(..), CardViewState(..), MainPageWidgetState, Page(..), WidgetState(..), CardManagerState)
 import Effect.Aff.Class (liftAff)
 import Functions.Card (appendToTitle, archiveCard, createCardEntry, decryptCard, restoreCard)
 import Functions.Communication.Blobs (getBlob)
@@ -117,8 +118,7 @@ handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just inde
 
     (AddCardEvent card) ->
       do
-        res <- addCardSteps cardManagerState state card (Main $ defaultPage {cardManagerState = cardManagerState {cardViewState = CardForm (emptyCardFormData {card = card}) (NewCardFromFragment card)}}) proxyInfo
-        pure res
+        cardOperationSteps (Add card) (spinnerWidgetState (Main $ defaultPage {cardManagerState = cardManagerState {cardViewState = CardForm (emptyCardFormData {card = card}) (NewCardFromFragment card)}})) cardManagerState state <#> wrapResponse
       # runExceptT
       >>= handleOperationResult state defaultErrorPage true Black
 
@@ -126,22 +126,22 @@ handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just inde
       do
         ProxyResponse proxy' (Tuple cardsCache' card) <- getCardSteps connectionState cardsCache cardEntry (Main defaultPage) proxyInfo
         let cloneCard                                  = appendToTitle " - copy" <<< (\(DataModel.CardVersions.Card.Card card') -> DataModel.CardVersions.Card.Card card' {archived = false}) $ card
-        res                                           <- addCardSteps cardManagerState state{proxy = proxy', cardsCache = cardsCache'} cloneCard (Main defaultPage) proxyInfo
-        pure res
+        res                                           <- cardOperationSteps (Add cloneCard) (spinnerWidgetState (Main defaultPage)) cardManagerState state{proxy = proxy', cardsCache = cardsCache'}
+        pure $ wrapResponse res
 
       # runExceptT
       >>= handleOperationResult state defaultErrorPage true Black
   
     (DeleteCardEvent cardEntry) ->
       do
-        deleteCardSteps cardManagerState state cardEntry (Main defaultPage) proxyInfo
+        cardOperationSteps (Delete cardEntry) (spinnerWidgetState (Main defaultPage)) cardManagerState state <#> wrapResponse
 
       # runExceptT
       >>= handleOperationResult state defaultErrorPage true Black
 
     (EditCardEvent (Tuple oldCardEntry updatedCard)) ->
       do
-        editCardSteps cardManagerState state oldCardEntry updatedCard (Main defaultPage {cardManagerState = cardManagerState {cardViewState = CardForm (emptyCardFormData {card = updatedCard}) (ModifyCard updatedCard oldCardEntry) }}) proxyInfo
+        cardOperationSteps (Edit updatedCard oldCardEntry) (spinnerWidgetState (Main defaultPage {cardManagerState = cardManagerState {cardViewState = CardForm (emptyCardFormData {card = updatedCard}) (ModifyCard updatedCard oldCardEntry) }})) cardManagerState state <#> wrapResponse
       
       # runExceptT
       >>= handleOperationResult state defaultErrorPage true Black
@@ -150,8 +150,8 @@ handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just inde
       do
         ProxyResponse proxy' (Tuple _ card) <- getCardSteps  connectionState  cardsCache            cardEntry             (Main defaultPage) proxyInfo
         let updatedCard                      = archiveCard card
-        res                                 <- editCardSteps cardManagerState state{proxy = proxy'} cardEntry updatedCard (Main defaultPage) proxyInfo
-        pure res
+        res                                 <- cardOperationSteps (Edit updatedCard cardEntry) (spinnerWidgetState (Main defaultPage)) cardManagerState state{proxy = proxy'}
+        pure $ wrapResponse res
 
       # runExceptT
       >>= handleOperationResult state defaultErrorPage true Black
@@ -160,13 +160,19 @@ handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just inde
       do
         ProxyResponse proxy' (Tuple _ card) <- getCardSteps  connectionState  cardsCache            cardEntry             (Main defaultPage) proxyInfo
         let updatedCard                      = restoreCard card
-        res                                 <- editCardSteps cardManagerState state{proxy = proxy'} cardEntry updatedCard (Main defaultPage) proxyInfo
-        pure res
+        res                                 <- cardOperationSteps (Edit updatedCard cardEntry) (spinnerWidgetState (Main defaultPage)) cardManagerState state{proxy = proxy'}
+        pure $ wrapResponse res
 
       # runExceptT
       >>= handleOperationResult state defaultErrorPage true Black
 
   where
+    wrapResponse :: Tuple AppState Page -> OperationState
+    wrapResponse res = (\page -> WidgetState hiddenOverlayInfo page proxyInfo) <$> res
+
+    spinnerWidgetState :: Page -> String -> WidgetState
+    spinnerWidgetState page message = WidgetState (spinnerOverlay message Black) page proxyInfo
+
     updateCardManagerState :: MainPageWidgetState -> CardManagerState -> Widget HTML OperationState
     updateCardManagerState mainPageState cardManagerState' = 
       noOperation (Tuple 
@@ -204,28 +210,25 @@ getCardSteps connectionState cardsCache cardEntry@(CardEntry entry) page proxyIn
       let updatedCardsCache      =          insert (reference cardEntry) card cardsCache
       pure $ ProxyResponse proxy' (Tuple updatedCardsCache card)
 
-addCardSteps :: CardManagerState -> AppState -> DataModel.CardVersions.Card.Card -> Page -> ProxyInfo -> ExceptT AppError (Widget HTML) OperationState
-addCardSteps cardManagerState state@{index: Just index, masterKey: Just masterKey, userInfo: Just userInfo@(UserInfo {userPreferences, donationInfo}), userInfoReferences: Just userInfoReferences, proxy, hash: hashFunc, srpConf, c: Just c, s: Just s, p: Just p, cardsCache, username: Just username, password: Just password, pinEncryptedPassword, enableSync, syncDataWire, donationLevel: Just donationLevel} newCard page proxyInfo = do
+data CardOperation = Add DataModel.CardVersions.Card.Card | Edit DataModel.CardVersions.Card.Card CardEntry | Delete CardEntry
+
+cardOperationSteps :: CardOperation -> (String -> WidgetState) -> CardManagerState -> AppState -> ExceptT AppError (Widget HTML) (Tuple AppState Page)
+cardOperationSteps cardOperation message cardManagerState state@{index: Just index, masterKey: Just masterKey, userInfo: Just userInfo@(UserInfo {userPreferences, donationInfo}), userInfoReferences: Just userInfoReferences, proxy, hash: hashFunc, srpConf, c: Just c, s: Just s, p: Just p, cardsCache, username: Just username, password: Just password, pinEncryptedPassword, enableSync, syncDataWire, donationLevel: Just donationLevel} = do
   let connectionState = {proxy, hashFunc, srpConf, c, p}
 
-  Tuple newEncryptedCard     newCardEntry         <- runStep (createCardEntry  hashFuncSHA256 newCard # liftAff)  (WidgetState (spinnerOverlay "Compute Encrypted Data" Black) page proxyInfo)
-  newIndex                                        <- runStep (addToIndex       newCardEntry index     # liftAff)  (WidgetState (spinnerOverlay "Compute Encrypted Data" Black) page proxyInfo)
-  Tuple newEncryptedIndex    newIndexReference    <- runStep (encryptIndex     newIndex hashFunc      # liftAff)  (WidgetState (spinnerOverlay "Compute Encrypted Data" Black) page proxyInfo)
+  { saveCardOp, deleteCardOp
+  , newCardsCache, newIndex, newCardManagerState} <- operationSpecificData
+  Tuple newEncryptedIndex    newIndexReference    <- runStep (encryptIndex     newIndex hashFunc         # liftAff)  (message "Compute Encrypted Data")
   newUserInfo                                     <- runStep ((\id -> ( set _userInfo_identifier id >>>
                                                                         set _indexReference newIndexReference
                                                                       ) userInfo
-                                                              ) <$> (computeIdentifier                # liftAff)) (WidgetState (spinnerOverlay "Compute Encrypted Data" Black) page proxyInfo)
-  Tuple newEncryptedUserInfo newUserInfoReference <- runStep (encryptUserInfo  newUserInfo hashFunc   # liftAff)  (WidgetState (spinnerOverlay "Compute Encrypted Data" Black) page proxyInfo)
+                                                              ) <$> (computeIdentifier                   # liftAff)) (message "Compute Encrypted Data")
+  Tuple newEncryptedUserInfo newUserInfoReference <- runStep (encryptUserInfo  newUserInfo hashFunc      # liftAff)  (message "Compute Encrypted Data")
   newUser                                         <- runStep (computeRemoteUserCard srpConf c p s (fst masterKey) =<<
-                                                             (computeMasterKey newUserInfoReference p # liftAff)) (WidgetState (spinnerOverlay "Compute Encrypted Data" Black) page proxyInfo)
-  
-  let syncOperations =  ( ( Tuple (SaveBlob (_card_reference  # flip view newCardEntry)
-                                            (_card_identifier # flip view newCardEntry)
-                                            (newEncryptedCard # fromArrayBuffer)
-                                  )
-                                  "Save Card"
-                          )      
-                        : ( Tuple (SaveBlob (_index_reference  # flip view newUserInfo)
+                                                             (computeMasterKey newUserInfoReference p    # liftAff)) (message "Compute Encrypted Data")
+
+  let syncOperations =  ( saveCardOp
+                       <> ( Tuple (SaveBlob (_index_reference  # flip view newUserInfo)
                                             (_index_identifier # flip view newIndex)
                                             (newEncryptedIndex # fromArrayBuffer)
                                   )
@@ -251,18 +254,19 @@ addCardSteps cardManagerState state@{index: Just index, masterKey: Just masterKe
                                   "Delete old User Info"
                           )
                         :   Nil
+                       <> deleteCardOp
                         )
-  
-  _        <- syncLocalStorage syncDataWire (syncOperations <#> fst) (      WidgetState (spinnerOverlay "Sync Data to Local Storage" Black) page proxyInfo)
-  newProxy <- syncBackend connectionState syncOperations             (\m -> WidgetState (spinnerOverlay m                            Black) page proxyInfo)
+
+  _        <- syncLocalStorage syncDataWire    (syncOperations <#> fst) (message "Sync Data to Local Storage")
+  newProxy <- syncBackend      connectionState  syncOperations           message
 
   pure (Tuple 
-        (state  { proxy = newProxy, cardsCache = insert (view _card_reference newCardEntry) newCard cardsCache
+        (state  { proxy = newProxy, cardsCache = newCardsCache
                 , index = Just newIndex, userInfo = Just newUserInfo, userInfoReferences = Just newUserInfoReference
                 , masterKey = Just (unwrap newUser).masterKey
                 })
-        (WidgetState
-          hiddenOverlayInfo
+        -- (WidgetState
+        --   hiddenOverlayInfo
           (Main { index:            newIndex
                 , credentials:     {username, password}
                 , donationInfo
@@ -270,169 +274,72 @@ addCardSteps cardManagerState state@{index: Just index, masterKey: Just masterKe
                 , enableSync
                 , userPreferences
                 , userAreaState:    userAreaInitialState
-                , cardManagerState: cardManagerState {cardViewState = Card newCard newCardEntry, highlightedEntry = Nothing}
+                , cardManagerState: newCardManagerState
                 , donationLevel
                 , syncDataWire: Just syncDataWire
                 }
           )
-          proxyInfo
-        )
+        --   proxyInfo
+        -- )
       )
-addCardSteps _ _ _ _ _ = throwError $ InvalidStateError (CorruptedState "addCardStep")
 
-editCardSteps :: CardManagerState -> AppState -> CardEntry -> DataModel.CardVersions.Card.Card -> Page -> ProxyInfo -> ExceptT AppError (Widget HTML) OperationState
-editCardSteps cardManagerState state@{index: Just index, masterKey: Just masterKey, proxy, srpConf, hash: hashFunc, c: Just c, s: Just s, p: Just p, userInfo: Just userInfo@(UserInfo {userPreferences, donationInfo}), userInfoReferences: Just userInfoReferences, cardsCache, username: Just username, password: Just password, pinEncryptedPassword, donationLevel: Just donationLevel, enableSync, syncDataWire} oldCardEntry updatedCard page proxyInfo = do
-  let connectionState = {proxy, hashFunc, srpConf, c, p}
+  where
+    operationSpecificData :: ExceptT AppError (Widget HTML) { saveCardOp :: List (Tuple SyncOperation String), deleteCardOp :: List (Tuple SyncOperation String), newCardsCache :: CardsCache, newIndex :: Index, newCardManagerState :: CardManagerState }
+    operationSpecificData = case cardOperation of
+      Add newCard -> do
+        Tuple newEncryptedCard newCardEntry <- runStep (createCardEntry  hashFuncSHA256 newCard # liftAff) (message "Compute Encrypted Data")
+        newIndex                            <- runStep (addToIndex       newCardEntry   index   # liftAff) (message "Compute Encrypted Data")
 
-  Tuple newEncryptedCard     newCardEntry         <- runStep (createCardEntry hashFuncSHA256 updatedCard # liftAff)  (WidgetState (spinnerOverlay "Compute Encrypted Data" Black) page proxyInfo)
-  newIndex                                        <- runStep ((addToIndex       newCardEntry index >>=
-                                                               removeFromIndex oldCardEntry)             # liftAff)  (WidgetState (spinnerOverlay "Compute Encrypted Data" Black) page proxyInfo)
-  Tuple newEncryptedIndex    newIndexReference    <- runStep (encryptIndex     newIndex hashFunc         # liftAff)  (WidgetState (spinnerOverlay "Compute Encrypted Data" Black) page proxyInfo)
-  newUserInfo                                     <- runStep ((\id -> ( set _userInfo_identifier id >>>
-                                                                        set _indexReference newIndexReference
-                                                                      ) userInfo
-                                                              ) <$> (computeIdentifier                   # liftAff)) (WidgetState (spinnerOverlay "Compute Encrypted Data" Black) page proxyInfo)
-  Tuple newEncryptedUserInfo newUserInfoReference <- runStep (encryptUserInfo  newUserInfo hashFunc      # liftAff)  (WidgetState (spinnerOverlay "Compute Encrypted Data" Black) page proxyInfo)
-  newUser                                         <- runStep (computeRemoteUserCard srpConf c p s (fst masterKey) =<<
-                                                             (computeMasterKey newUserInfoReference p    # liftAff)) (WidgetState (spinnerOverlay "Compute Encrypted Data" Black) page proxyInfo)
+        pure $ {
+          saveCardOp: singleton ( Tuple (SaveBlob (_card_reference  # flip view newCardEntry)
+                                                  (_card_identifier # flip view newCardEntry)
+                                                  (newEncryptedCard # fromArrayBuffer)
+                                        )
+                                        "Save Card"
+                                )
+        , deleteCardOp:         Nil
+        , newCardsCache:        insert (view _card_reference newCardEntry) newCard cardsCache
+        , newIndex:             newIndex
+        , newCardManagerState:  cardManagerState {cardViewState = Card newCard newCardEntry, highlightedEntry = Nothing}
+        }
+      
+      Edit updatedCard oldCardEntry -> do
+          Tuple newEncryptedCard newCardEntry <- runStep (createCardEntry hashFuncSHA256 updatedCard # liftAff) (message "Compute Encrypted Data")
+          newIndex                            <- runStep (( addToIndex       newCardEntry index >>=
+                                                            removeFromIndex oldCardEntry)            # liftAff) (message "Compute Encrypted Data")
 
-  let syncOperations =  ( ( Tuple (SaveBlob (_card_reference  # flip view newCardEntry)
-                                            (_card_identifier # flip view newCardEntry)
-                                            (newEncryptedCard # fromArrayBuffer)
-                                  )
-                                  "Save Card"
-                          )      
-                        : ( Tuple (SaveBlob (_index_reference  # flip view newUserInfo)
-                                            (_index_identifier # flip view newIndex)
-                                            (newEncryptedIndex # fromArrayBuffer)
-                                  )
-                                  "Save Index"
-                          )
-                        : ( Tuple (SaveBlob (_userInfo_reference  # flip view newUserInfoReference)
-                                            (_userInfo_identifier # flip view newUserInfo)
-                                            (newEncryptedUserInfo # fromArrayBuffer)
-                                  )
-                                  "Save User Info"
-                          )
-                        : ( Tuple (SaveUser    newUser)                                             
-                                  "Update User Info"
-                          )
-                        : ( Tuple (DeleteBlob (_userInfo_reference  # flip view userInfoReferences)
-                                              (_userInfo_identifier # flip view userInfo)
-                                  )
-                                  "Delete old Index"
-                          )
-                        : ( Tuple (DeleteBlob (_index_reference  # flip view userInfo)
-                                              (_index_identifier # flip view index)
-                                  )
-                                  "Delete old User Info"
-                          )
-                        : ( Tuple (DeleteBlob (_card_reference  # flip view oldCardEntry)
-                                              (_card_identifier # flip view oldCardEntry)
-                                  )
-                                  "Delete old Card"
-                          )
-                        :   Nil
-                        )
+          pure $ {
+            saveCardOp:   singleton ( Tuple (SaveBlob (_card_reference  # flip view newCardEntry)
+                                                      (_card_identifier # flip view newCardEntry)
+                                                      (newEncryptedCard # fromArrayBuffer)
+                                            )
+                                            "Save Card"
+                                    )
+          , deleteCardOp: singleton ( Tuple (DeleteBlob (_card_reference  # flip view oldCardEntry)
+                                                        (_card_identifier # flip view oldCardEntry)
+                                            )
+                                            "Delete old Card"
+                                    )
+          , newCardsCache:          ( insert (view _card_reference newCardEntry) updatedCard <<< 
+                                      delete (view _card_reference oldCardEntry)
+                                    ) cardsCache
+          , newIndex:               newIndex
+          , newCardManagerState:    cardManagerState {cardViewState = Card updatedCard newCardEntry, highlightedEntry = Nothing}
+          }
+      
+      Delete cardEntry -> do
+        newIndex <- runStep ((removeFromIndex cardEntry index) # liftAff) (message "Compute Encrypted Data")
 
-  _        <- syncLocalStorage syncDataWire (syncOperations <#> fst) (      WidgetState (spinnerOverlay "Sync Data to Local Storage" Black) page proxyInfo)
-  newProxy <- syncBackend connectionState syncOperations             (\m -> WidgetState (spinnerOverlay m                            Black) page proxyInfo)
-
-  pure (Tuple 
-        (state  { proxy = newProxy, cardsCache = (insert (view _card_reference newCardEntry) updatedCard <<< 
-                                                  delete (view _card_reference oldCardEntry)) cardsCache
-                , index = Just newIndex, userInfo = Just newUserInfo, userInfoReferences = Just newUserInfoReference
-                , masterKey = Just (unwrap newUser).masterKey
-                })
-        (WidgetState
-          hiddenOverlayInfo
-          (Main { index:            newIndex
-                , credentials:     {username, password}
-                , donationInfo
-                , pinExists: isJust pinEncryptedPassword
-                , enableSync
-                , userPreferences
-                , userAreaState:    userAreaInitialState
-                , cardManagerState: cardManagerState {cardViewState = Card updatedCard newCardEntry, highlightedEntry = Nothing}
-                , donationLevel
-                , syncDataWire: Just syncDataWire
-                }
-          )
-          proxyInfo
-        )
-      )
-editCardSteps _ _ _ _ _ _ = throwError $ InvalidStateError (CorruptedState "editCardStep")
-
-deleteCardSteps :: CardManagerState -> AppState -> CardEntry -> Page -> ProxyInfo -> ExceptT AppError (Widget HTML) OperationState
-deleteCardSteps cardManagerState state@{index: Just index, masterKey: Just masterKey, proxy, srpConf, hash: hashFunc, c: Just c, s: Just s, p: Just p, userInfo: Just userInfo@(UserInfo {userPreferences, donationInfo}), userInfoReferences: Just userInfoReferences, cardsCache, username: Just username, password: Just password, pinEncryptedPassword, donationLevel: Just donationLevel, enableSync, syncDataWire} cardEntry page proxyInfo = do
-  let connectionState = {proxy, hashFunc, srpConf, c, p}
-
-  newIndex                                        <- runStep ((removeFromIndex cardEntry index)          # liftAff)  (WidgetState (spinnerOverlay "Compute Encrypted Data" Black) page proxyInfo)
-  Tuple newEncryptedIndex    newIndexReference    <- runStep (encryptIndex     newIndex hashFunc         # liftAff)  (WidgetState (spinnerOverlay "Compute Encrypted Data" Black) page proxyInfo)
-  newUserInfo                                     <- runStep ((\id -> ( set _userInfo_identifier id >>>
-                                                                        set _indexReference newIndexReference
-                                                                      ) userInfo
-                                                              ) <$> (computeIdentifier                   # liftAff)) (WidgetState (spinnerOverlay "Compute Encrypted Data" Black) page proxyInfo)
-  Tuple newEncryptedUserInfo newUserInfoReference <- runStep (encryptUserInfo  newUserInfo hashFunc      # liftAff)  (WidgetState (spinnerOverlay "Compute Encrypted Data" Black) page proxyInfo)
-  newUser                                         <- runStep (computeRemoteUserCard srpConf c p s (fst masterKey) =<<
-                                                             (computeMasterKey newUserInfoReference p    # liftAff)) (WidgetState (spinnerOverlay "Compute Encrypted Data" Black) page proxyInfo)
-
-  let syncOperations =  ( ( Tuple (SaveBlob (_index_reference  # flip view newUserInfo)
-                                            (_index_identifier # flip view newIndex)
-                                            (newEncryptedIndex # fromArrayBuffer)
-                                  )
-                                  "Save Index"
-                          )
-                        : ( Tuple (SaveBlob (_userInfo_reference  # flip view newUserInfoReference)
-                                            (_userInfo_identifier # flip view newUserInfo)
-                                            (newEncryptedUserInfo # fromArrayBuffer)
-                                  )
-                                  "Save User Info"
-                          )
-                        : ( Tuple (SaveUser    newUser)                                             
-                                  "Update User Info"
-                          )
-                        : ( Tuple (DeleteBlob (_userInfo_reference  # flip view userInfoReferences)
-                                              (_userInfo_identifier # flip view userInfo)
-                                  )
-                                  "Delete old Index"
-                          )
-                        : ( Tuple (DeleteBlob (_index_reference  # flip view userInfo)
-                                              (_index_identifier # flip view index)
-                                  )
-                                  "Delete old User Info"
-                          )
-                        : ( Tuple (DeleteBlob (_card_reference  # flip view cardEntry)
-                                              (_card_identifier # flip view cardEntry)
-                                  )
-                                  "Delete old Card"
-                          )
-                        :   Nil
-                        )
-
-  _        <- syncLocalStorage syncDataWire (syncOperations <#> fst) (      WidgetState (spinnerOverlay "Sync Data to Local Storage" Black) page proxyInfo)
-  newProxy <- syncBackend connectionState syncOperations             (\m -> WidgetState (spinnerOverlay m                            Black) page proxyInfo)
-
-  pure (Tuple 
-        (state  { proxy = newProxy, cardsCache = (delete (view _card_reference cardEntry)) cardsCache
-                , index = Just newIndex, userInfo = Just newUserInfo, userInfoReferences = Just newUserInfoReference
-                , masterKey = Just (unwrap newUser).masterKey
-                })
-        (WidgetState
-          hiddenOverlayInfo
-          (Main { index:            newIndex
-                , credentials:     {username, password}
-                , donationInfo
-                , pinExists: isJust pinEncryptedPassword
-                , enableSync
-                , userPreferences
-                , userAreaState:    userAreaInitialState
-                , cardManagerState: cardManagerState {cardViewState = NoCard, highlightedEntry = Nothing}
-                , donationLevel
-                , syncDataWire: Just syncDataWire
-                }
-          )
-          proxyInfo
-        )
-      )
-deleteCardSteps _ _ _ _ _ = throwError $ InvalidStateError (CorruptedState "editCardStep")
+        pure $ {
+            saveCardOp:             Nil
+          , deleteCardOp: singleton ( Tuple (DeleteBlob (_card_reference  # flip view cardEntry)
+                                                        (_card_identifier # flip view cardEntry)
+                                            )
+                                            "Delete old Card"
+                                    )
+          , newCardsCache:          (delete (view _card_reference cardEntry)) cardsCache
+          , newIndex:               newIndex
+          , newCardManagerState:    cardManagerState {cardViewState = NoCard, highlightedEntry = Nothing}
+          }
+        
+cardOperationSteps _ _ _ _ = throwError $ InvalidStateError (CorruptedState "cardOperationStep")
