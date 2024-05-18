@@ -3,7 +3,6 @@
 const path                   = require('path');
 const HtmlWebpackPlugin      = require('html-webpack-plugin');
 const HtmlInlineScriptPlugin = require('html-inline-script-webpack-plugin');
-const CopyPlugin             = require("copy-webpack-plugin");
 const webpack                = require('webpack');
 
 const child_process = require('child_process');
@@ -56,9 +55,6 @@ module.exports = (env) => {
 			new HtmlInlineScriptPlugin({
 				htmlMatchPattern: [/index.html$/],
 				scriptMatchPattern: [/app-bundle(.[a-zA-Z0-9]+)?.js/],
-			}),
-			new CopyPlugin({
-				patterns: [path.resolve(__dirname, 'src', "main", "purescript", "_offline-fallback.js")],
 			}),
 			...(env.production ? [] : [
 				// password generator html package configuration

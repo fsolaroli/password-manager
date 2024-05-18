@@ -56,20 +56,6 @@ function debugAnimation() {
 	})
 }
 
-function registerOfflineServiceWorker() {
-	if (navigator.serviceWorker.controller) {
-		if (window.navigator.onLine) {
-			navigator.serviceWorker.controller.postMessage('update');
-		}
-	} else {
-		navigator.serviceWorker
-			.register('_offline-fallback.js', { scope: './' })
-			.then(_ => {
-				console.log('Service worker change, registered the service worker');
-			});
-	}
-}
-
 function main () {
     /*
         Here we could add variables such as
@@ -89,7 +75,6 @@ function main () {
     addEventBubblingBlockers();
     addPreventDefaults();
 	debugAnimation();
-	registerOfflineServiceWorker();
     Main.main();
 }
 
