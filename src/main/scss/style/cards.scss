@@ -19,61 +19,67 @@ div#homePage {
 			@include offlineHeader();
         
             header {
-                display: flex;
-                flex-direction: row;
-                height: 48px;
-                justify-content: space-between;
-                background-color: $main-color;
+				display: flex;
+				flex-direction: column;
 
-                div {
-                    padding: 4px;
-                    // flex: 0;
-                    button,
-                    &.selection {
-                        background-color: inherit;
-                        border: 0px;
-                        color: $main-text-color;
-                        font-size: 24pt;
-                        font-family: 'clipperz-icons';
-                        font-feature-settings: "liga" 1, "dlig" 1;
-                        text-rendering: optimizeLegibility;
-                    }
+				div.toolbar {
+					display: flex;
+					flex-direction: row;
+					height: 48px;
+					justify-content: space-between;
+					background-color: $main-color;
+	
+					div {
+						padding: 4px;
+						// flex: 0;
+						button,
+						&.selection {
+							background-color: inherit;
+							border: 0px;
+							color: $main-text-color;
+							font-size: 24pt;
+							font-family: 'clipperz-icons';
+							font-feature-settings: "liga" 1, "dlig" 1;
+							text-rendering: optimizeLegibility;
+						}
+	
+						&.tags {
+							button {
+								cursor: pointer;
+							}
+							// flex: 1;
+			
+						}
+	
+						&.selection {
+							font-size: 28pt;
+							margin-top: 1px;
+	
+							span {
+								&::before {
+									content: "tag";
+									font-family: 'clipperz-icons';
+									font-size: 14pt;
+									display: inline-block;
+									padding-right: 7px;
+								}
+	
+								font-family: 'clipperz-font';
+								font-size: 18pt;
+								display: block;
+								margin-top: 8px;
+							}
+						}
+	
+						&.menu {
+							button {
+								cursor: pointer;
+							}
+							align-content: flex-end;
+							// flex: 1;
+						}
 
-                    &.tags {
-                        button {
-                            cursor: pointer;
-                        }
-                        // flex: 1;
-        
-                    }
-
-                    &.selection {
-                        font-size: 28pt;
-                        margin-top: 1px;
-
-                        span {
-                            &::before {
-                                content: "tag";
-                                font-family: 'clipperz-icons';
-                                font-size: 14pt;
-                                display: inline-block;
-                                padding-right: 7px;
-                            }
-
-                            font-family: 'clipperz-font';
-                            font-size: 18pt;
-                            display: block;
-                            margin-top: 8px;
-                        }
-                    }
-
-                    &.menu {
-                        button {
-                            cursor: pointer;
-                        }
-                        align-content: flex-end;
-                        // flex: 1;
-                    }
+					}
             
                 }
             }

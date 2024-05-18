@@ -80,8 +80,6 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
     indexFilterView filterData index' >>= updateFilterData
   , div [Props.className "cardToolbarFrame"] [
       toolbarHeader "frame"
-    , syncProgressBar enableSync syncDataWire
-    , proxyInfoComponent proxyInfo [Just "withDate"]
     , div [Props._id "mainView", Props.className (if cardViewState /= NoCard then "CardViewOpen" else "CardViewClose")] [
         div [Props._id "indexView"] [
           toolbarHeader "cardList"
@@ -146,10 +144,14 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
 
     toolbarHeader :: String -> Widget HTML CardManagerEvent
     toolbarHeader className = header [Props.className className] [
-      div [Props.className "tags"] [button [Props.onClick] [text "tags"]] *> updateFilterData (filterData {filterViewStatus = FilterViewOpen})
-    , div [Props.className "selection"] [getFilterHeader filter]
-    , OpenUserAreaEvent <$ div [Props.className "menu"] [button [Props.onClick] [text "menu"]]
-    ]
+      div [Props.className "toolbar"] [
+        div [Props.className "tags"] [button [Props.onClick] [text "tags"]] *> updateFilterData (filterData {filterViewStatus = FilterViewOpen})
+      , div [Props.className "selection"] [getFilterHeader filter]
+      , OpenUserAreaEvent <$ div [Props.className "menu"] [button [Props.onClick] [text "menu"]]
+      ]
+    , syncProgressBar enableSync syncDataWire
+    , proxyInfoComponent proxyInfo [Just "withDate"]
+    ] 
 
     allTags :: Set String
     allTags = unions $ (\(CardEntry entry) -> entry.tags) <$> fromFoldable entries
