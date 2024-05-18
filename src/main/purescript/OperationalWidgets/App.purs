@@ -62,9 +62,3 @@ executeOperation (LoginPageEvent           event)      = handleLoginPageEvent   
 executeOperation (MainPageCardManagerEvent event s)    = handleCardManagerEvent  event s
 executeOperation (MainPageUserAreaEvent    event s s') = handleUserAreaEvent     event s s'
 executeOperation (DonationPageEvent        event)      = handleDonationPageEvent event
-
--- updateProxy :: OperationState -> Widget HTML OperationState
--- updateProxy (Tuple state (WidgetState overlayInfo' page' _)) =
---   affAction online *> do
---     newProxy <- liftEffect $ updateProxy state
---     pure $ (Tuple state {proxy = newProxy} (WidgetState overlayInfo' page' (getProxyInfoFromProxy newProxy)))

@@ -156,7 +156,7 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
         _              <- runWidgetStep (updateConnectionState syncDataWire { c: userUpdateInfo.c
                                                                             , p: userUpdateInfo.p
                                                                             , srpConf, hashFunc
-                                                                            , proxy: defaultOnlineProxy
+                                                                            , proxy: DynamicProxy defaultOnlineProxy
                                                                             })              (WidgetState (spinnerOverlay "Compute data to sync" White) page proxyInfo)
         _              <- runStep       (   (updateSyncPreference                c false      # liftEffect)
                                          *> (updateSyncPreference userUpdateInfo.c enableSync # liftEffect)
@@ -435,7 +435,7 @@ logoutSteps state@{username, hash: hashFunc, proxy, srpConf} message page proxyI
       _ -> do 
         let connectionState = {proxy, hashFunc, srpConf, c: hex "", p: hex ""}
         _ <- runStep (genericRequest connectionState "logout" POST Nothing RF.ignore) (WidgetState (spinnerOverlay message White) page proxyInfo)
-        pure $ defaultOnlineProxy
+        pure $ DynamicProxy defaultOnlineProxy
 
     passphrase <- runStep (liftEffect $ window >>= localStorage >>= getItem (makeKey "passphrase")) (WidgetState (spinnerOverlay message White) page proxyInfo)
     

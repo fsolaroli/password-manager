@@ -103,7 +103,7 @@ executeLocalStorageSynOperations wire = with wire \syncData -> affAction (delay 
               Just i  -> pure $ syncData  #   addOver _completedOperations 2 
                                           <<< set     _pendingOperations  (fromMaybe tail $ deleteAt i tail) 
               Nothing -> empty
-          _ -> empty
+          _ -> pure $ syncData
 
       SaveBlob ref _ blob -> do
         (setItem ("blob_" <> toString Hex ref) (toString Hex blob) =<< localStorage =<< window) # liftEffect

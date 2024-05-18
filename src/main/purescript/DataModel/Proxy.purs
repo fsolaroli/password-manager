@@ -34,8 +34,8 @@ data Proxy = DynamicProxy DynamicProxy
 
 data DynamicProxy = OnlineProxy PathPrefix TollManager (Maybe SessionKey) | OfflineProxy (Maybe BackendSessionState) DataOnLocalStorage
 
-defaultOnlineProxy :: Proxy
-defaultOnlineProxy = DynamicProxy (OnlineProxy defaultPathPrefix {toll: Nothing, currentChallenge: Nothing} Nothing)
+defaultOnlineProxy :: DynamicProxy
+defaultOnlineProxy = OnlineProxy defaultPathPrefix {toll: Nothing, currentChallenge: Nothing} Nothing
 
 type MissingEntries = List HexString
 

@@ -265,22 +265,18 @@ cardOperationSteps cardOperation message cardManagerState state@{index: Just ind
                 , index = Just newIndex, userInfo = Just newUserInfo, userInfoReferences = Just newUserInfoReference
                 , masterKey = Just (unwrap newUser).masterKey
                 })
-        -- (WidgetState
-        --   hiddenOverlayInfo
-          (Main { index:            newIndex
-                , credentials:     {username, password}
-                , donationInfo
-                , pinExists: isJust pinEncryptedPassword
-                , enableSync
-                , userPreferences
-                , userAreaState:    userAreaInitialState
-                , cardManagerState: newCardManagerState
-                , donationLevel
-                , syncDataWire: Just syncDataWire
-                }
-          )
-        --   proxyInfo
-        -- )
+        (Main { index:            newIndex
+              , credentials:     {username, password}
+              , donationInfo
+              , pinExists: isJust pinEncryptedPassword
+              , enableSync
+              , userPreferences
+              , userAreaState:    userAreaInitialState
+              , cardManagerState: newCardManagerState
+              , donationLevel
+              , syncDataWire: Just syncDataWire
+              }
+        )
       )
 
   where

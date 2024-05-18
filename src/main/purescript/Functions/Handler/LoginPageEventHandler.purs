@@ -24,7 +24,7 @@ import DataModel.AppState (AppState)
 import DataModel.Communication.ProtocolError (ProtocolError(..))
 import DataModel.Credentials (Credentials, emptyCredentials)
 import DataModel.FragmentState as Fragment
-import DataModel.Proxy (ProxyInfo, ProxyResponse(..), defaultOnlineProxy)
+import DataModel.Proxy (Proxy(..), ProxyInfo, ProxyResponse(..), defaultOnlineProxy)
 import DataModel.WidgetState (CardFormInput(..), CardViewState(..), LoginType(..), Page(..), WidgetState(..))
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
@@ -137,8 +137,8 @@ loadHomePageSteps state@{hash: hashFunc, proxy, srpConf, c: Just c, p: Just p, m
   let updatedState = state {proxy = proxy'', index = Just index, userInfo = Just userInfo, donationLevel = Just donationLevel, enableSync = enableSync}
 
   syncOperations                 <- runStep       (computeSyncOperations updatedState                                                                     ) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} page proxyInfo)
-  _                              <- runWidgetStep (updateConnectionState syncDataWire {c, p, srpConf, hashFunc, proxy: defaultOnlineProxy}                ) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} page proxyInfo)
-  _                              <- runWidgetStep (addPendingOperation  syncDataWire syncOperations                                                      ) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} page proxyInfo)
+  _                              <- runWidgetStep (updateConnectionState syncDataWire {c, p, srpConf, hashFunc, proxy: DynamicProxy defaultOnlineProxy}   ) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} page proxyInfo)
+  _                              <- runWidgetStep (addPendingOperation  syncDataWire syncOperations                                                       ) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} page proxyInfo)
 
   proxy''' <- runStep (updateProxy updatedState # liftEffect) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} page proxyInfo)
 

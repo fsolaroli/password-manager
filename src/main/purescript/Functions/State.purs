@@ -24,7 +24,7 @@ import Data.Unit (Unit)
 import DataModel.AppState (AppState)
 import DataModel.CardVersions.Card (Card)
 import DataModel.IndexVersions.Index (Index)
-import DataModel.Proxy (DataOnLocalStorage(..), DynamicProxy(..), Proxy(..), ProxyInfo(..), defaultPathPrefix)
+import DataModel.Proxy (DataOnLocalStorage(..), DynamicProxy(..), Proxy(..), ProxyInfo(..), defaultOnlineProxy, defaultPathPrefix)
 import DataModel.SRPVersions.SRP (HashFunction, SRPConf, baseSRPConf, hashFuncSHA256)
 import DataModel.UserVersions.User (MasterKey, UserInfo, UserInfoReferences)
 import Effect (Effect)
@@ -84,17 +84,22 @@ updateProxy state@{proxy: DynamicProxy dynamicProxy} = DynamicProxy <$> ((window
           ((un Wire syncDataWire).value) <#> (\syncData ->
             fold (syncData.pendingOperations <#> (case _ of
               SaveBlobFromRef ref -> ref : Nil
-              _            ->       Nil
+              _                   ->       Nil
             ))
-          ) <#>  (withDataOnLocalStorage <<< WithData)
-      false, _ -> withDataOnLocalStorage NoData # pure
-      true,  _ -> dynamicProxy                  # pure
+          ) <#>  (preserveOfflineData <<< WithData)
+      false, _ -> preserveOfflineData NoData # pure
+      true,  _ -> preserveOnlineData         # pure
 )
   where
-    withDataOnLocalStorage :: DataOnLocalStorage -> DynamicProxy
-    withDataOnLocalStorage dataOnLocalStorage = case dynamicProxy of
+    preserveOfflineData :: DataOnLocalStorage -> DynamicProxy
+    preserveOfflineData dataOnLocalStorage = case dynamicProxy of
       OfflineProxy backendSessionState _ -> OfflineProxy backendSessionState dataOnLocalStorage
-      onlineProxy                        -> onlineProxy
+      _                                  -> OfflineProxy Nothing             dataOnLocalStorage
+
+    preserveOnlineData :: DynamicProxy
+    preserveOnlineData = case dynamicProxy of
+      OfflineProxy _ _ -> defaultOnlineProxy
+      onlineProxy      -> onlineProxy
 
 updateProxy {proxy} = pure proxy
 
