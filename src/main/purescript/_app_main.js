@@ -57,17 +57,22 @@ function debugAnimation() {
 }
 
 function registerOfflineServiceWorker() {
-	if (navigator.serviceWorker.controller) {
-		if (window.navigator.onLine) {
-			navigator.serviceWorker.controller.postMessage('update');
-		}
-	} else {
-		navigator.serviceWorker
-			.register('_offline-fallback.js', { scope: './' })
-			.then(_ => {
-				console.log('Service worker change, registered the service worker');
-			});
-	}
+    if (navigator.serviceWorker.controller) {
+        if (window.navigator.onLine) {
+            navigator.serviceWorker.controller.postMessage('update');
+        }
+    } else {
+        navigator.serviceWorker
+            .register('/_offline-site.js', { scope: './' })
+            .then(
+                (registration) => {
+                    console.log("Service worker change, registered the service worker:", registration);
+                },
+                (error) => {
+                    console.error("Service worker registration failed:", error);
+                },
+            );
+    }
 }
 
 function main () {
@@ -88,8 +93,8 @@ function main () {
     */
     addEventBubblingBlockers();
     addPreventDefaults();
-	debugAnimation();
-	registerOfflineServiceWorker();
+    debugAnimation();
+    registerOfflineServiceWorker();
     Main.main();
 }
 
