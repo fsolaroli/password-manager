@@ -63,7 +63,8 @@ function registerOfflineServiceWorker() {
         }
     } else {
         navigator.serviceWorker
-            .register('/_offline-site.js', { scope: './' })
+            // .register('/_offline-site.js', { scope: './' })
+            .register('/_offline-site.js')
             .then(
                 (registration) => {
                     console.log("Service worker change, registered the service worker:", registration);
