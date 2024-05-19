@@ -26,7 +26,7 @@ type BlobHash = HexString
 // ----------------------------------------------------------------------------
 
 trait BlobArchive:
-    def getBlob             (hash: BlobHash): Task[ZStream[Any, Throwable, Byte]]
+    def getBlob             (hash: BlobHash): Task[(ZStream[Any, Throwable, Byte], Long)]
     def getBlobIdentifier   (hash: BlobHash): Task[HexString]
     def saveBlob            (hash: BlobHash, identifier: HexString, content:  ZStream[Any, Throwable, Byte]): Task[BlobHash]
     def saveBlob_path       (identifier: HexString, filename: String, hash: BlobHash, content: Path): Task[BlobHash]
@@ -38,7 +38,7 @@ object BlobArchive:
     val WAIT_TIME = 10000
 
     case class FileSystemBlobArchive(keyBlobArchive: KeyBlobArchive, tmpDir: Path) extends BlobArchive:
-        override def getBlob(hash: BlobHash): Task[ZStream[Any, Throwable, Byte]] =
+        override def getBlob(hash: BlobHash): Task[(ZStream[Any, Throwable, Byte], Long)] =
             keyBlobArchive.getBlob(hash.toString)
 
         override def getBlobIdentifier(hash: BlobHash): Task[HexString] =

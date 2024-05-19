@@ -12,6 +12,8 @@ import zio.{ Duration, Task, ZIO }
 import zio.stream.{ ZSink, ZStream }
 import zio.http.codec.HttpCodec.Metadata
 import zio.http.Header.ContentType
+import zio.nio.file.Files.Attribute
+import zio.nio.file.Files.Attributes
 
 // ============================================================================
 
@@ -21,7 +23,7 @@ trait KeyBlobArchive:
     def saveBlob             (key: Key, content:  ZStream[Any, Throwable, Byte]): Task[Unit]
     def saveBlobWithMetadata (key: Key, content:  ZStream[Any, Throwable, Byte], metadata: ZStream[Any, Throwable, Byte]): Task[Unit]
     def saveBlobWithMetadata_fromPath (key: Key, content:  Path, metadata: ZStream[Any, Throwable, Byte]): Task[Unit]
-    def getBlob              (key: Key): Task[ZStream[Any, Throwable, Byte]]
+    def getBlob              (key: Key): Task[(ZStream[Any, Throwable, Byte], Long)]
     def getMetadata          (key: Key): Task[ZStream[Any, Throwable, Byte]]
     def deleteBlob           (key: Key): Task[Unit]
 
@@ -37,22 +39,22 @@ object KeyBlobArchive:
 
     class FileSystemKeyBlobArchive private (basePath: Path, levels: Int) extends KeyBlobArchive:
 
-        private def getContent (key: Key, contentType: ContentType): Task[ZStream[Any, Throwable, Byte]] =
+        private def getContent (key: Key, contentType: ContentType): Task[(ZStream[Any, Throwable, Byte], Long)] =
             getBlobPath(key, false)
             .map(path => pathForContentType(key, path, contentType))
             .flatMap(path =>
                 Files.exists(path)
                 .flatMap(exists => exists match {
                     // case true   => ZStream.fromPath(path)
-                    case true   => Files.readAllBytes(path).map(ZStream.fromChunk)
+                    case true   => (Files.readAllBytes(path).map(ZStream.fromChunk)).zip(Files.size(path))
                     case false  => ZIO.fail(new ResourceNotFoundException("Referenced blob does not exists"))
                 })
             )
             // .getOrElse(ZIO.fail(new ResourceNotFoundException("Blob metadata not found")))
 
-        override def getBlob (key: Key): Task[ZStream[Any, Throwable, Byte]] = getContent(key, ContentType.Blob)
+        override def getBlob (key: Key): Task[(ZStream[Any, Throwable, Byte], Long)] = getContent(key, ContentType.Blob)
 
-        override def getMetadata(key: Key): Task[ZStream[Any, Throwable, Byte]] = getContent(key, ContentType.Metadata)
+        override def getMetadata(key: Key): Task[ZStream[Any, Throwable, Byte]] = getContent(key, ContentType.Metadata).map(_._1)
 
         private def saveData (key: Key, contentType: ContentType, content: ZStream[Any, Throwable, Byte]): Task[Unit] = 
             getBlobPath(key, true)

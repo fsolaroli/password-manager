@@ -21,8 +21,6 @@ import zio.json.{ EncoderOps, JsonDecoder, DeriveJsonDecoder, JsonEncoder, Deriv
 import zio.stream.{ ZStream }
 import zio.nio.charset.Charset
 
-import zio.schema.codec.JsonCodec.zioJsonBinaryCodec
-
 // ------------------------------------------------------------------------------------
 
 case class OneTimeSecretData (
@@ -68,7 +66,7 @@ val oneTimeShareApi = Routes (
         ZIO
         .service[OneTimeShareArchive]
         .flatMap(archive =>
-            archive.getSecret(id).flatMap(oneTimeSecret => 
+            archive.getSecret(id).flatMap((oneTimeSecret, contentLength) => 
                 if (oneTimeSecret.expirationDate < DateTime.now())
                 then
                     archive.deleteSecret(id).flatMap(_ =>
@@ -80,15 +78,16 @@ val oneTimeShareApi = Routes (
                         , ZStream
                             .fromChunk(Chunk.fromArray(oneTimeSecret.secret.toByteArray))
                             .ensuring(archive.deleteSecret(id).isSuccess)
+                        , contentLength
                         )
                     )
             )
         )
-        .map((version: Option[SecretVersion], bytes: ZStream[Any, Throwable, Byte]) => 
+        .map((version: Option[SecretVersion], bytes: ZStream[Any, Throwable, Byte], contentLength: Long) => 
             Response(
                 status  = Status.Ok,
                 headers = version.map(v => Headers("clipperz-onetimesecret-version", v.toJson)).getOrElse(Headers.empty),
-                body    = Body.fromStream(bytes)
+                body    = Body.fromStream(bytes, contentLength)
             )
         ) @@ LogAspect.logAnnotateRequestData(request)
 )

@@ -17,8 +17,6 @@ import zio.nio.file.{ Files, Path as PathNIO }
 import java.io.FileOutputStream
 import java.security.MessageDigest
 
-import zio.schema.codec.JsonCodec.zioJsonBinaryCodec
-
 private case class BlobData(identifier: Option[Identifier], blob: Option[Blob])
 private case class Identifier(value: HexString)
 // private case class Blob(hash: HexString, data: ZStream[Any, Nothing, Byte])
@@ -87,10 +85,10 @@ val blobsApi: Routes[BlobArchive, Throwable] = Routes(
         ZIO
         .service[BlobArchive]
         .flatMap(archive => archive.getBlob(HexString(hash)))
-        .map((bytes: ZStream[Any, Throwable, Byte]) =>
+        .map((bytes: ZStream[Any, Throwable, Byte], contentLength: Long) =>
             Response(
                 status = Status.Ok,
-                body = Body.fromStream(bytes),
+                body = Body.fromStream(bytes, contentLength),
                 headers = Headers(ContentTransferEncoding.Binary)
                             .addHeader("Content-Type", "application/octet-stream"),
             )

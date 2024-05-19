@@ -18,6 +18,8 @@ import zio.http.netty.{ EventLoopGroups, NettyConfig }
 import zio.http.netty.NettyConfig.LeakDetectionLevel
 import zio.http.Server.RequestStreaming
 import zio.http.Routes
+import java.io.File
+import zio.http.Path
 
 object Main extends zio.ZIOAppDefault:
     override val bootstrap =
@@ -38,7 +40,7 @@ object Main extends zio.ZIOAppDefault:
         ++  logoutApi
         ++  blobsApi        @@ hashcash(ChallengeType.MESSAGE,  ChallengeType.MESSAGE)
         ++  oneTimeShareApi @@ hashcash(ChallengeType.SHARE,    ChallengeType.SHARE)
-        ++  staticApi
+        // ++  staticApi
     )
     .handleErrorCauseZIO(customErrorHandler)
   
@@ -46,13 +48,14 @@ object Main extends zio.ZIOAppDefault:
         Middleware.debug ++                                                         //  print debug info about request and response
         Middleware.timeout(20.seconds) ++                                           //  TODO: add timeout time to configuration file [fsolaroli - 10/01/2024]
         Middleware.requestLogging(logRequestBody = true, logResponseBody = true) ++ //  loggingMiddleware
+        Middleware.serveDirectory(Path.root / "api" / "static", File("./target/output.webpack")) ++
         metrics()
 
     val completeClipperzBackend: ClipperzHttpApp = clipperzBackend @@ middlewares
 
     val keyBlobArchiveFolderDepth = 16
 
-    val run: ZIO[Any & ZIOAppArgs & Scope, Any, Any] = ZIOAppArgs.getArgs.flatMap { args =>
+    val run = ZIOAppArgs.getArgs.flatMap { args =>
         if args.length == 4
         then
             val blobBasePath         = FileSystem.default.getPath(args(0))
@@ -69,7 +72,7 @@ object Main extends zio.ZIOAppDefault:
                                     //     responseCompression = Some(Server.Config.ResponseCompressionConfig.default)
                                     // )
                                     .port(port)
-                                    .requestStreaming(RequestStreaming.Enabled)
+                                    .enableRequestStreaming
             val nettyConfig   = NettyConfig.default
                                     .leakDetection(LeakDetectionLevel.PARANOID)
                                     .maxThreads(nThreads)

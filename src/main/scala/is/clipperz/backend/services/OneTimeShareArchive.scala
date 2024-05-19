@@ -41,15 +41,15 @@ implicit val encoder: JsonEncoder[DateTime] = JsonEncoder[String].contramap(_.to
 // ----------------------------------------------------------------------------
 
 trait OneTimeShareArchive:
-    def getSecret(id: SecretId): Task[OneTimeSecret]
+    def getSecret(id: SecretId): Task[(OneTimeSecret, Long)]
     def saveSecret(content: ZStream[Any, Throwable, Byte]): Task[SecretId]
     def deleteSecret(id: SecretId): Task[Unit]
 
 object OneTimeShareArchive:
 
     case class FileSystemOneTimeShareArchive(keyBlobArchive: KeyBlobArchive) extends OneTimeShareArchive:
-        override def getSecret(id: SecretId): Task[OneTimeSecret] =
-            keyBlobArchive.getBlob(id).flatMap(fromStream[OneTimeSecret])
+        override def getSecret(id: SecretId): Task[(OneTimeSecret, Long)] =
+            keyBlobArchive.getBlob(id).flatMap((content, contentLength) => fromStream[OneTimeSecret](content).zip(ZIO.succeed(contentLength)))
         
         override def deleteSecret(id: SecretId): Task[Unit] = 
             keyBlobArchive.deleteBlob(id)

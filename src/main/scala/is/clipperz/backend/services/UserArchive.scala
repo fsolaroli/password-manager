@@ -82,7 +82,7 @@ object UserArchive:
     case class FileSystemUserArchive(keyBlobArchive: KeyBlobArchive) extends UserArchive:
         override def getUser(username: HexString): Task[Option[RemoteUserCard]] =
             keyBlobArchive
-            .getBlob(username.toString)
+            .getBlob(username.toString).map(_._1)
             .flatMap(fromStream[RemoteUserCard](_).map(Some.apply))
             .catchSome:
                 case ex: ResourceNotFoundException => ZIO.succeed(None)
