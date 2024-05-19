@@ -2,12 +2,14 @@ module Functions.Communication.Cards where
 
 import Control.Applicative (pure)
 import Control.Bind (bind)
+import Control.Monad.Error.Class (catchError)
 import Control.Monad.Except.Trans (ExceptT)
-import Data.Function (($))
+import Data.Function (flip, (#), ($))
 import Data.Map (insert, lookup)
 import Data.Map.Internal (delete)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
+import Data.Unit (unit)
 import DataModel.AppError (AppError)
 import DataModel.AppState (CardsCache)
 import DataModel.CardVersions.Card (Card)
@@ -33,7 +35,7 @@ getCard connectionState cardsCache cardEntry@(CardEntry entry) = do
 
 deleteCard :: ConnectionState -> CardsCache -> CardReference -> ExceptT AppError Aff (ProxyResponse CardsCache)
 deleteCard connectionState cardsCache (CardReference { reference, identifier }) = do
-  ProxyResponse proxy _ <- deleteBlob connectionState reference identifier
+  ProxyResponse proxy _ <- deleteBlob connectionState reference identifier # flip catchError (\_ -> pure $ ProxyResponse connectionState.proxy unit)
   let updatedCardsCache =  delete identifier cardsCache
   pure $ ProxyResponse proxy updatedCardsCache
 
