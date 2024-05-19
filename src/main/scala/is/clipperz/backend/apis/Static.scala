@@ -13,6 +13,7 @@ val staticApi = Routes(
         .flatMap: fileName =>
             Handler
             .fromFile(File(s"target/output.webpack/${fileName}"))
-            .tapZIO(r => ZIO.unit @@ Metric.frequency("static")
-            .contramap(_ => fileName.encode))
+            .tapZIO (r => ZIO.unit @@ Metric.frequency("static")
+                                            .contramap(_ => fileName.encode)
+                    )
 )

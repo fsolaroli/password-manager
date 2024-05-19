@@ -44,7 +44,7 @@ object SrpManangerSpec extends ZIOSpecDefault:
       ((archive ++ PRNG.live) >>> SrpManager.v6a())
 
   val testRequestEmpty = Request(
-    url = URL(Root),
+    url = URL(Path.root),
     method = Method.GET,
     headers = Headers((SessionManager.sessionKeyHeaderName, "test")),
     body = Body.empty,

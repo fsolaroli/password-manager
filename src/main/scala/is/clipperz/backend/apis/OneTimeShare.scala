@@ -21,6 +21,8 @@ import zio.json.{ EncoderOps, JsonDecoder, DeriveJsonDecoder, JsonEncoder, Deriv
 import zio.stream.{ ZStream }
 import zio.nio.charset.Charset
 
+import zio.schema.codec.JsonCodec.zioJsonBinaryCodec
+
 // ------------------------------------------------------------------------------------
 
 case class OneTimeSecretData (
@@ -86,7 +88,7 @@ val oneTimeShareApi = Routes (
             Response(
                 status  = Status.Ok,
                 headers = version.map(v => Headers("clipperz-onetimesecret-version", v.toJson)).getOrElse(Headers.empty),
-                body    = Body.fromStream(bytes),
+                body    = Body.fromStream(bytes)
             )
         ) @@ LogAspect.logAnnotateRequestData(request)
 )

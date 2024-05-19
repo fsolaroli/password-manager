@@ -17,6 +17,8 @@ import zio.nio.file.{ Files, Path as PathNIO }
 import java.io.FileOutputStream
 import java.security.MessageDigest
 
+import zio.schema.codec.JsonCodec.zioJsonBinaryCodec
+
 private case class BlobData(identifier: Option[Identifier], blob: Option[Blob])
 private case class Identifier(value: HexString)
 // private case class Blob(hash: HexString, data: ZStream[Any, Nothing, Byte])

@@ -57,7 +57,7 @@ object LoginSpec extends ZIOSpec[UserArchive & BlobArchive]:
 
     val app =   loginApi
                 .handleErrorCauseZIO(customErrorHandler)
-                .toHttpApp
+                // .toHttpApp
     val blobBasePath            = FileSystem.default.getPath("target", "tests", "archive", "blobs")
     val userBasePath            = FileSystem.default.getPath("target", "tests", "archive", "users")
     val oneTimeShareBasePath    = FileSystem.default.getPath("target", "tests", "archive", "one_time_share")
@@ -109,7 +109,7 @@ object LoginSpec extends ZIOSpec[UserArchive & BlobArchive]:
         Charset.Standard.utf8.encodeString(stepData)
         .map(body =>
             Request(
-                url = URL(Root / "api" / "login" / "step1" / c),
+                url = URL(Path.root / "api" / "login" / "step1" / c),
                 method = Method.POST,
                 headers = if (withSession) Headers((SessionManager.sessionKeyHeaderName, sessionKey)) else Headers.empty,
                 body = Body.fromChunk(body),
@@ -122,7 +122,7 @@ object LoginSpec extends ZIOSpec[UserArchive & BlobArchive]:
         Charset.Standard.utf8.encodeString(stepData)
         .map(body =>
             Request(
-                url = URL(Root / "api" / "login" / "step2" / c),
+                url = URL(Path.root / "api" / "login" / "step2" / c),
                 method = Method.POST,
                 headers = if (withSession) Headers((SessionManager.sessionKeyHeaderName, sessionKey)) else Headers.empty,
                 body = Body.fromChunk(body),

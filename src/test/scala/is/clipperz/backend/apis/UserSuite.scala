@@ -43,7 +43,7 @@ object UserSpec extends ZIOSpec[SessionManager]:
 
     val app =  usersApi
                .handleErrorCauseZIO(customErrorHandler)
-               .toHttpApp
+            //    .toHttpApp
     val blobBasePath            = FileSystem.default.getPath("target", "tests", "archive", "blobs")
     val userBasePath            = FileSystem.default.getPath("target", "tests", "archive", "users")
     val oneTimeShareBasePath    = FileSystem.default.getPath("target", "tests", "archive", "one_time_share")
@@ -129,7 +129,7 @@ object UserSpec extends ZIOSpec[SessionManager]:
         Charset.Standard.utf8.encodeString(signupData)
         .map(body =>
             Request(
-                url = URL(Root / "api" / "users" / c),
+                url = URL(Path.root / "api" / "users" / c),
                 method = Method.POST,
                 headers = if (session) Headers((SessionManager.sessionKeyHeaderName, sessionKey)) else Headers.empty,
                 body = Body.fromChunk(body),
@@ -140,7 +140,7 @@ object UserSpec extends ZIOSpec[SessionManager]:
 
     def prepareGet(c: String, session: Boolean): Request =
         Request(
-            url = URL(Root / "api" / "users" / c),
+            url = URL(Path.root / "api" / "users" / c),
             method = Method.GET,
             headers = if (session) Headers((SessionManager.sessionKeyHeaderName, sessionKey)) else Headers.empty,
             body = Body.empty,
@@ -150,7 +150,7 @@ object UserSpec extends ZIOSpec[SessionManager]:
 
     def prepareDelete (c: String, session: Boolean): Request =
         Request(
-            url = URL(Root / "api" / "users" / c),
+            url = URL(Path.root / "api" / "users" / c),
             method = Method.DELETE,
             headers = if (session) Headers((SessionManager.sessionKeyHeaderName, sessionKey)) else Headers.empty,
             body = Body.empty,
@@ -162,7 +162,7 @@ object UserSpec extends ZIOSpec[SessionManager]:
         Charset.Standard.utf8.encodeString(putData)
         .map(body =>
             Request(
-                url = URL(Root / "api" / "users" / c),
+                url = URL(Path.root / "api" / "users" / c),
                 method = Method.PUT,
                 headers = if (session) Headers((SessionManager.sessionKeyHeaderName, sessionKey)) else Headers.empty,
                 body = Body.fromChunk(body),

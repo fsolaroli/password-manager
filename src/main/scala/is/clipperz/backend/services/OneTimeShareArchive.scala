@@ -58,9 +58,9 @@ object OneTimeShareArchive:
             val id = UUID.randomUUID().nn.toString();
             ZIO
                 .scoped:
-                keyBlobArchive
-                    .saveBlob(id, content)
-                    .map(_ => id)
+                    keyBlobArchive
+                        .saveBlob(id, content)
+                        .map(_ => id)
                 .catchSome:
                     case ex: FileNotFoundException =>
                         val str: String =

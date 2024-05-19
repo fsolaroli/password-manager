@@ -7,7 +7,8 @@ import scala.language.postfixOps
 import zio.nio.file.{ Files, Path, FileSystem }
 import zio.{ Chunk, Task, ZIO, ZLayer, durationInt }
 import zio.json.EncoderOps
-import zio.http.{ Body, Boundary, Form, FormField, Headers, MediaType, Method, Request, Root, Server, URL, Version }
+import zio.http.{ Body, Boundary, Form, FormField, Headers, MediaType, Method, Request, Server, URL, Version }
+import zio.http.Path.root
 import zio.http.Server.RequestStreaming
 import zio.stream.{ ZStream, ZSink }
 import zio.test.{ ZIOSpecDefault, assertTrue, assert, TestAspect }
@@ -23,6 +24,7 @@ import is.clipperz.backend.services.{ BlobArchive, OneTimeShareArchive, PRNG, Se
 import is.clipperz.backend.TestUtilities
 import zio.nio.charset.Charset
 
+import zio.schema.codec.JsonCodec.zioJsonBinaryCodec
 
 object BlobSpec extends ZIOSpecDefault:
 
@@ -164,7 +166,7 @@ object BlobSpec extends ZIOSpecDefault:
 
     val app =  (   blobsApi        
                ).handleErrorCauseZIO(customErrorHandler)
-                .toHttpApp
+                // .toHttpApp
     val blobBasePath = FileSystem.default.getPath("target", "tests", "archive", "blobs")
     val userBasePath = FileSystem.default.getPath("target", "tests", "archive", "users")
     val oneTimeShareBasePath = FileSystem.default.getPath("target", "tests", "archive", "one_time_share")
@@ -213,7 +215,7 @@ object BlobSpec extends ZIOSpecDefault:
     def readSampleBlob (blobHash: String): Task[ZStream[Any, Nothing, Byte]] = Files.readAllBytes(Path(s"src/test/resources/blobs/${blobHash}.blob")).map(ZStream.fromChunk)
 
     def post (hash: HexString, identifier: HexString, data: ZStream[Any, Nothing, Byte]) = Request(
-        url = URL(Root / "api" / "blobs"),
+        url = URL(root / "api" / "blobs"),
         method = Method.POST,
         body = Body.fromStream(
             Form(
@@ -238,7 +240,7 @@ object BlobSpec extends ZIOSpecDefault:
     )
 
     val postEmptyForm = Request (
-        url = URL(Root / "api" / "blobs"),
+        url = URL(root / "api" / "blobs"),
         method = Method.POST,
         body = Body.fromStream(
             Form.empty.multipartBytes(Boundary(boundary))
@@ -247,7 +249,7 @@ object BlobSpec extends ZIOSpecDefault:
     )
 
     def delete (hash: HexString, identifier: HexString) = Request(
-        url = URL(Root / "api" / "blobs" / hash.toString()),
+        url = URL(root / "api" / "blobs" / hash.toString()),
         method = Method.DELETE,
         body = Body.fromStream(
             Form(FormField.binaryField(
@@ -261,7 +263,7 @@ object BlobSpec extends ZIOSpecDefault:
     )
 
     def get (hash: HexString) = Request(
-        url = URL(Root / "api" / "blobs" / hash.toString()),
+        url = URL(root / "api" / "blobs" / hash.toString()),
         method = Method.GET,
         headers = Headers.empty,
         body = Body.empty,

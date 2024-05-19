@@ -6,7 +6,6 @@ import is.clipperz.backend.middleware.{ hashcash, metrics }
 import is.clipperz.backend.services.{ BlobArchive, PRNG, SessionManager, SrpManager, TollManager, UserArchive, OneTimeShareArchive }
 import is.clipperz.backend.services.ChallengeType
 
-// import java.nio.file.FileSystems
 import zio.nio.file.{ Files, FileSystem }
 
 import scala.util.Try
@@ -18,6 +17,7 @@ import zio.http.{ HttpApp, Middleware, Server }
 import zio.http.netty.{ EventLoopGroups, NettyConfig }
 import zio.http.netty.NettyConfig.LeakDetectionLevel
 import zio.http.Server.RequestStreaming
+import zio.http.Routes
 
 object Main extends zio.ZIOAppDefault:
     override val bootstrap =
@@ -27,8 +27,9 @@ object Main extends zio.ZIOAppDefault:
     type ClipperzEnvironment =
         PRNG & SessionManager & TollManager & UserArchive & BlobArchive & OneTimeShareArchive & SrpManager
 
-    type ClipperzHttpApp = HttpApp[
+    type ClipperzHttpApp = Routes[
         ClipperzEnvironment
+    ,   Nothing
     ]
 
     val clipperzBackend: ClipperzHttpApp = (
@@ -40,7 +41,6 @@ object Main extends zio.ZIOAppDefault:
         ++  staticApi
     )
     .handleErrorCauseZIO(customErrorHandler)
-    .toHttpApp
   
     val middlewares =
         Middleware.debug ++                                                         //  print debug info about request and response
@@ -48,11 +48,9 @@ object Main extends zio.ZIOAppDefault:
         Middleware.requestLogging(logRequestBody = true, logResponseBody = true) ++ //  loggingMiddleware
         metrics()
 
-    // val completeClipperzBackend: ClipperzHttpApp = clipperzBackend @@ (Middleware.timeout(10.seconds) ++ metrics()) //TODO: add timeout time to configuration file [fsolaroli - 10/01/2024]
     val completeClipperzBackend: ClipperzHttpApp = clipperzBackend @@ middlewares
 
     val keyBlobArchiveFolderDepth = 16
-    // val keyBlobArchiveFolderDepth = 2
 
     val run: ZIO[Any & ZIOAppArgs & Scope, Any, Any] = ZIOAppArgs.getArgs.flatMap { args =>
         if args.length == 4
@@ -66,9 +64,10 @@ object Main extends zio.ZIOAppDefault:
 
             val nThreads: Int = args.headOption.flatMap(x => Try(x.toInt).toOption).getOrElse(0)
 
-            val config        = Server.Config.default.copy(
-                                        responseCompression = Some(Server.Config.ResponseCompressionConfig.default)
-                                    )
+            val config        = Server.Config.default
+                                    // .copy(
+                                    //     responseCompression = Some(Server.Config.ResponseCompressionConfig.default)
+                                    // )
                                     .port(port)
                                     .requestStreaming(RequestStreaming.Enabled)
             val nettyConfig   = NettyConfig.default
