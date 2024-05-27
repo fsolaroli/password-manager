@@ -97,7 +97,7 @@ val zio_logging_version = "2.2.4"
 val zio_json_version =    "0.6.2"
 val zio_cache_version =   "0.2.3"
 val nscala_time_version = "2.32.0"
-val zio_metrics_version = "2.1.0"
+val zio_metrics_version = "2.3.1"
 val zio_nio_version =     "2.0.2"
 
 lazy val dependencies = Seq(
