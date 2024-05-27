@@ -56,21 +56,6 @@ const _getWindowMessage = function() {
 	}
 }
 
-const _keyboardShortcut = function(shortcut) {
-	return (onError, onSuccess) => {
-		let result = new Promise((resolve, reject) => {
-			Mousetrap.bind(shortcut, function(e) {
-				e.preventDefault();
-				resolve()
-			});
-        });
-
-        result.then(onSuccess).catch(onError);
-        return (cancelError, cancelerError, cancelerSuccess) => {
-        }
-	}
-}
-
 const _online = function() {
 	return (onError, onSuccess) => {
 		let result = new Promise((resolve, reject) => {
@@ -113,6 +98,15 @@ const cursorToEnd = function(ev) {
 	}
 }
 
+const scrollElementIntoView = function(className) {
+	return function() {
+		let elem = document.getElementsByClassName(className)[0]
+		if (elem) {
+			elem.scrollIntoView({ block: "nearest", behavior: "auto" });
+		}
+	}
+}
+
 const focus = function(id) {
 	return function() {
 		document.getElementById(id).focus();
@@ -138,7 +132,6 @@ export {
     _readFile,
     _readFileFromDrop,
 	_getWindowMessage,
-	_keyboardShortcut,
 	_online,
     renderElement,
     _getXClickCoordinates,
@@ -147,5 +140,6 @@ export {
 	cursorToEnd,
 	focus,
 	blur,
-	select
+	select,
+	scrollElementIntoView
 }

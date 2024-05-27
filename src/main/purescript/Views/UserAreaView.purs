@@ -2,7 +2,7 @@ module Views.UserAreaView where
 
 import Concur.Core (Widget)
 import Concur.Core.Patterns (Wire)
-import Concur.React (HTML, affAction)
+import Concur.React (HTML)
 import Concur.React.DOM (a, button, div, header, li, li', span, text, ul)
 import Concur.React.Props as Props
 import Control.Alt (($>), (<#>))
@@ -10,12 +10,11 @@ import Control.Bind (bind, (=<<))
 import Control.Category ((>>>))
 import Data.Eq ((==))
 import Data.Formatter.DateTime (format)
-import Data.Function ((#), ($))
+import Data.Function (($))
 import Data.Functor ((<$>))
 import Data.HeytingAlgebra (not)
 import Data.Map (Map, fromFoldable, insert, lookup)
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Monoid ((<>))
 import Data.Time.Duration (Days)
 import Data.Tuple (Tuple(..), swap)
 import DataModel.Credentials (Credentials)
@@ -25,7 +24,6 @@ import DataModel.UserVersions.UserCodecs (iso8601DateFormatter)
 import DataModel.WidgetState (ImportState, UserAreaPage(..), UserAreaState, UserAreaSubmenu(..))
 import Effect.Class (liftEffect)
 import Functions.EnvironmentalVariables (currentCommit, donationIFrameURL)
-import Functions.Events (keyboardShortcut)
 import OperationalWidgets.Sync (SyncData)
 import Views.ChangePasswordView (changePasswordView)
 import Views.Components (Enabled(..), footerComponent)
@@ -67,8 +65,6 @@ userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenu
       ]
     , userAreaInternalView
     ])
-    <> 
-    ((keyboardShortcut ["l o c k"] # affAction) $> LockEvent)
   ) <#> (Tuple state >>> swap)
 
   where

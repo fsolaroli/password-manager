@@ -5,8 +5,8 @@ module Functions.Handler.DonationEventHandler
 
 import Concur.Core (Widget)
 import Concur.React (HTML)
-import Control.Alternative (pure)
-import Control.Bind (bind, (=<<), (>>=))
+import Control.Alternative (pure, (*>))
+import Control.Bind (bind, discard, (=<<), (>>=))
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Except (runExceptT)
 import Data.DateTime (adjust)
@@ -27,6 +27,7 @@ import Effect.Class (liftEffect)
 import Effect.Now (nowDateTime)
 import Functions.Communication.Users (asMaybe, computeRemoteUserCard, updateUserInfo)
 import Functions.Donations (DonationLevel(..), computeDonationLevel)
+import Functions.Events (focus)
 import Functions.Handler.GenericHandlerFunctions (OperationState, defaultErrorPage, handleOperationResult, noOperation, runStep, runWidgetStep)
 import OperationalWidgets.Sync (SyncOperation(..), addPendingOperation)
 import Record (merge)
@@ -79,7 +80,7 @@ handleDonationPageEvent donationPageEvent state@{c: Just c, p: Just p, s: Just s
         let cardViewState = case fragmentState of
                         Fragment.AddCard card -> CardForm (emptyCardFormData {card = card}) (NewCardFromFragment card)
                         _                     -> NoCard
-
+        focus "indexView" # liftEffect
         pure $ Tuple 
           (merge (asMaybe stateUpdate) state {proxy = proxy, donationLevel = Just newDonationLevel})
           (WidgetState 
@@ -95,7 +96,7 @@ handleDonationPageEvent donationPageEvent state@{c: Just c, p: Just p, s: Just s
       # runExceptT
       >>= handleOperationResult state defaultErrorPage true Black
 
-    CloseDonationPage -> noOperation (Tuple state $ WidgetState hiddenOverlayInfo (Main defaultPage) proxyInfo)
+    CloseDonationPage -> (focus "indexView" # liftEffect) *> noOperation (Tuple state $ WidgetState hiddenOverlayInfo (Main defaultPage) proxyInfo)
 
 handleDonationPageEvent _ state _ _ = do
   throwError $ InvalidStateError (CorruptedState "DonationPage")

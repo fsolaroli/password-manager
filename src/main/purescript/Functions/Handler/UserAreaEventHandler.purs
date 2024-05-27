@@ -52,6 +52,7 @@ import Functions.Communication.Blobs (deleteBlob, getBlob)
 import Functions.Communication.Cards (deleteCard, getCard, postCard)
 import Functions.Communication.Users (asMaybe, computeRemoteUserCard, deleteUserCard, deleteUserInfo, updateUserPreferences)
 import Functions.DeviceSync (computeDeleteOperations, computeSyncOperations, updateSyncPreference)
+import Functions.Events (focus)
 import Functions.Export (BlobsList, appendCardsDataInPlace, getBasicHTML, prepareUnencryptedExport, prepareHTMLBlob)
 import Functions.Handler.DonationEventHandler (handleDonationPageEvent)
 import Functions.Handler.GenericHandlerFunctions (OperationState, defaultErrorPage, handleOperationResult, noOperation, runStep, runWidgetStep)
@@ -93,6 +94,8 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
 
   case userAreaEvent of
     (CloseUserAreaEvent) -> 
+      (focus "indexView" # liftEffect)
+      *> 
       noOperation (Tuple 
                   state
                   (WidgetState

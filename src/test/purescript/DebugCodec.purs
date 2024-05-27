@@ -515,6 +515,7 @@ cardManagerStateCodec =
 -- , filter :: Filter
 -- , filterViewStatus :: FilterViewStatus
 -- , searchString :: String
+-- , isFocused :: Boolean
 -- }
 filterDataCodec :: CA.JsonCodec FilterData
 filterDataCodec =
@@ -524,6 +525,7 @@ filterDataCodec =
       , filter:           filterCodec
       , filterViewStatus: filterViewStatusCodec
       , searchString:     CA.string
+      , selected:         CA.boolean
       }
     )
 

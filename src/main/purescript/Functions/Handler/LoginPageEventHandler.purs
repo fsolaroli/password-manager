@@ -2,7 +2,8 @@ module Functions.Handler.LoginPageEventHandler where
 
 import Concur.Core (Widget)
 import Concur.React (HTML)
-import Control.Alt ((<|>))
+import Control.Alt (($>), (<|>))
+import Control.Alternative ((*>))
 import Control.Applicative (pure)
 import Control.Bind (bind, discard, (=<<), (>>=))
 import Control.Category ((<<<))
@@ -33,6 +34,7 @@ import Functions.Communication.Users (extractUserInfoReference, getUserInfo)
 import Functions.DeviceSync (computeSyncOperations, getSyncOptionFromLocalStorage)
 import Functions.Donations (DonationLevel(..), computeDonationLevel)
 import Functions.EncodeDecode (importCryptoKeyAesGCM)
+import Functions.Events (focus)
 import Functions.Handler.GenericHandlerFunctions (OperationState, defaultView, handleOperationResult, noOperation, runStep, runWidgetStep)
 import Functions.Index (getIndex)
 import Functions.Pin (decryptPassphraseWithPin, deleteCredentials, makeKey)
@@ -141,7 +143,8 @@ loadHomePageSteps state@{hash: hashFunc, proxy, srpConf, c: Just c, p: Just p, m
   _                              <- runWidgetStep (addPendingOperation  syncDataWire syncOperations                                                       ) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} page proxyInfo)
 
   proxy''' <- runStep (updateProxy updatedState # liftEffect) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} page proxyInfo)
-
+  
+  focus "indexView" # liftEffect 
   pure $ Tuple 
     updatedState { proxy = proxy'''}
     (WidgetState 

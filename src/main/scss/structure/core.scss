@@ -158,6 +158,10 @@ html {
                                 // width: 100vw;
                                 flex: 1;
 
+								&:focus {
+									outline: none;
+								}
+
                                 .addCard {
                                     position: fixed;
                                     bottom: 20px;

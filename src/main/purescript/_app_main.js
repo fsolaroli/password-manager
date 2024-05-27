@@ -1,7 +1,5 @@
 const Main = require ("../../../target/output.purescript/AppMain")
 
-var Mousetrap = require('../js/Mousetrap');
-
 import "../scss/main.scss";
 
 function addEventBubblingBlockers() {

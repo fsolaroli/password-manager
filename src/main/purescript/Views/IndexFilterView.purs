@@ -19,6 +19,7 @@ import Data.Semigroup ((<>))
 import Data.Set (isEmpty, member, toUnfoldable)
 import Data.String (Pattern(..), contains, toLower)
 import DataModel.IndexVersions.Index (CardEntry(..), Index(..))
+import Unsafe.Coerce (unsafeCoerce)
 
 numberOfRecent :: Int
 numberOfRecent =  10
@@ -32,6 +33,7 @@ type FilterData = {
 , filter :: Filter
 , filterViewStatus :: FilterViewStatus
 , searchString :: String
+, selected :: Boolean
 }
 
 data FilterViewStatus = FilterViewClosed | FilterViewOpen
@@ -47,6 +49,7 @@ initialFilterData = {
 , filter:   All
 , filterViewStatus: FilterViewClosed
 , searchString: ""
+, selected: false
 }
 
 indexFilterView :: FilterData -> Index -> Widget HTML FilterData
@@ -73,6 +76,7 @@ indexFilterView filterData@{archived, filter, searchString} (Index {entries}) = 
                         , Props.disabled false
                         , Props.unsafeTargetValue <$> Props.onChange
                         , Props.unsafeTargetValue <$> Props.onFocus
+                        , Props.filterProp (\e -> (unsafeCoerce e).key == "Escape") Props.onKeyDown $> ""
                         ] <#> (\search -> filterData {filter = Search search, searchString = search})
                 ]
               , span [Props.className "count"] [int $ filterCardsNumber (Search searchString)]

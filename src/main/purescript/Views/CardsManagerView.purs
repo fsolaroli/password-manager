@@ -2,19 +2,19 @@ module Views.CardsManagerView where
 
 import Concur.Core (Widget)
 import Concur.Core.Patterns (Wire)
-import Concur.React (HTML, affAction)
+import Concur.React (HTML)
 import Concur.React.DOM (button, dd, div, dl, dt, h3, h4, header, li, ol, span, text)
 import Concur.React.Props as Props
 import Control.Alt (($>), (<#>), (<|>))
-import Control.Alternative (empty, (*>))
-import Control.Applicative (pure)
+import Control.Alternative (empty)
 import Control.Bind ((=<<), (>>=))
 import Control.Category ((<<<), (>>>))
 import Data.Array (foldl, fromFoldable, mapWithIndex)
+import Data.Boolean (otherwise)
 import Data.CommutativeRing (add)
 import Data.Either (either)
-import Data.Eq ((/=), (==))
-import Data.Function (flip, (#), ($))
+import Data.Eq (eq, (/=), (==))
+import Data.Function (flip, ($))
 import Data.Functor ((<$>), (<$))
 import Data.HexString (HexString)
 import Data.HeytingAlgebra (not, (||))
@@ -27,7 +27,6 @@ import Data.Semigroup ((<>))
 import Data.Set (Set, unions)
 import Data.Time.Duration (Days)
 import Data.Tuple (Tuple(..), swap)
-import Data.Unit (unit)
 import DataModel.CardVersions.Card (Card, emptyCard)
 import DataModel.IndexVersions.Index (CardEntry(..), CardReference(..), Index(..))
 import DataModel.Password (PasswordGeneratorSettings)
@@ -36,9 +35,9 @@ import DataModel.WidgetState (CardFormInput(..), CardManagerState, CardViewState
 import Effect.Class (liftEffect)
 import Functions.Donations (DonationLevel(..))
 import Functions.EnvironmentalVariables (donationIFrameURL)
-import Functions.Events (blur, focus, keyboardShortcut, select)
 import IndexFilterView (Filter(..), FilterData, FilterViewStatus(..), filteredEntries, getClassNameFromFilterStatus, indexFilterView, initialFilterData, shownEntries)
 import OperationalWidgets.Sync (SyncData)
+import Unsafe.Coerce (unsafeCoerce)
 import Views.CardViews (CardEvent(..), cardView)
 import Views.Components (proxyInfoComponent)
 import Views.CreateCardView (CardFormData, createCardView)
@@ -60,6 +59,7 @@ data CardManagerEvent = AddCardEvent        Card
                       | NavigateCardsEvent  NavigateCardsEvent
                       | UpdateDonationLevel Days
                       | UpdateCardForm      CardFormData
+                      | NoEvent
 
 data NavigateCardsEvent = Move Int | Open (Maybe CardEntry) | Close (Maybe Int)
 
@@ -76,12 +76,12 @@ type EnableShortcuts = Boolean
 
 cardsManagerView :: CardManagerState -> Index -> PasswordGeneratorSettings -> DonationLevel -> ProxyInfo -> EnableShortcuts -> EnableSync -> Maybe (Wire (Widget HTML) SyncData) -> Widget HTML (Tuple CardManagerEvent CardManagerState)
 cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archived, searchString}, highlightedEntry, cardViewState, showShortcutsHelp, showDonationOverlay} index'@(Index {entries}) userPasswordGeneratorSettings donationLevel proxyInfo enableShortcuts enableSync syncDataWire = do
-  div [Props._id "cardsManager", Props.className $ "filterView_" <> getClassNameFromFilterStatus filterViewStatus] [
-    indexFilterView filterData index' >>= updateFilterData
+  div ([ Props._id "cardsManager", Props.className $ "filterView_" <> getClassNameFromFilterStatus filterViewStatus ]) [
+    indexFilterView filterData index' <#> ChangeFilterEvent
   , div [Props.className "cardToolbarFrame"] [
       toolbarHeader "frame"
     , div [Props._id "mainView", Props.className (if cardViewState /= NoCard then "CardViewOpen" else "CardViewClose")] [
-        div [Props._id "indexView"] [
+        div ([Props._id "indexView", Props.tabIndex 0] <> shortcutsHandlers) [
           toolbarHeader "cardList"
         , div [Props.className "addCard"] [
             button [Props.onClick, Props.className "addCard" ] [span [] [text "add card"]] $> OpenCardFormEvent Nothing
@@ -95,8 +95,7 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
       ]
     , donationButton (donationLevel == DonationWarning) showDonationOverlay
     ]
-  ] <> (if enableShortcuts then shortcutsHandlers else empty)
-    <> (shortcutsHelp     showShortcutsHelp)
+  ] <> (shortcutsHelp showShortcutsHelp)
   <#> (Tuple state >>> swap)
 
   where
@@ -122,16 +121,6 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
     getCardToOpen :: List CardEntry -> Maybe CardEntry
     getCardToOpen entries' = highlightedEntry >>= (index entries')
 
-    updateFilterData :: FilterData -> Widget HTML CardManagerEvent
-    updateFilterData filterData' = 
-      case filterData'.filterViewStatus of
-        FilterViewClosed -> blur  "searchInputField" # liftEffect
-        FilterViewOpen   -> 
-          case filterData'.filter of
-            Search _     -> focus "searchInputField" # liftEffect
-            _            -> pure unit
-        $> ChangeFilterEvent filterData'
-
     getFilterHeader :: forall a. Filter -> Widget HTML a
     getFilterHeader f =
       case f of
@@ -145,7 +134,7 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
     toolbarHeader :: String -> Widget HTML CardManagerEvent
     toolbarHeader className = header [Props.className className] [
       div [Props.className "toolbar"] [
-        div [Props.className "tags"] [button [Props.onClick] [text "tags"]] *> updateFilterData (filterData {filterViewStatus = FilterViewOpen})
+        div [Props.className "tags"] [button [Props.onClick] [text "tags"]] $> ChangeFilterEvent (filterData {filterViewStatus = FilterViewOpen})
       , div [Props.className "selection"] [getFilterHeader filter]
       , OpenUserAreaEvent <$ div [Props.className "menu"] [button [Props.onClick] [text "menu"]]
       ]
@@ -156,17 +145,25 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
     allTags :: Set String
     allTags = unions $ (\(CardEntry entry) -> entry.tags) <$> fromFoldable entries
 
-    shortcutsHandlers :: Widget HTML CardManagerEvent
-    shortcutsHandlers =
-         ((keyboardShortcut ["*"                  ] # affAction) *>                                             updateFilterData initialFilterData)
-      <> ((keyboardShortcut ["/"                  ] # affAction) *> (select "searchInputField" # liftEffect) *> updateFilterData filterData {filterViewStatus = FilterViewOpen, filter = Search searchString})
-      <> ((keyboardShortcut ["j", "down"          ] # affAction) $> (NavigateCardsEvent $ Move (increaseIndex (length sortedCards))))
-      <> ((keyboardShortcut ["k", "up"            ] # affAction) $> (NavigateCardsEvent $ Move (decreaseIndex                     )))
-      <> ((keyboardShortcut ["l", "right", "enter"] # affAction) $> (NavigateCardsEvent $ Open (getCardToOpen sortedCards         )))
-      <> ((keyboardShortcut ["h", "left" , "esc"  ] # affAction) $> if showShortcutsHelp
-                                                               then  ShowShortcutsEvent   false
-                                                               else (NavigateCardsEvent $ Close getHighlightedEntry                ))
-      <> ((keyboardShortcut ["?"                  ] # affAction) $>  ShowShortcutsEvent   true                                      )
+    shortcutsHandlers = if (not enableShortcuts || isCardForm) then [] else [
+      Props.onKeyDown <#> (\e -> case (unsafeCoerce e).key of
+        key
+          | eq   key  "*"                          ->  ChangeFilterEvent initialFilterData
+          | eq   key  "/"                          ->  ChangeFilterEvent filterData {filterViewStatus = FilterViewOpen, filter = Search searchString, selected = true}
+          | elem key ["k", "ArrowUp"             ] -> (NavigateCardsEvent $ Move (decreaseIndex                     ))
+          | elem key ["j", "ArrowDown"           ] -> (NavigateCardsEvent $ Move (increaseIndex (length sortedCards)))
+          | elem key ["l", "ArrowRight", "Enter" ] -> (NavigateCardsEvent $ Open (getCardToOpen sortedCards         ))
+          | elem key ["h", "ArrowLeft" , "Escape"] -> if showShortcutsHelp
+                                                then   ShowShortcutsEvent   false
+                                                else  (NavigateCardsEvent $ Close getHighlightedEntry)
+          | eq   key  "?"                          ->  ShowShortcutsEvent   true
+          | otherwise                              ->  NoEvent
+      )
+    ]
+      where
+        isCardForm = case cardViewState of
+          CardForm _ _ -> true
+          _            -> false
 
     mainStageView :: CardViewState -> Widget HTML CardManagerEvent
     mainStageView  NoCard                               = div [] []
@@ -258,7 +255,7 @@ donationButton :: Boolean -> Boolean -> Widget HTML CardManagerEvent
 donationButton false _           = empty
 donationButton true  showOverlay =
   div [Props.classList [Just "donationButton"]] ([
-    button [Props.onClick] [span [] [text "Support Clipperz"]] $> ShowDonationEvent true
+    button [Props.onClick $> ShowDonationEvent true, Props.filterProp (\e -> (unsafeCoerce e).key == "Escape") Props.onKeyDown $> ShowDonationEvent false] [span [] [text "Support Clipperz"]]
   ] <> (if (not showOverlay) then [] else [
     div [Props.className "disableOverlay"] [
       div [Props.className "mask", Props.onClick] [] $> ShowDonationEvent false
@@ -281,7 +278,6 @@ indexView sortedCards proxyInfo selectedEntry = do
   ol [] (
     flip mapWithIndex (fromFoldable sortedCards) (\index cardEntry@(CardEntry { title, archived: archived', cardReference: CardReference { reference: ref } }) -> do
       let disabled = proxyInfo == Offline NoData || elem ref disabledCards
-
       li ([Props.classList [archivedClass archived', selectedClass index, disabledClass disabled]] <> if disabled then []  else [cardEntry <$ Props.onClick]) [
         text title
       ]
@@ -289,9 +285,9 @@ indexView sortedCards proxyInfo selectedEntry = do
   ) 
 
   where
-    archivedClass archived' = if archived'                   then Just "archived" else Nothing
-    selectedClass index     = if selectedEntry == Just index then Just "selected" else Nothing
-    disabledClass disabled  = if disabled                    then Just "disabled" else Nothing
+    archivedClass archived' = if archived'                   then Just "archived"     else Nothing
+    selectedClass index     = if selectedEntry == Just index then Just "selectedCard" else Nothing
+    disabledClass disabled  = if disabled                    then Just "disabled"     else Nothing
 
     getDisabledCards :: ProxyInfo -> List HexString
     getDisabledCards (Offline (WithData refList)) = refList
