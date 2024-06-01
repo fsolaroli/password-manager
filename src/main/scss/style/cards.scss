@@ -118,8 +118,10 @@ div#homePage {
             
                             // bottom: 0px;
                             font-size: 45pt;
-                            color: white;
-                            background-color: #1863a1;
+                            // color: white;
+                            color: $accent-text-color;
+                            // background-color: #1863a1;
+                            background-color: $accent-color;
                             box-shadow: 2px 8px 6px 0 rgba(0, 0, 0, 0.2);
                             width: 60px;
                             height: 60px;
@@ -127,11 +129,13 @@ div#homePage {
                             // margin-left: 25%;
                             // margin-bottom: 20px;
                             font-size: 36pt;
-							text-align: left;
+                            text-align: left;
                             cursor: pointer;             
 
                             &:hover {
-                                background-color: #114875;
+                                // background-color: #114875;
+                                // background-color: $accent-color-darker;
+                                background-color: $accent-color-lighter;
                             }
                         }
                     }
