@@ -28,9 +28,9 @@ overlay info =
     case info.status of
       Hidden  ->  div  [] []
       Spinner ->  div  [Props.className "spinner"]     $ map (\i -> div [Props.className (color <> " " <> "bar" <> (format dd (toNumber i)))] []) (range 1 12)
-      Done    ->  span [Props.className "icon done"]   [text "done"]
-      Copy    ->  span [Props.className "icon copy"]   [text "copy"]
-      Failed  ->  span [Props.className "icon failed"] [text "failed"]
+      Done    ->  div  [Props.className "icon done"]   [text "done"]
+      Copy    ->  div  [Props.className "icon copy"]   [text "copy"]
+      Failed  ->  div  [Props.className "icon failed"] [text "failed"]
     ,
     span [Props.className "title"] [text info.message]
   ]

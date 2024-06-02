@@ -36,7 +36,7 @@ import Web.HTML.Window (history, location)
 
 main :: Effect Unit
 main = do  
-  runWidgetInDom "debugApp" $ debugApp Nothing
+  runWidgetInDom "app" $ debugApp Nothing
 
 debugApp :: Maybe WidgetState -> Widget HTML Unit
 

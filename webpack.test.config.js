@@ -2,6 +2,7 @@
 
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const HtmlInlineScriptPlugin = require('html-inline-script-webpack-plugin');
 const webpack = require('webpack');
 
 module.exports = {
@@ -34,11 +35,16 @@ module.exports = {
 		}),
 		// debug app package configuration
 		new HtmlWebpackPlugin({
-			template: '/src/test/html/debug_index.html',
+			// template: '/src/test/html/debug_index.html',
+			template: '/src/main/html/index.html',
 			filename: 'debug_index.html',
 			scriptLoading: 'module',
 			chunks: ["debug"],
 			minify: true,
+		}),
+		new HtmlInlineScriptPlugin({
+			htmlMatchPattern: [/debug_index.html$/],
+			scriptMatchPattern: [/debug-bundle(.[a-zA-Z0-9]+)?.js/],
 		}),
 	],
 	module: {
