@@ -123,9 +123,9 @@ cardField showPassword f@(CardField {name, value, locked}) = do
   where
     getActionButton =
       case getFieldType f of
-        Passphrase  -> button [Props.className "action PASSWORD", Props.disabled false, Props.onClick        ] [span [] [text "view password"]] $> if showPassword then HidePassword else ShowPassword
-        Email       -> button [Props.className "action EMAIL",    Props.disabled true                        ] [span [] [text "email"        ]]
+        Passphrase  -> button [Props.className "action PASSWORD", Props.disabled false, Props.onClick        ] [text "view password"] $> if showPassword then HidePassword else ShowPassword
+        Email       -> button [Props.className "action EMAIL",    Props.disabled true                        ] [text "email"        ]
         Url         -> a      [Props.className "action URL",      Props.disabled false, Props.href   value
-                                                                                      , Props.target "_blank"] [span [] [text "url"          ]]
-        None        -> button [Props.className "action NONE",     Props.disabled true                        ] [span [] [text "none"         ]]
+                                                                                      , Props.target "_blank"] [text "url"          ]
+        None        -> button [Props.className "action NONE",     Props.disabled true                        ] [text "none"         ]
 

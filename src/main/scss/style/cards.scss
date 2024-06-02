@@ -325,109 +325,108 @@ div#homePage {
 								}
 							}
 	
-							div.card_fields {
-								// padding: 10px 42px 10px 32px;
-								padding: 10px 0px 10px 32px;
-								
-								div.cardField {
-									padding: 10px;
-									display: flex;
+                            div.card_fields {
+                                // padding: 10px 42px 10px 32px;
+                                padding: 10px 0px 10px 32px;
+                                
+                                div.cardField {
+                                    padding: 10px;
+                                    display: flex;
 
-									div.fieldValues {
-										flex: 1;
+                                    div.fieldValues {
+                                        flex: 1;
 
-										div.fieldLabel {
-											color: gray;
-											padding-bottom: 4px;
-											margin-bottom: 4px;
-											user-select: text;
-										}
+                                        div.fieldLabel {
+                                            color: gray;
+                                            padding-bottom: 4px;
+                                            margin-bottom: 4px;
+                                            user-select: text;
+                                        }
 
-										.dynamicWrap {
-											display: grid;
-											width: 100%;
-											
-											&::after {
-												content: attr(replicatedvalue) " ";
-												white-space: pre-wrap;
-												visibility: hidden;
-											}
-	
-											textarea {
-												resize: none;
-												overflow: hidden;
-											}
-	
-											&.PASSWORD {
-												textarea, &::after {
-													font-family: clipperz-password;
-													font-size: 22pt;
-													line-height: 28px;
-													margin-top: -2px;  
-												}
-											}
+                                        .dynamicWrap {
+                                            display: grid;
+                                            width: 100%;
+                                            
+                                            &::after {
+                                                content: attr(replicatedvalue) " ";
+                                                white-space: pre-wrap;
+                                                visibility: hidden;
+                                            }
+    
+                                            textarea {
+                                                resize: none;
+                                                overflow: hidden;
+                                            }
+    
+                                            &.PASSWORD {
+                                                textarea, &::after {
+                                                    font-family: clipperz-password;
+                                                    font-size: 22pt;
+                                                    line-height: 28px;
+                                                    margin-top: -2px;  
+                                                }
+                                            }
 
-											textarea, &::after {
-												font-family: 'clipperz-font';
-												outline: none;
-												cursor: pointer;
-												font-size: 18pt;
-												line-height: 28px;
-												user-select: text;
-												resize: none;
-												white-space: pre-wrap;
-												word-wrap: break-word;
-												border: 0px;
+                                            textarea, &::after {
+                                                font-family: 'clipperz-font';
+                                                outline: none;
+                                                cursor: pointer;
+                                                font-size: 18pt;
+                                                line-height: 28px;
+                                                user-select: text;
+                                                resize: none;
+                                                white-space: pre-wrap;
+                                                word-wrap: break-word;
+                                                border: 0px;
                                                 padding: 0px;
-												width: 100%;
-												background-color: white;
-												color: $alternate-text-color;
-												
-												@include dontBreakOut;
-												grid-area: 1 / 1 / 2 / 2;
-											}
-										}
+                                                width: 100%;
+                                                background-color: white;
+                                                color: $alternate-text-color;
+                                                
+                                                @include dontBreakOut;
+                                                grid-area: 1 / 1 / 2 / 2;
+                                            }
+                                        }
 
-									}
+                                    }
 
-									div.fieldAction {
-										flex-direction: column;
-										padding-left: 5px;
-										padding-right: 10px;
-										// background-color: purple;
+                                    div.fieldAction {
+                                        display: flex;
+                                        flex-direction: column;
+                                        padding-left: 5px;
+                                        padding-right: 10px;
+                                        // background-color: purple;
 
-										button, a {
-											font-family: 'clipperz-icons';
-											font-size: 15pt;
-											text-decoration: none;
-											color: #aaa;
-											border: 0px;
-											background-color: inherit;
-											color: #ccc;
-											padding: 0px;
-											margin: 10px 0 6px;
-											
-											&:enabled {
-												cursor: pointer;
-												&:hover {
-													color: #666;
-												}
-											}
-										}
-									}
-								}
-							}
-							div.card_notes {
-								// border: 0px;
-								// font-size: 10pt;
-								// padding: 10px 42px 10px 42px;
-								width: 100%;
-								
-								& > h3 {
-									border-top-width: 10;
-									border-top-style: double;
+                                        button, a {
+                                            font-family: 'clipperz-icons';
+                                            font-size: 15pt;
+                                            text-decoration: none;
+                                            color: #aaa;
+                                            border: 0px;
+                                            background-color: inherit;
+                                            color: #ccc;
+                                            padding: 0px;
+                                            margin: 10px 0 6px;
+                                            
+                                            &:hover {
+                                                cursor: pointer;
+                                                color: #666;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            div.card_notes {
+                                // border: 0px;
+                                // font-size: 10pt;
+                                // padding: 10px 42px 10px 42px;
+                                width: 100%;
+                                
+                                & > h3 {
+                                    border-top-width: 10;
+                                    border-top-style: double;
 
-									color: $alternate-text-color;
+                                    color: $alternate-text-color;
 									
 									border-bottom-style: dashed;
 									border-bottom-width: 1px;
@@ -834,10 +833,11 @@ div#homePage {
                                                 padding-right: 10px;
                                                 // background-color: purple;
 
-												button {
+												button, a {
 													font-family: 'clipperz-icons';
-													font-size: 18pt;
-													cursor: pointer;
+													font-size: 15pt;
+                                                    text-decoration: none;
+													// cursor: pointer;
 													border: 0px;
 													background-color: inherit;
 													color: #ccc;
@@ -846,7 +846,11 @@ div#homePage {
 													
                                                     &:hover:enabled {
 														color: #666;
-													}
+                                                        cursor: pointer;
+                                                        &:hover {
+                                                            color: #666;
+                                                        }
+                                                    }
 													
 													&.lock {
 														margin-left: 10px;
@@ -906,7 +910,7 @@ div#homePage {
                                         background-color: #eee;
 
                                         button.addNewField {
-                                            color: #7c7;
+                                            color: $add_new_field;
                                         }
                                     }
                                 }
@@ -974,34 +978,34 @@ div#homePage {
                                     cursor: pointer;
 
                                     &.cancel {
-                                        color: white;
-                                        background-color: #d11;
+                                        color: $submit_button_text;
+                                        background-color: $cancel_enabled;
 
                                         &:hover {
-                                            background-color: #911;
+                                            background-color: $cancel_enabled_hover;
                                         }
 
                                         &.inactive {
-                                            background-color: #666;
+                                            background-color: $cancel_disabled;
     
                                             &:hover {
-                                                background-color: #444;
+                                                background-color: $cancel_disabled_hovered;
                                             }
                                         }
                                     }
 
                                     &.save {
-                                        color: white;
-                                        background-color: #2a2;
+                                        color: $submit_button_text;
+                                        background-color: $save_enabled;
 
                                         &:hover {
-                                            background-color: #1a801a;
+                                            background-color: $save_enabled_hover;
                                         }
                                         &:disabled {
-                                            background-color: #5a5;
+                                            background-color: $save_disabled;
                                             &:hover {
                                                 cursor: default;
-                                                background-color: #5a5;
+                                                background-color: $save_disabled;
                                             }
                                         }
 

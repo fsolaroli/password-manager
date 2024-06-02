@@ -75,10 +75,10 @@ createCardView cardFormData@{card} originalCard allTags passwordGeneratorSetting
     getActionButton :: CardField -> Widget HTML Unit
     getActionButton cardField =
       case getFieldType cardField of
-        Passphrase  -> button [unit <$ Props.onClick, Props.disabled false, Props.className "action passwordGenerator" ] [span [] [text "password generator"]]
-        Email       -> button [Props.disabled true, Props.className "action email"]                                      [span [] [text "email"]]
-        Url         -> button [Props.className "action url",  Props.disabled true]                                       [span [] [text "url"]]
-        None        -> button [Props.className "action none", Props.disabled true]                                       [span [] [text "none"]]
+        Passphrase  -> button [unit <$ Props.onClick, Props.disabled false, Props.className "action passwordGenerator" ] [text "password generator"]
+        Email       -> button [Props.disabled true, Props.className "action email"]                                      [text "email"]
+        Url         -> button [Props.className "action url",  Props.disabled true]                                       [text "url"]
+        None        -> button [Props.className "action none", Props.disabled true]                                       [text "none"]
 
     cardFieldWidget :: PasswordGeneratorSettings -> CardField -> Widget HTML CardField
     cardFieldWidget defaultSettings cf@(CardField r@{ name, value, locked, settings}) = do
