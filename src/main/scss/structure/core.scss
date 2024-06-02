@@ -175,22 +175,20 @@ html {
 								position: relative;
 								z-index: 8;
 
-								#cardForm div.cardForm .cardFormFields .dragAndDropList .draggableElem .fieldForm .fieldActions div.passwordGeneratorOverlay div.passwordGeneratorPopup div.passwordGeneratorForm {
-									transition: left 0.3s ease-in-out;
-									left: calc(-100vw + 90px);
-									width: 80vw;
-								}
-
 								#cardForm {
 									position: fixed;
 									height: 100vh;
 									z-index: 100;
 									width: 100vw;
+
+									.mask {
+										width: 0;
+									}
 								}
                             }
 
                             &.CardViewOpen {
-                                left: -100vw;
+                                left: calc(-100vw + 250px);
 
                                 #indexView {
                                     .addCard {
