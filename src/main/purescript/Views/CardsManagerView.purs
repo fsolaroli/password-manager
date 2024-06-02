@@ -80,7 +80,7 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
     indexFilterView filterData index' <#> ChangeFilterEvent
   , div [Props.className "cardToolbarFrame"] [
       toolbarHeader "frame"
-    , div [Props._id "mainView", Props.className (if cardViewState /= NoCard then "CardViewOpen" else "CardViewClose")] [
+    , div [Props._id "mainView", Props.className cardViewStateClass] [
         div ([Props._id "indexView", Props.tabIndex 0] <> shortcutsHandlers) [
           toolbarHeader "cardList"
         , div [Props.className "addCard"] [
@@ -99,6 +99,12 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
   <#> (Tuple state >>> swap)
 
   where
+
+    cardViewStateClass :: String
+    cardViewStateClass = case cardViewState of
+      NoCard       -> "CardViewClose"
+      CardForm _ NewCard -> "CardFormOpen"
+      _ -> "CardViewOpen"
 
     sortedCards :: List CardEntry
     sortedCards  = List.sort $ filteredEntries filter (shownEntries entries selectedEntry archived)

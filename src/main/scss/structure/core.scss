@@ -188,7 +188,8 @@ html {
                             }
 
                             &.CardViewOpen {
-                                left: calc(-100vw + 250px);
+                                // left: calc(-100vw + 250px);
+                                left: -100vw;
 
                                 #indexView {
                                     .addCard {
@@ -197,6 +198,10 @@ html {
                                     }
                                 }
                             }
+
+							&.CardFormOpen {
+								left: calc(-100vw + 250px);	
+							}
 
                         }
                     }
