@@ -36,9 +36,9 @@ deviceSyncView enableSync proxyInfo syncDataWire = div [Props._id "deviceSync"] 
           true  -> do
             syncProgressBar enableSync syncDataWire
             <>
-            button [Props.onClick $> false, Props.disabled disabled] [text "Remove synched data"]
+            button [Props.onClick $> false, Props.disabled disabled] [text "Remove local data"]
           false -> do
-            button [Props.onClick $> true,  Props.disabled disabled] [text "Synch"]
+            button [Props.onClick $> true,  Props.disabled disabled] [text "Synchronize data"]
       ]
   ]
 ]
@@ -55,7 +55,7 @@ syncProgressBar true (Just wire) = with wire \{completedOperations, pendingOpera
                             else (toNumber completedOperations) / (toNumber totalOperations) * 100.0
     
   ((h2 [] [ if syncCompleted 
-            then text "All data synced!"
+            then text "All data synchronized!"
             else text (show completedOperations <> "/" <> (show $ totalOperations) <> " operations completed")
   ])
   <>
