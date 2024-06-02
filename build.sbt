@@ -1,53 +1,59 @@
-import complete.DefaultParsers._
-import Dependencies._
+import complete.DefaultParsers.*
+import Dependencies.*
 import java.nio.file.Paths
 
 lazy val installPurescript = TaskKey[Unit]("installPurescript", "Install purescript")
 installPurescript := {
-  import sys.process._
+  import sys.process.*
   "npm install" !
 }
 
 lazy val buildPurescript = TaskKey[Unit]("buildPurescript", "Build frontend")
 buildPurescript := {
-  import sys.process._
+  import sys.process.*
   "npm run build" !
+}
+
+lazy val checksumHTML = TaskKey[Unit]("checksum", "Compute index.html checksum")
+checksumHTML := {
+    import sys.process.*
+    "npm run checksum" !
 }
 
 lazy val packagePurescript = TaskKey[Unit]("packagePurescript", "Package frontend")
 packagePurescript := {
-  import sys.process._
+  import sys.process.*
   Process(Seq("bash", "-c", "npm run package"), None, "CURRENT_COMMIT" -> "development").!
 }
 
 lazy val keepPackagingPurescript = TaskKey[Unit]("keepPackagingPurescript", "Keep packaging frontend")
 keepPackagingPurescript := {
-  import sys.process._
+  import sys.process.*
   "npm run keep-packaging" !
 }
 
 lazy val servePurescript = TaskKey[Unit]("servePurescript", "Serve frontend")
 servePurescript := {
-  import sys.process._
+  import sys.process.*
   "npm run go" !
 }
 
 lazy val cleanDependenciesPurescript =
   TaskKey[Unit]("cleanDependenciesPurescript", "Clean dependencies frontend")
 cleanDependenciesPurescript := {
-  import sys.process._
+  import sys.process.*
   "npm run nuke" !
 }
 
 lazy val runTestPurescript = TaskKey[Unit]("runTestPurescript", "Run test frontend")
 runTestPurescript := {
-  import sys.process._
+  import sys.process.*
   "npm run test-browser" !
 }
 
 lazy val cleanTargetSubdir = inputKey[Unit]("Clean the given subdirectory of the target directory")
 cleanTargetSubdir := {
-  import sys.process._
+  import sys.process.*
   val directory: String = spaceDelimited("<arg>").parsed(0)
   val path = Paths.get(baseDirectory.value.toString(), "target", directory)
   s"rm -rf ${path}" !
@@ -127,8 +133,8 @@ fork in Global := true
 
 Compile / mainClass := Some("is.clipperz.backend.Main")
 
-assemblyJarName in assembly := "clipperz.jar"
-assemblyMergeStrategy in assembly := {
+assembly / assemblyJarName := "clipperz.jar"
+assembly / assemblyMergeStrategy := {
  case PathList("META-INF", _*) => MergeStrategy.discard
  case _                        => MergeStrategy.first
 }

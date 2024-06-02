@@ -30,9 +30,9 @@ addCommandAlias(
 
 onLoadMessage +=
   s"""|
-      |╭────────────────────────────────────╮
+      |╭───────────────────────────────────────╮
       |│     List of defined ${styled("aliases")}           │
-      |├────────────────┬───────────────────┤
+      |├────────────────┬──────────────────────┤
       |│ ${styled("buildAll")}       │ build all            │
       |│ ${styled("cleanAll")}       │ clean all            │
       |│ ${styled("cleanArchive")}   │ clean target/archive │
@@ -44,4 +44,4 @@ onLoadMessage +=
       |│ ${styled("styleCheck")}     │ fmt check            │
       |│ ${styled("styleFix")}       │ fmt                  │
       |│ ${styled("up2date")}        │ dependencyUpdates    │
-      |╰────────────────┴───────────────────╯""".stripMargin
+      |╰────────────────┴──────────────────────╯""".stripMargin

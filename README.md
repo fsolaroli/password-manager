@@ -10,10 +10,10 @@ The backend uses Scala, in particular the [ZIO](https://github.com/zio/zio) libr
 
 The implementation of SRP v6a is self implemented both in Purescript and Scala.
 
-### Current status - 10/01/2024
+### Current status - 2/06/2024
 In the current stage of development the backend is functionally complete.
-The frontend is almost functionally identical to the current version, except for the offline copy (which implementation is still ongoing) and attachments, that we are not 100% sure we are going to keep around. Another important thing yet to be implemented is a cryptographically secure prng.
-On the other hand during the development we have added a few smaller features (like Markdown in notes and saving the password preferences for each locked field).
+The frontend is functionally identical to the current version, except for attachments, that we are not 100% sure we are going to keep around. Another important thing yet to be implemented is a cryptographically secure prng.
+On the other hand during the development we have added a few smaller features (like Markdown in notes and saving the password preferences for each locked field) and a big new feature that gives the option to sync the data to the local storage, allowing access to the account with no internet connection.
 Another bigger feature implemented is the one-time share. It is yet to be incorporated in the main application, but it has a [dedicated page in the website](https://clipperz.is/share).
 
 ## License
@@ -27,7 +27,10 @@ Necessary tools:
 ### Building and running the application
 All the building and running of the application is managed by sbt, that under the hood uses yarn to manage the Purescript side.
 On a console, in the base folder run `sbt` to open the sbt console, after that the command `r` (or `runAll`) builds the whole project, both Scala and Purescript and then starts the Scala server that also serves the frontend at `localhost:8090/api/static/index.html`.
- 
+
+### Checksum
+To compute the SHA1 of the html application file, run the command `checksum` from the sbt console.
+
 ### Running tests
 Command to run inside of the sbt console to execute tests:
 - Scala
