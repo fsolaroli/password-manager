@@ -23,28 +23,29 @@ import Data.Show (class Show, show)
 import Data.String.Common (joinWith)
 import Data.Tuple (Tuple(..))
 import Data.Unit (Unit, unit)
-import DataModel.AppError (AppError(..))
-import DataModel.AppState (AppState, InvalidStateError(..), ProxyResponse(..))
+import DataModel.AppError (AppError(..), InvalidStateError(..))
+import DataModel.AppState (AppState)
+import DataModel.Communication.ConnectionState (ConnectionState)
 import DataModel.Communication.ProtocolError (ProtocolError(..))
+import DataModel.Proxy (ProxyResponse(..))
 import DataModel.SRPVersions.CurrentSRPVersions (currentSRPVersion)
-import DataModel.SRPVersions.SRP (HashFunction)
+import DataModel.SRPVersions.SRP (HashFunction, SRPConf)
 import DataModel.UserVersions.CurrentUserVersions (currentMasterKeyEncodingVersion, currentUserInfoCodecVersion)
 import DataModel.UserVersions.User (class UserInfoVersions, MasterKey, MasterKeyEncodingVersion(..), RequestUserCard(..), UserCard(..), UserInfo(..), UserInfoReferences, UserPreferences, toUserInfo, userCardCodec)
-import DataModel.UserVersions.UserCodecs (userInfoV1Codec, userInfoV2Codec, fromUserInfo)
+import DataModel.UserVersions.UserCodecs (fromUserInfo, userInfoV1Codec, userInfoV2Codec, userInfoV3Codec)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Functions.ArrayBuffer (concatArrayBuffers)
-import Functions.Communication.Backend (ConnectionState, genericRequest, isStatusCodeOk)
+import Functions.Communication.Backend (genericRequest, isStatusCodeOk)
 import Functions.Communication.Blobs (deleteBlob, getBlob, postBlob)
 import Functions.EncodeDecode (decryptArrayBuffer, decryptJson, encryptArrayBuffer, encryptJson, exportCryptoKeyToHex, generateCryptoKeyAesGCM, importCryptoKeyAesGCM)
 import Functions.SRP (prepareV)
 
-computeRemoteUserCard :: AppState -> ExceptT AppError Aff RequestUserCard
-computeRemoteUserCard { c: Just c, p: Just p, s: Just s, masterKey: Just masterKey, srpConf } = do
+computeRemoteUserCard :: SRPConf -> HexString -> HexString -> HexString -> HexString -> MasterKey -> ExceptT AppError Aff RequestUserCard
+computeRemoteUserCard srpConf c p s originMasterKey masterKey = do
   v <- withExceptT (show >>> SRPError >>> ProtocolError) $ ExceptT (prepareV srpConf (toArrayBuffer s) (toArrayBuffer p))
-  pure $ RequestUserCard { c, v, s, srpVersion: currentSRPVersion, originMasterKey: Nothing, masterKey }
-computeRemoteUserCard _ = throwError $ InvalidStateError (CorruptedState "computeRemoteUserCard")
+  pure $ RequestUserCard { c, v, s, srpVersion: currentSRPVersion, originMasterKey: Just originMasterKey, masterKey }
 
 updateUserCard :: ConnectionState -> HexString -> UserCard -> ExceptT AppError Aff (ProxyResponse Unit)
 updateUserCard connectionState c newUserCard = do
@@ -65,8 +66,9 @@ deleteUserCard connectionState c = do
 
 -- ------------
 
-computeMasterKey :: UserInfoReferences -> CryptoKey -> Aff MasterKey
-computeMasterKey {reference: userInfoHash, key: userInfoKey} masterPassword = do
+computeMasterKey :: UserInfoReferences -> HexString -> Aff MasterKey
+computeMasterKey {reference: userInfoHash, key: userInfoKey} p = do
+  masterPassword <- importCryptoKeyAesGCM (toArrayBuffer p) # liftAff
   unencryptedMasterKeyContent <- concatArrayBuffers ((userInfoHash : userInfoKey : Nil) <#> toArrayBuffer) # liftEffect
   encryptedMasterKeyContent   <- encryptArrayBuffer masterPassword unencryptedMasterKeyContent
   pure $ Tuple (fromArrayBuffer encryptedMasterKeyContent) currentMasterKeyEncodingVersion
@@ -76,6 +78,7 @@ extractUserInfoReference (Tuple masterKeyContent masterKeyEncodingVersion) maste
   case masterKeyEncodingVersion of
    MasterKeyEncodingVersion_1 -> decryptArrayBufferWithSplit
    MasterKeyEncodingVersion_2 -> decryptArrayBufferWithSplit
+   MasterKeyEncodingVersion_3 -> decryptArrayBufferWithSplit
 
   where
     decryptArrayBufferWithSplit = do
@@ -88,6 +91,7 @@ decryptUserInfo encryptedUserInfo key version =
   case version of 
     MasterKeyEncodingVersion_1 -> decryptJsonUserInfo userInfoV1Codec
     MasterKeyEncodingVersion_2 -> decryptJsonUserInfo userInfoV2Codec
+    MasterKeyEncodingVersion_3 -> decryptJsonUserInfo userInfoV3Codec
 
   where
     decryptJsonUserInfo :: forall a. UserInfoVersions a => JsonCodec a -> ExceptT AppError Aff UserInfo
@@ -121,7 +125,10 @@ postUserInfo connectionState@{hashFunc} userInfo@(UserInfo {identifier}) = do
   pure $ ProxyResponse proxy userInfoReference
 
 
-type UpdateUserStateUpdateInfo = {userInfo :: Maybe UserInfo, masterKey :: Maybe MasterKey, userInfoReferences :: Maybe UserInfoReferences }
+type UpdateUserStateUpdateInfo = {userInfo :: UserInfo, masterKey :: MasterKey, userInfoReferences :: UserInfoReferences }
+
+asMaybe :: UpdateUserStateUpdateInfo -> {userInfo :: Maybe UserInfo, masterKey :: Maybe MasterKey, userInfoReferences :: Maybe UserInfoReferences }
+asMaybe {userInfo, masterKey, userInfoReferences } = {userInfo: Just userInfo, masterKey: Just masterKey, userInfoReferences: Just userInfoReferences}
 
 updateUserInfo :: AppState -> UserInfo -> ExceptT AppError Aff (ProxyResponse UpdateUserStateUpdateInfo)
 
@@ -133,10 +140,10 @@ updateUserInfo { c: Just c, p: Just p, masterKey: Just (Tuple originMasterKey _)
   ProxyResponse proxy'   newUserInfoReferences <-           postUserInfo connectionState newUserInfo
   ProxyResponse proxy''  _                     <-           deleteUserInfo connectionState {proxy = proxy'} oldUserInfo userInfoReferences
 
-  newMasterKey        :: MasterKey             <- liftAff $ computeMasterKey newUserInfoReferences =<< (importCryptoKeyAesGCM (toArrayBuffer p) # liftAff)
+  newMasterKey        :: MasterKey             <- liftAff $ computeMasterKey newUserInfoReferences p
   ProxyResponse proxy''' _                     <-           updateUserCard connectionState{proxy = proxy''} c (UserCard { masterKey: newMasterKey, originMasterKey })
 
-  pure $ ProxyResponse proxy''' { userInfo: Just newUserInfo, masterKey: Just newMasterKey, userInfoReferences: Just newUserInfoReferences }
+  pure $ ProxyResponse proxy''' { userInfo: newUserInfo, masterKey: newMasterKey, userInfoReferences: newUserInfoReferences }
   
 updateUserInfo _ _ = 
   throwError $ InvalidStateError (MissingValue "Corrupted State")

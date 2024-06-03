@@ -1,51 +1,73 @@
 module Views.CreateCardView where
 
 import Concur.Core (Widget)
-import Concur.Core.FRP (Signal, demand, fireOnce, loopS, loopW)
 import Concur.React (HTML)
-import Concur.React.DOM (button, datalist, div, div_, form, input, label, li_, option, span, text, textarea, ul_)
+import Concur.React.DOM (button, datalist, div, form, input, label, li, option, span, text, textarea, ul)
 import Concur.React.Props as Props
-import Control.Alt ((<|>))
+import Control.Alt (($>), (<#>), (<|>))
 import Control.Applicative (pure)
-import Control.Bind (bind, discard, (=<<))
+import Control.Bind (bind, discard, (>>=))
+import Control.Plus (empty)
 import Control.Semigroupoid ((<<<))
-import Data.Array (filter, singleton, snoc, sort)
+import Data.Array (delete, snoc, sort)
+import Data.Either (Either(..))
 import Data.Eq ((==), (/=))
 import Data.Function (($))
-import Data.Functor ((<$), (<$>))
-import Data.HeytingAlgebra (not)
-import Data.Maybe (Maybe(..), isJust, maybe, fromMaybe)
+import Data.Functor (map, (<$), (<$>))
+import Data.HeytingAlgebra (not, (||))
+import Data.Lens (Lens', set, view)
+import Data.Lens.Record (prop)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Semigroup ((<>))
 import Data.Set (Set, difference, fromFoldable, member, toUnfoldable)
 import Data.String (null)
-import Data.Traversable (sequence)
 import Data.Tuple (Tuple(..), fst)
 import Data.Unit (Unit, unit)
 import DataModel.AsyncValue as Async
-import DataModel.CardVersions.Card (Card(..), CardField(..), CardValues(..), FieldType(..), emptyCardField)
+import DataModel.CardVersions.Card (Card(..), CardField(..), FieldType(..), _fields, _notes, _tags, _title, emptyCard, emptyCardField)
 import DataModel.Password (PasswordGeneratorSettings)
+import DataModel.Proxy (ProxyInfo(..))
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import Functions.Card (getFieldType)
 import Functions.Time (getCurrentTimestamp)
 import MarkdownIt (renderString)
+import Type.Proxy (Proxy(..))
 import Views.Components (dynamicWrapper, entropyMeter)
 import Views.PasswordGenerator (passwordGenerator)
 import Views.SimpleWebComponents (confirmationWidget, dragAndDropAndRemoveList, simpleButton)
 
-createCardView :: Card -> Set String -> PasswordGeneratorSettings -> Widget HTML (Maybe Card)
-createCardView card allTags passwordGeneratorSettings = do
-  mCard <- div [Props._id "cardForm"] [
+type CardFormData = {
+  newTag  :: String
+, preview :: Boolean
+, card    :: Card
+}
+_card :: Lens' CardFormData Card
+_card = prop (Proxy :: _ "card")
+_preview :: Lens' CardFormData Boolean
+_preview = prop (Proxy :: _ "preview")
+_newTag :: Lens' CardFormData String
+_newTag = prop (Proxy :: _ "newTag")
+
+emptyCardFormData :: CardFormData
+emptyCardFormData = {newTag: "", preview: false, card: emptyCard}
+
+-- ------------------------------------------------------------------------
+
+createCardView :: CardFormData -> Card -> Set String -> PasswordGeneratorSettings -> ProxyInfo -> Widget HTML (Either CardFormData (Maybe Card))
+createCardView cardFormData@{card} originalCard allTags passwordGeneratorSettings proxyInfo = do
+  div [Props._id "cardForm"] [
     mask
   , div [Props.className "cardForm"] [
-      demand (formSignal passwordGeneratorSettings)
+      formSignal passwordGeneratorSettings
     ]
-  ]
-  case mCard of
-    Just (Card { content, secrets }) -> do
-      timestamp' <- liftEffect $ getCurrentTimestamp
-      pure $ Just (Card { content, secrets, archived: false, timestamp: timestamp' })
-    Nothing -> pure Nothing
+  ] >>= (\res -> 
+    case res of
+      Right (Just (Card { content, secrets })) -> do
+        timestamp' <- liftEffect $ getCurrentTimestamp
+        pure $ Right $ Just (Card { content, secrets, archived: false, timestamp: timestamp' })
+      _ -> pure res
+  )
 
   where 
     mask = div [Props.className "mask"] []
@@ -53,10 +75,10 @@ createCardView card allTags passwordGeneratorSettings = do
     getActionButton :: CardField -> Widget HTML Unit
     getActionButton cardField =
       case getFieldType cardField of
-        Passphrase  -> button [unit <$ Props.onClick, Props.disabled false, Props.className "action passwordGenerator" ] [span [] [text "password generator"]]
-        Email       -> button [Props.disabled true, Props.className "action email"]                                      [span [] [text "email"]]
-        Url         -> button [Props.className "action url",  Props.disabled true]                                       [span [] [text "url"]]
-        None        -> button [Props.className "action none", Props.disabled true]                                       [span [] [text "none"]]
+        Passphrase  -> button [unit <$ Props.onClick, Props.disabled false, Props.className "action passwordGenerator" ] [text "password generator"]
+        Email       -> button [Props.disabled true, Props.className "action email"]                                      [text "email"]
+        Url         -> button [Props.className "action url",  Props.disabled true]                                       [text "url"]
+        None        -> button [Props.className "action none", Props.disabled true]                                       [text "none"]
 
     cardFieldWidget :: PasswordGeneratorSettings -> CardField -> Widget HTML CardField
     cardFieldWidget defaultSettings cf@(CardField r@{ name, value, locked, settings}) = do
@@ -84,7 +106,7 @@ createCardView card allTags passwordGeneratorSettings = do
           , dynamicWrapper Nothing value $ textarea [Props.rows 1, Props.placeholder (if locked then "" else "value"), Props.value value, Props.onChange] []
           , (if locked
             then (entropyMeter value)
-            else (text "")
+            else  empty
             )
           ]
         ]
@@ -95,117 +117,118 @@ createCardView card allTags passwordGeneratorSettings = do
         ]
       ]
 
-    fieldsSignal :: PasswordGeneratorSettings -> Array CardField -> Signal HTML (Array CardField)
+    fieldsSignal :: PasswordGeneratorSettings -> Array CardField -> Widget HTML (Array CardField)
     fieldsSignal settings fields = do
       let loopables = (\f -> Tuple f (cardFieldWidget settings)) <$> fields 
-      fields' <- loopS loopables $ \ls -> do
-                                            es <- loopW ls dragAndDropAndRemoveList
-                                            addField <- fireOnce $ div [Props.className "newCardField", Props.onClick] [
-                                              div [Props.className "fieldGhostShadow"] [
-                                                div [Props.className "label"] []
-                                              , div [Props.className "value"] []
-                                              ]
-                                            , button [Props.className "addNewField"] [text "add new field"]
-                                            ]
-                                            case addField of
-                                              Nothing -> pure es
-                                              Just _  -> pure $ snoc es (Tuple emptyCardField (cardFieldWidget settings))
-      pure $ fst <$> fields'
+      -- fields' <- loopS loopables $ \ls -> do
+      dragAndDropAndRemoveList loopables <#> (map fst)
+      <>
+      (div [Props.className "newCardField", Props.onClick] [
+        div [Props.className "fieldGhostShadow"] [
+          div [Props.className "label"] []
+        , div [Props.className "value"] []
+        ]
+      , button [Props.className "addNewField"] [text "add new field"]
+      ] $> (snoc fields emptyCardField))
+      -- pure $ fst <$> fields'
 
-    tagSignal :: String -> Signal HTML (Maybe String)
-    tagSignal tag = li_ [] do
-      removeTag <- fireOnce $ simpleButton "remove" "remove tag" false unit
-      tag' <- loopW tag text
-      case removeTag of
-        Nothing -> pure $ Just tag'
-        Just _  -> pure $ Nothing
+    tagSignal :: String -> Widget HTML String
+    tagSignal tag = li [] [
+      simpleButton "remove" "remove tag" false unit
+    , text tag
+    ] $> tag
 
-    inputTagSignal :: String -> Set String -> Signal HTML (Tuple String Boolean)
+    inputTagSignal :: String -> Set String -> Widget HTML (Tuple String Boolean)
     inputTagSignal newTag tags = do
 
-      loopW (Tuple newTag false) (\(Tuple value _) -> do
-        result <- form [(\_ -> Tuple value (value /= "")) <$> Props.onSubmit] [
+      -- loopW (Tuple newTag false) (\(Tuple value _) -> do
+        form [(\_ -> Tuple newTag (newTag /= "")) <$> Props.onSubmit] [
           label [] [
             span [Props.className "label"] [text "New Tag"]
             , input [
                 Props._type "text"
               , Props.placeholder "add tag"
-              , Props.value value
+              , Props.value newTag
               , Props.list "tags-list"
               , (\e -> Tuple (Props.unsafeTargetValue e) (member (Props.unsafeTargetValue e) (difference allTags tags))) <$> Props.onInput
               ]
             , datalist [Props._id "tags-list"] ((\t -> option [] [text t]) <$> (toUnfoldable $ difference allTags tags))
           ]
-        ] 
-        pure result
-      )
+        ]
 
-    tagsSignal :: String -> Set String -> Signal HTML (Tuple String (Array String))
-    tagsSignal newTag tags = div_ [Props.className "tags"] do
-      ul_ [] do
-        tags' <- (\ts -> ((maybe [] singleton) =<< filter isJust ts)) <$> (sequence $ tagSignal <$> (sort $ toUnfoldable tags))
-        li_ [Props.className "addTag"] do
-          Tuple newTag' addTag <- inputTagSignal newTag tags
-          case addTag of
-            false -> pure $ Tuple newTag' tags'
-            true  -> do
-              pure $ Tuple ""    $ snoc tags' newTag'
-      
-    notesSignal :: String -> Boolean -> Signal HTML (Tuple String Boolean)
-    notesSignal notes preview = do
-      loopW (Tuple notes preview) (\(Tuple _notes _preview) ->
-        button [(Tuple _notes (not _preview)) <$ Props.onClick, Props.className "preview"] [text if _preview then "Edit" else "Preview Markdown"]
-        <>
-        (if _preview 
-        then
-          (Tuple _notes _preview) <$ div [Props.className "card_notes"] [
-            div [Props.className "markdown-body", Props.dangerouslySetInnerHTML { __html: unsafePerformEffect $ renderString notes}] []
-          ]       
-        else
-          (\e -> (Tuple (Props.unsafeTargetValue e) _preview)) <$> label [Props.className "notes"] [
-            span [Props.className "label"] [text "Notes"]
-          , dynamicWrapper Nothing _notes $ textarea [Props.rows 1, Props.value _notes, Props.onChange, Props.placeholder "notes"] []
+    tagsSignal :: String -> Set String -> Widget HTML (Tuple String (Array String))
+    tagsSignal newTag tags = do
+      let sortedTags = sort $ toUnfoldable tags :: Array String
+      div [Props.className "tags"] [
+        ul [] $
+          ((\tag -> tagSignal tag <#> (\tagToRemove -> Tuple newTag (delete tagToRemove sortedTags))) <$> sortedTags)
+          <>
+          [li [Props.className "addTag"] [
+              inputTagSignal newTag tags <#> (\(Tuple newTag' addTag) -> 
+                case addTag of
+                  false -> Tuple newTag'  sortedTags
+                  true  -> Tuple ""      (snoc sortedTags newTag')
+              )
+            ]
           ]
-        )
+      ]
+      
+    notesSignal :: Boolean -> String -> Widget HTML (Tuple String Boolean)
+    notesSignal preview notes = do
+      button [(Tuple notes (not preview)) <$ Props.onClick, Props.className "preview"] [text if preview then "Edit" else "Preview Markdown"]
+      <>
+      (if preview 
+      then
+        div [Props.className "card_notes"] [
+          div [Props.className "markdown-body", Props.dangerouslySetInnerHTML { __html: unsafePerformEffect $ renderString notes}] []
+        ]
+      else
+        (\e -> (Tuple (Props.unsafeTargetValue e) preview)) <$> label [Props.className "notes"] [
+          span [Props.className "label"] [text "Notes"]
+        , dynamicWrapper Nothing notes $ textarea [Props.rows 1, Props.value notes, Props.onChange, Props.placeholder "notes"] []
+        ]
       )
 
-    formSignal :: PasswordGeneratorSettings -> Signal HTML (Maybe (Maybe Card))
-    formSignal settings = do
-      { card: formValues } <- loopS { newTag: "", preview: false, card: card } $ \{ newTag, preview, card: Card {content: (CardValues {title, tags, fields, notes}), archived, timestamp} } ->
-        div_ [Props.className "cardFormFields"] do
-          title' :: String <- loopW title (\_title -> label [Props.className "title"] [
-            span [Props.className "label"] [text "Title"]
-          , dynamicWrapper Nothing _title $ textarea [Props.rows 1, Props.placeholder "Card title", Props.autoFocus true, Props.value _title, Props.unsafeTargetValue <$> Props.onChange] []
-          ])
+    formSignal :: PasswordGeneratorSettings -> Widget HTML (Either CardFormData (Maybe Card))
+    formSignal settings =
+      (div [Props.className "cardFormFields"] [
+        label [Props.className "title"] [
+          span [Props.className "label"] [text "Title"]
+        , dynamicWrapper Nothing                 (view (_card <<< _title)  cardFormData) $ 
+            textarea  [ Props.rows 1
+                      , Props.placeholder "Card title"
+                      , Props.autoFocus true
+                      , Props.unsafeTargetValue <$> Props.onChange
+                      , Props.value              (view (_card <<< _title)  cardFormData)
+                      ] []
+        ]                                                                                <#> (\title                 -> (set (_card <<< _title)  title)                                        cardFormData)
+      , tagsSignal  (view _newTag cardFormData)  (view (_card <<< _tags)   cardFormData) <#> (\(Tuple newTag tags)   -> (set (_card <<< _tags)   (fromFoldable tags) <<< set _newTag newTag)   cardFormData)
+      , fieldsSignal settings                    (view (_card <<< _fields) cardFormData) <#> (\fields                -> (set (_card <<< _fields)  fields)                                      cardFormData)
+      , notesSignal (view _preview cardFormData) (view (_card <<< _notes)  cardFormData) <#> (\(Tuple notes preview) -> (set (_card <<< _notes)               notes  <<< set _preview preview) cardFormData)
 
-          Tuple newTag' tags' <- tagsSignal newTag tags
-          
-          fields' <- fieldsSignal settings fields
+        -- pure $ {
+        --   newTag: newTag'
+        -- , preview: preview'
+        -- , card: Card { content: (CardValues {title: title', tags: fromFoldable tags', fields: fields', notes: notes'})
+        --               , secrets: []
+        --               , archived: archived
+        --               , timestamp
+        --               }
+        -- }
+      ] <#> Left)
+      <>
+      (div [Props.className "submitButtons"] [(cancelButton card) <|> (saveButton card)])
 
-          Tuple notes' preview' <- notesSignal notes preview
-
-          pure $ {
-            newTag: newTag'
-          , preview: preview'
-          , card: Card { content: (CardValues {title: title', tags: fromFoldable tags', fields: fields', notes: notes'})
-                       , secrets: []
-                       , archived: archived
-                       , timestamp
-                       }
-          }
-      res <- fireOnce $ div [Props.className "submitButtons"] [(cancelButton formValues) <|> (saveButton formValues)]
-
-      pure res
 
     cancelButton v = 
-      if (card == v) then 
+      if (originalCard == v) then 
       -- if ((card == v && not isNew) || (v == emptyCard && isNew)) then 
-        simpleButton "inactive cancel" "cancel" false Nothing 
+        simpleButton "inactive cancel" "cancel" false (Right Nothing) 
       else do
-        _ <- simpleButton "active cancel" "cancel" false Nothing 
-        confirmation <- (false <$ simpleButton "active cancel" "cancel" false Nothing) <|> (confirmationWidget "Are you sure you want to exit without saving?")
-        if confirmation then pure Nothing else (cancelButton v)
+        _ <- simpleButton "active cancel" "cancel" false (Right Nothing)
+        confirmation <- (simpleButton "active cancel" "cancel" false false) <|> (confirmationWidget "Are you sure you want to exit without saving?")
+        if confirmation then pure (Right Nothing) else (cancelButton v)
 
     saveButton v =
       -- simpleButton "save" "save" ((not isNew && card == v) || (isNew && v == emptyCard)) (Just v)
-      simpleButton "save" "save" (card == v) (Just v)
+      simpleButton "save" "save" (originalCard == v || (not (proxyInfo == Online))) (Right $ Just v)

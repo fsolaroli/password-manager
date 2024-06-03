@@ -9,12 +9,11 @@ import Data.HexString (Base(..), hex, toString)
 import Data.Maybe (Maybe(..))
 import Data.String (drop)
 import Data.Unit (Unit)
-import DataModel.AppState (Proxy(..))
-import DataModel.AsyncValue (AsyncValue(..))
+import DataModel.Communication.ConnectionState (ConnectionState)
+import DataModel.Proxy (DynamicProxy(..), Proxy(..), defaultPathPrefix)
 import DataModel.SRPVersions.SRP (baseSRPConf, hashFuncSHA256)
 import Effect (Effect)
 import Foreign (unsafeToForeign)
-import Functions.Communication.Backend (ConnectionState)
 import OperationalWidgets.ShareWidget (shareWidget)
 import Views.ShareView (Secret(..))
 import Web.HTML (window)
@@ -24,7 +23,7 @@ import Web.HTML.Window (history, location)
 
 initialConnectionState :: ConnectionState
 initialConnectionState = {
-  proxy: OnlineProxy "/api" { toll: Loading Nothing, currentChallenge: Nothing } Nothing
+  proxy: DynamicProxy $ OnlineProxy defaultPathPrefix { toll: Nothing, currentChallenge: Nothing } Nothing
 , hashFunc: hashFuncSHA256
 , srpConf: baseSRPConf
 , c: hex ""

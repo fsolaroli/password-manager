@@ -1,7 +1,7 @@
 module OperationalWidgets.ShareWidget where
 
 import Concur.Core (Widget)
-import Concur.React (HTML)
+import Concur.React (HTML, affAction)
 import Concur.React.DOM (a, button, div, p, text)
 import Concur.React.Props as Props
 import Control.Alt (($>), (<|>))
@@ -18,12 +18,11 @@ import Data.Semigroup ((<>))
 import Data.Show (show)
 import Data.Tuple (Tuple(..))
 import Data.Unit (Unit, unit)
+import DataModel.Communication.ConnectionState (ConnectionState)
 import DataModel.OneTimeShare (SecretData)
 import Effect.Aff (Milliseconds(..), delay)
-import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Functions.Clipboard (copyToClipboard)
-import Functions.Communication.Backend (ConnectionState)
 import Functions.Communication.OneTimeShare (encryptKeyWithPin, encryptSecret, share)
 import Functions.EnvironmentalVariables (currentCommit, redeemURL)
 import Views.OverlayView (OverlayColor(..), OverlayStatus(..), overlay)
@@ -36,9 +35,9 @@ shareWidget :: ConnectionState -> Secret -> Widget HTML Unit
 shareWidget connectionState secret = do
   version <- liftEffect currentCommit
   do
-    secretData <- shareView true secret =<< liftAff emptySecretData
-    Tuple encryptionKey encryptedSecret <- liftAff $ encryptSecret CA.string secretData.secret
-    result <- ( liftAff $ runExceptT $ share connectionState encryptedSecret secretData.duration )
+    secretData <- shareView true secret =<< affAction emptySecretData
+    Tuple encryptionKey encryptedSecret <- affAction $ encryptSecret CA.string secretData.secret
+    result <- ( affAction $ runExceptT $ share connectionState encryptedSecret secretData.duration )
               <|>
               ( overlay { status: Spinner, color: Black, message: "loading" } )
               <|> 
@@ -46,7 +45,7 @@ shareWidget connectionState secret = do
     case result of
       Left  err -> text ("error:" <> show err)
       Right uuid -> do
-        encryptedKey <- liftAff $ encryptKeyWithPin encryptionKey secretData.pin
+        encryptedKey <- affAction $ encryptKeyWithPin encryptionKey secretData.pin
         redeemURL_ <- liftEffect $ redeemURL
         origin_  <- liftEffect $ window >>= location >>= origin
         go (origin_ <> redeemURL_ <> uuid <> "#" <> (toString Base.Hex $ fromArrayBuffer encryptedKey)) secretData
@@ -59,10 +58,10 @@ shareWidget connectionState secret = do
                 <>
                 div [Props.className "share"] [
                   div [Props.className "url"] [a [Props.href url, Props.target "_blank"] [text url]]
-                , button [Props.onClick] [text "copy share link"] *> (liftAff $ copyToClipboard url $> true)
+                , button [Props.onClick] [text "copy share link"] *> (affAction $ copyToClipboard url $> true)
                 ]
       _ <- if result then 
-                go url secretData <|> (liftAff $ delay (Milliseconds 1000.0)) <|> overlay { status: Copy, color: Black, message: "copied" }
+                go url secretData <|> (affAction $ delay (Milliseconds 1000.0)) <|> overlay { status: Copy, color: Black, message: "copied" }
            else
                 pure unit
       go url secretData

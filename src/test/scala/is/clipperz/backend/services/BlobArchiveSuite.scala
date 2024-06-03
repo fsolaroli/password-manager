@@ -49,7 +49,7 @@ object BlobArchiveSpec extends ZIOSpecDefault:
           fiber <- archive.saveBlob(testKey, identifier, testContent).fork
           _ <- TestClock.adjust(Duration.fromMillis(BlobArchive.WAIT_TIME + 10))
           _ <- fiber.join
-          content <- archive.getBlob(testKey)
+          (content, _) <- archive.getBlob(testKey)
           result <- testContent.zip(content).map((a, b) => a == b).toIterator.map(_.map(_.getOrElse(false)).reduce(_ && _))
         } yield assertTrue(result)
       } +
@@ -72,7 +72,7 @@ object BlobArchiveSpec extends ZIOSpecDefault:
       test("getBlob - success") {
         for {
           archive <- ZIO.service[BlobArchive]
-          content <- archive.getBlob(testKey)
+          (content, _) <- archive.getBlob(testKey)
           result <- testContent.zip(content).map((a, b) => a == b).toIterator.map(_.map(_.getOrElse(false)).reduce(_ && _))
         } yield assertTrue(result)
       } +

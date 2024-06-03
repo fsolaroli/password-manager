@@ -1,8 +1,12 @@
-module Test.Donations where
+module Test.Donations
+  ( donationSpec
+  )
+  where
 
 import Control.Bind
 
 import Data.Array (foldl, replicate)
+import Data.CommutativeRing ((*))
 import Data.DateTime (DateTime, adjust)
 import Data.Eq (eq)
 import Data.Function (flip, (#), ($))
@@ -11,9 +15,8 @@ import Data.HeytingAlgebra ((&&))
 import Data.Identity (Identity)
 import Data.List (fromFoldable)
 import Data.Maybe (Maybe(..))
-import Data.Ring ((-), (+))
 import Data.Set (empty)
-import Data.Time.Duration (negateDuration)
+import Data.Time.Duration (Days(..), negateDuration)
 import Data.Traversable (sequence)
 import Data.Tuple (Tuple(..))
 import Data.Unit (Unit)
@@ -25,10 +28,13 @@ import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Now (nowDateTime)
-import Functions.Donations (DonationLevel(..), computeDonationLevel, lowerBoundaryNumberOfCards, lowerBoundaryNumberOfDays, upperBoundaryNumberOfCards, upperBoundaryNumberOfDays)
+import Functions.Donations (DonationLevel(..), computeDonationLevel, lowerBoundaryNumberOfCards, upperBoundaryNumberOfCards)
 import Test.Spec (describe, it, SpecT)
 import Test.Spec.Assertions (shouldEqual)
 import TestUtilities (makeTestableOnBrowser)
+
+upperBoundaryNumberOfDays :: Days
+upperBoundaryNumberOfDays = Days (3.0 * 30.0)
 
 donationSpec :: SpecT Aff Unit Identity Unit
 donationSpec  =
@@ -37,20 +43,15 @@ donationSpec  =
     it donationLevel do
       now <- liftEffect nowDateTime
       let donationData = [
-        Tuple (Tuple  Nothing                                                               (lowerBoundaryNumberOfCards - 1)) DonationOk
-      , Tuple (Tuple  Nothing                                                               lowerBoundaryNumberOfCards) DonationInfo
-      , Tuple (Tuple  Nothing                                                               (lowerBoundaryNumberOfCards + 1)) DonationInfo
-      , Tuple (Tuple  Nothing                                                               upperBoundaryNumberOfCards) DonationWarning
-      , Tuple (Tuple  Nothing                                                               upperBoundaryNumberOfCards) DonationWarning
-      , Tuple (Tuple (Just now)                                                                                      2) DonationOk
-      , Tuple (Tuple (Just now)                                                             upperBoundaryNumberOfCards) DonationOk
-      , Tuple (Tuple (Just now)                                                             lowerBoundaryNumberOfCards) DonationOk
-      , Tuple (Tuple ((lowerBoundaryNumberOfDays) <#> negateDuration >>= (flip adjust now))                          2) DonationOk
-      , Tuple (Tuple ((lowerBoundaryNumberOfDays) <#> negateDuration >>= (flip adjust now)) lowerBoundaryNumberOfCards) DonationInfo
-      , Tuple (Tuple ((lowerBoundaryNumberOfDays) <#> negateDuration >>= (flip adjust now)) upperBoundaryNumberOfCards) DonationWarning
-      , Tuple (Tuple ((upperBoundaryNumberOfDays) <#> negateDuration >>= (flip adjust now))                          2) DonationOk
-      , Tuple (Tuple ((upperBoundaryNumberOfDays) <#> negateDuration >>= (flip adjust now)) lowerBoundaryNumberOfCards) DonationWarning
-      , Tuple (Tuple ((upperBoundaryNumberOfDays) <#> negateDuration >>= (flip adjust now)) upperBoundaryNumberOfCards) DonationWarning
+        Tuple (Tuple   Nothing                                                                                            0) DonationOk
+      , Tuple (Tuple   Nothing                                                                   lowerBoundaryNumberOfCards) DonationInfo
+      , Tuple (Tuple   Nothing                                                                   upperBoundaryNumberOfCards) DonationWarning
+      , Tuple (Tuple ( Just now                                                                )                          0) DonationOk
+      , Tuple (Tuple ( Just now                                                                ) upperBoundaryNumberOfCards) DonationOk
+      , Tuple (Tuple ( Just now                                                                ) lowerBoundaryNumberOfCards) DonationOk
+      , Tuple (Tuple ((Just upperBoundaryNumberOfDays) <#> negateDuration >>= (flip adjust now))                          0) DonationOk
+      , Tuple (Tuple ((Just upperBoundaryNumberOfDays) <#> negateDuration >>= (flip adjust now)) lowerBoundaryNumberOfCards) DonationInfo
+      , Tuple (Tuple ((Just upperBoundaryNumberOfDays) <#> negateDuration >>= (flip adjust now)) upperBoundaryNumberOfCards) DonationWarning
       ]
 
       result <- liftEffect $ (\(Tuple (Tuple time cards) level) -> (computeDonationLevelFromRawData cards time) <#> (eq level)) <$> donationData # sequence <#> (foldl (\a b -> a && b) true)
@@ -61,6 +62,15 @@ computeDonationLevelFromRawData numberOfCards dateOfLastDonation =
   let emptyCardEntry      = CardEntry      { title: "", tags: empty, lastUsed: 0.0, archived: false, cardReference: CardReference {identifier: hex "", key: hex "", reference: hex "", version: currentCardVersion}}
       emptyIndexReference = IndexReference { reference: hex "", key: hex "", version: currentIndexVersion}
       index               = Index          { entries: fromFoldable $ replicate numberOfCards emptyCardEntry, identifier: hex "" }
-      userInfo            = UserInfo       { dateOfLastDonation, identifier: hex "", userPreferences: defaultUserPreferences, indexReference: emptyIndexReference}
+      userInfo            = UserInfo       { identifier: hex ""
+                                           , userPreferences: defaultUserPreferences
+                                           , indexReference: emptyIndexReference
+                                           , donationInfo    : do
+                                              donationDate <- dateOfLastDonation
+                                              nextReminder <- adjust (upperBoundaryNumberOfDays) donationDate
+                                              pure  { dateOfLastDonation   : donationDate
+                                                    , nextDonationReminder : nextReminder
+                                                    }
+                                           }
   in computeDonationLevel index userInfo
   

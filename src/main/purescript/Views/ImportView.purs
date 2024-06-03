@@ -74,7 +74,7 @@ importView state@{step, content, selection, tag} = do
     
 
     importInternalView Selection = demand $ do
-      selectionInfo <- loopS { filter: NonArchived, tag: snd tag, tagSelected: true } $ \v -> do
+      selectionInfo <- loopS { filter: NonArchived, tag: snd tag, tagSelected: false } $ \v -> do
         filter' <- loopW v.filter (\_ -> div [Props.className "selectButtons"] [
                                           span [] [text "Select:"]
                                         , a [Props.className "all",          Props.onClick] [text "All"]          $> All

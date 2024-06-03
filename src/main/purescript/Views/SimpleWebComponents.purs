@@ -19,7 +19,6 @@ module Views.SimpleWebComponents
   , simpleButton
   , simpleCheckboxSignal
   , simpleCheckboxWidget
-  , simpleFileInputWidget
   , simpleInputWidget
   , simpleNumberInputWidget
   , simplePasswordInputWidget
@@ -36,12 +35,11 @@ module Views.SimpleWebComponents
 
 import Concur.Core (Widget)
 import Concur.Core.FRP (Signal, display, loopS, loopW)
-import Concur.Core.Props (handleProp)
 import Concur.React (HTML)
 import Concur.React.DOM (button, div, input, label, li, span, text, textarea, ul)
 import Concur.React.Props as Props
 import Control.Applicative (pure)
-import Control.Bind (bind, discard, (=<<), (>>=))
+import Control.Bind (bind, discard, (>>=))
 import Control.Semigroupoid ((<<<))
 import Data.Array (catMaybes, deleteAt, insertAt, intersperse, length, mapWithIndex, range, updateAt, zipWith, (:))
 import Data.Bifunctor (lmap, rmap)
@@ -63,12 +61,10 @@ import Data.Traversable (sequence)
 import Data.Tuple (Tuple(..), fst)
 import Data.Unit (Unit)
 import Effect (Effect)
-import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
-import Functions.Events (readFile)
 import Functions.Password (PasswordStrengthFunction, PasswordStrength, passwordStrengthClass)
-import React.SyntheticEvent (currentTarget, preventDefault, SyntheticEvent_, NativeEventTarget, NativeEvent, SyntheticMouseEvent)
+import React.SyntheticEvent (NativeEvent, SyntheticMouseEvent, preventDefault)
 import Unsafe.Coerce (unsafeCoerce)
 import Views.Components (Enabled(..), entropyMeter)
 
@@ -106,22 +102,6 @@ simpleInputWidget className lbl disable placeholder value t =
     , Props.onChange
     ]
   ]
-
-simpleFileInputWidget :: String -> Widget HTML String -> Widget HTML String
-simpleFileInputWidget className lbl = do
-  label [Props.className className] [
-    span [Props.className "label"] [lbl]
-  , fromSyntheticEvent =<< input [
-      Props._type "file"
-    , Props.onChange
-    ]
-  ]
-
-  where 
-    fromSyntheticEvent :: forall r. SyntheticEvent_ (currentTarget :: NativeEventTarget | r) -> Widget HTML String
-    fromSyntheticEvent se = do
-      nve <- liftEffect $ currentTarget se
-      liftAff $ readFile nve
 
 simpleTextInputWidget :: String -> Widget HTML String -> String -> String -> Widget HTML String
 simpleTextInputWidget className lbl placeholder s = simpleInputWidget className lbl false placeholder s "text"
@@ -475,4 +455,8 @@ dragAndDropAndRemoveList widgets = do
             Just es -> pure $ catMaybes $ hush <$> es
 
   
-  
+-- copied from a previous version of Concur library: #TODO: use the supported version from the Concur library
+-- | Use `handleProp` to handle an event manually
+handleProp :: forall p a b .  (a -> Effect Unit) -> Props.Props p a -> Props.Props p b
+handleProp _ (Props.PrimProp p) = Props.PrimProp p
+handleProp f (Props.Handler g) = Props.PrimProp (g f)

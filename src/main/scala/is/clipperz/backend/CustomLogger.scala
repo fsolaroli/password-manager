@@ -5,7 +5,7 @@ import org.slf4j.LoggerFactory
 import java.time.format.DateTimeFormatter
 
 import zio.{ Cause, FiberId, FiberRefs, LogLevel, LogSpan, Trace, ZLayer, ZLogger }
-import zio.logging.{ LogColor, LogFormat, LoggerNameExtractor, LogFilter, LogGroup, console }
+import zio.logging.{ LogColor, LogFormat, LoggerNameExtractor, LogFilter, LogGroup }
 
 object CustomLogger:
   val basicLogger: ZLogger[String, Unit] =

@@ -172,7 +172,7 @@ object AppSpec extends ZIOSpecDefault:
             Charset.Standard.utf8.encodeString(signupData.toJson)
             .map(body =>
                 Request(
-                    url = URL(Root / "users" / userCard.c.toString()),
+                    url = URL(Path.root / "users" / userCard.c.toString()),
                     method = Method.POST,
                     headers = Headers(SessionManager.sessionKeyHeaderName, sessionKey),
                     body = Body.fromChunk(body),
@@ -194,7 +194,7 @@ object AppSpec extends ZIOSpecDefault:
             Charset.Standard.utf8.encodeString(stepData.toJson)
             .map(body =>
                 Request(
-                    url = URL(Root / "login" / "step1" / userCard.c.toString()),
+                    url = URL(Path.root / "login" / "step1" / userCard.c.toString()),
                     method = Method.POST,
                     headers = Headers(SessionManager.sessionKeyHeaderName, sessionKey),
                     body = Body.fromChunk(body),
@@ -207,7 +207,7 @@ object AppSpec extends ZIOSpecDefault:
             Charset.Standard.utf8.encodeString(data.toJson)
             .map(body =>
                 Request(
-                    url = URL(Root / "login" / "step2" / userCard.c.toString()),
+                    url = URL(Path.root / "login" / "step2" / userCard.c.toString()),
                     method = Method.POST,
                     headers = Headers(SessionManager.sessionKeyHeaderName, sessionKey),
                     // body = Body.fromString(data.toJson, StandardCharsets.UTF_8.nn),
@@ -237,7 +237,7 @@ object AppSpec extends ZIOSpecDefault:
 
     private def doBlobPost(sessionKey: String) =
         val request = Request(
-            url = URL(Root / "blobs"),
+            url = URL(Path.root / "blobs"),
             method = Method.POST,
             headers = Headers(SessionManager.sessionKeyHeaderName, sessionKey),
             body = Body.fromMultipartForm(Form.empty.append(FormField.binaryField(name = "blob", data = Chunk.fromArray(blobData.toByteArray), filename = Some(blobHash.toString()), mediaType = MediaType.any)), Boundary("--XXX")),
@@ -250,7 +250,7 @@ object AppSpec extends ZIOSpecDefault:
 
     private def doBlobGet(sessionKey: String) =
         val request = Request(
-            url = URL(Root / "blobs" / blobHash.toString() ),
+            url = URL(Path.root / "blobs" / blobHash.toString() ),
             method = Method.GET,
             headers = Headers(SessionManager.sessionKeyHeaderName, sessionKey),
             body = Body.empty,
@@ -263,7 +263,7 @@ object AppSpec extends ZIOSpecDefault:
 
     private def doBlobDelete(sessionKey: String) =
         val request = Request(
-            url = URL(Root / "blobs"),
+            url = URL(Path.root / "blobs"),
             method = Method.DELETE,
             headers = Headers(SessionManager.sessionKeyHeaderName, sessionKey),
             body = Body.fromMultipartForm(Form.empty.append(FormField.binaryField(name = "blob", data = Chunk.fromArray(blobData.toByteArray), filename = Some(blobHash.toString()), mediaType = MediaType.any)), Boundary("--XXX")),
@@ -276,7 +276,7 @@ object AppSpec extends ZIOSpecDefault:
 
     private def doLogout(sessionKey: String) =
         val request = Request(
-            url = URL(Root / "logout"),
+            url = URL(Path.root / "logout"),
             method = Method.POST,
             headers = Headers(SessionManager.sessionKeyHeaderName, sessionKey),
             body = Body.empty,

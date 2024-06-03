@@ -6,7 +6,6 @@ import is.clipperz.backend.middleware.{ hashcash, metrics }
 import is.clipperz.backend.services.{ BlobArchive, PRNG, SessionManager, SrpManager, TollManager, UserArchive, OneTimeShareArchive }
 import is.clipperz.backend.services.ChallengeType
 
-// import java.nio.file.FileSystems
 import zio.nio.file.{ Files, FileSystem }
 
 import scala.util.Try
@@ -18,6 +17,9 @@ import zio.http.{ HttpApp, Middleware, Server }
 import zio.http.netty.{ EventLoopGroups, NettyConfig }
 import zio.http.netty.NettyConfig.LeakDetectionLevel
 import zio.http.Server.RequestStreaming
+import zio.http.Routes
+import java.io.File
+import zio.http.Path
 
 object Main extends zio.ZIOAppDefault:
     override val bootstrap =
@@ -27,8 +29,9 @@ object Main extends zio.ZIOAppDefault:
     type ClipperzEnvironment =
         PRNG & SessionManager & TollManager & UserArchive & BlobArchive & OneTimeShareArchive & SrpManager
 
-    type ClipperzHttpApp = HttpApp[
+    type ClipperzHttpApp = Routes[
         ClipperzEnvironment
+    ,   Nothing
     ]
 
     val clipperzBackend: ClipperzHttpApp = (
@@ -37,24 +40,22 @@ object Main extends zio.ZIOAppDefault:
         ++  logoutApi
         ++  blobsApi        @@ hashcash(ChallengeType.MESSAGE,  ChallengeType.MESSAGE)
         ++  oneTimeShareApi @@ hashcash(ChallengeType.SHARE,    ChallengeType.SHARE)
-        ++  staticApi
+        // ++  staticApi
     )
     .handleErrorCauseZIO(customErrorHandler)
-    .toHttpApp
   
     val middlewares =
         Middleware.debug ++                                                         //  print debug info about request and response
         Middleware.timeout(20.seconds) ++                                           //  TODO: add timeout time to configuration file [fsolaroli - 10/01/2024]
         Middleware.requestLogging(logRequestBody = true, logResponseBody = true) ++ //  loggingMiddleware
+        Middleware.serveDirectory(Path.root / "api" / "static", File("./target/output.webpack")) ++
         metrics()
 
-    // val completeClipperzBackend: ClipperzHttpApp = clipperzBackend @@ (Middleware.timeout(10.seconds) ++ metrics()) //TODO: add timeout time to configuration file [fsolaroli - 10/01/2024]
     val completeClipperzBackend: ClipperzHttpApp = clipperzBackend @@ middlewares
 
     val keyBlobArchiveFolderDepth = 16
-    // val keyBlobArchiveFolderDepth = 2
 
-    val run: ZIO[Any & ZIOAppArgs & Scope, Any, Any] = ZIOAppArgs.getArgs.flatMap { args =>
+    val run = ZIOAppArgs.getArgs.flatMap { args =>
         if args.length == 4
         then
             val blobBasePath         = FileSystem.default.getPath(args(0))
@@ -67,9 +68,11 @@ object Main extends zio.ZIOAppDefault:
             val nThreads: Int = args.headOption.flatMap(x => Try(x.toInt).toOption).getOrElse(0)
 
             val config        = Server.Config.default
+                                    // .copy(
+                                    //     responseCompression = Some(Server.Config.ResponseCompressionConfig.default)
+                                    // )
                                     .port(port)
-                                    .requestStreaming(RequestStreaming.Enabled)
-                                    // .enableRequestStreaming                                    
+                                    .enableRequestStreaming
             val nettyConfig   = NettyConfig.default
                                     .leakDetection(LeakDetectionLevel.PARANOID)
                                     .maxThreads(nThreads)

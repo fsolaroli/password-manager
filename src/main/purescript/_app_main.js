@@ -1,7 +1,5 @@
 const Main = require ("../../../target/output.purescript/AppMain")
 
-var Mousetrap = require('../js/Mousetrap');
-
 import "../scss/main.scss";
 
 function addEventBubblingBlockers() {
@@ -56,6 +54,26 @@ function debugAnimation() {
 	})
 }
 
+function registerOfflineServiceWorker() {
+    if (navigator.serviceWorker.controller) {
+        if (window.navigator.onLine) {
+            navigator.serviceWorker.controller.postMessage('update');
+        }
+    } else {
+        navigator.serviceWorker
+            // .register('/_offline-site.js', { scope: './' })
+            .register('/_offline-site.js')
+            .then(
+                (registration) => {
+                    console.log("Service worker change, registered the service worker:", registration);
+                },
+                (error) => {
+                    console.error("Service worker registration failed:", error);
+                },
+            );
+    }
+}
+
 function main () {
     /*
         Here we could add variables such as
@@ -74,7 +92,8 @@ function main () {
     */
     addEventBubblingBlockers();
     addPreventDefaults();
-	debugAnimation();
+    debugAnimation();
+    registerOfflineServiceWorker();
     Main.main();
 }
 

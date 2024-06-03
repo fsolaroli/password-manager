@@ -40,7 +40,7 @@ object HashCashMiddlewareSpec extends ZIOSpecDefault:
   val sessionKey = "____sessionKey____"
 
   val get = Request(
-    url = URL(Root / "api" / "blobs" / "4073041693a9a66983e6ffb75b521310d30e6db60afc0f97d440cb816bce7c63"),
+    url = URL(Path.root / "api" / "blobs" / "4073041693a9a66983e6ffb75b521310d30e6db60afc0f97d440cb816bce7c63"),
     method = Method.GET,
     headers = Headers.empty,
     body = Body.empty,
@@ -49,7 +49,7 @@ object HashCashMiddlewareSpec extends ZIOSpecDefault:
   )
 
   val getWithSession = Request(
-    url = URL(Root / "api" / "blobs" / "4073041693a9a66983e6ffb75b521310d30e6db60afc0f97d440cb816bce7c63"),
+    url = URL(Path.root / "api" / "blobs" / "4073041693a9a66983e6ffb75b521310d30e6db60afc0f97d440cb816bce7c63"),
     method = Method.GET,
     headers = Headers((SessionManager.sessionKeyHeaderName, sessionKey)),
     body = Body.empty,
@@ -58,7 +58,7 @@ object HashCashMiddlewareSpec extends ZIOSpecDefault:
   )
 
   val getWithFixedToll = Request(
-    url = URL(Root / "api" / "blobs" / "4073041693a9a66983e6ffb75b521310d30e6db60afc0f97d440cb816bce7c63"),
+    url = URL(Path.root / "api" / "blobs" / "4073041693a9a66983e6ffb75b521310d30e6db60afc0f97d440cb816bce7c63"),
     method = Method.GET,
     headers = Headers((SessionManager.sessionKeyHeaderName, sessionKey)).addHeaders(Headers((TollManager.tollReceiptHeader, "12345678901234567890"))),
     body = Body.empty,
@@ -66,7 +66,7 @@ object HashCashMiddlewareSpec extends ZIOSpecDefault:
     remoteAddress = Some(InetAddress.getLocalHost().nn)
   )
 
-  val idApp: HttpApp[TollManager & SessionManager] = HttpApp.collectZIO(_ => ZIO.succeed(Response.ok)) @@ hashcash(ChallengeType.MESSAGE, ChallengeType.MESSAGE)
+  val idApp: Routes[TollManager & SessionManager, Nothing] = Routes(Method.ANY / Root -> Handler.ok) @@ hashcash(ChallengeType.MESSAGE, ChallengeType.MESSAGE)
 
   def spec = suite("HashCashMiddleware")(
     test("400 if no session is active") {
@@ -97,7 +97,7 @@ object HashCashMiddlewareSpec extends ZIOSpecDefault:
         receipt <- computeWrongReceipt(prng, tollManager)(TollChallenge(toll, cost))
         newGet <- ZIO.succeed(
           Request(
-            url = URL(Root / "api" / "blobs" / "4073041693a9a66983e6ffb75b521310d30e6db60afc0f97d440cb816bce7c63"),
+            url = URL(Path.root / "api" / "blobs" / "4073041693a9a66983e6ffb75b521310d30e6db60afc0f97d440cb816bce7c63"),
             method = Method.GET,
             headers = Headers.empty,
             body = Body.empty,
@@ -122,7 +122,7 @@ object HashCashMiddlewareSpec extends ZIOSpecDefault:
         receipt <- computeWrongReceipt(prng, tollManager)(TollChallenge(toll, cost))
         newGet <- ZIO.succeed(
           Request(
-            url = URL(Root / "api" / "blobs" / "4073041693a9a66983e6ffb75b521310d30e6db60afc0f97d440cb816bce7c63"),
+            url = URL(Path.root / "api" / "blobs" / "4073041693a9a66983e6ffb75b521310d30e6db60afc0f97d440cb816bce7c63"),
             method = Method.GET,
             headers = Headers.empty,
             body = Body.empty,
@@ -147,7 +147,7 @@ object HashCashMiddlewareSpec extends ZIOSpecDefault:
         receipt <- TollManager.computeReceipt(prng, tollManager)(TollChallenge(toll, cost))
         newGet <- ZIO.succeed(
           Request(
-            url = URL(Root / "blobs" / "4073041693a9a66983e6ffb75b521310d30e6db60afc0f97d440cb816bce7c63"),
+            url = URL(Path.root / "blobs" / "4073041693a9a66983e6ffb75b521310d30e6db60afc0f97d440cb816bce7c63"),
             method = Method.GET,
             headers = Headers.empty,
             body = Body.empty,

@@ -15,6 +15,7 @@ import Data.Show (class Show, show)
 import Data.Tuple (Tuple(..), uncurry)
 import DataModel.Credentials (emptyCredentials)
 import DataModel.IndexVersions.Index (emptyIndex)
+import DataModel.Proxy (ProxyInfo)
 import DataModel.UserVersions.User (defaultUserPreferences)
 import DataModel.WidgetState (MainPageWidgetState, Page(..), UserAreaState, WidgetState(..), CardManagerState)
 import Effect.Class (liftEffect)
@@ -23,14 +24,14 @@ import Functions.EnvironmentalVariables (currentCommit)
 import Test.Debug (debugState)
 import Views.CardsManagerView (CardManagerEvent, cardManagerInitialState, cardsManagerView)
 import Views.Components (footerComponent, proxyInfoComponent)
-import Views.DonationViews (DonationPageEvent, donationPage, donationReminder)
+import Views.DonationViews (DonationPageEvent, donationPage)
 import Views.LoginFormView (LoginPageEvent, emptyLoginFormData, loginPage)
 import Views.OverlayView (overlay)
 import Views.SignupFormView (SignupPageEvent, emptyDataForm, signupFormView)
 import Views.UserAreaView (UserAreaEvent, userAreaInitialState, userAreaView)
 
 emptyMainPageWidgetState :: MainPageWidgetState
-emptyMainPageWidgetState = { index: emptyIndex, credentials: emptyCredentials, pinExists: false, userAreaState: userAreaInitialState, cardManagerState: cardManagerInitialState, donationLevel: DonationOk, userPreferences: defaultUserPreferences }
+emptyMainPageWidgetState = { index: emptyIndex, credentials: emptyCredentials, donationInfo: Nothing, pinExists: false, userAreaState: userAreaInitialState, cardManagerState: cardManagerInitialState, donationLevel: DonationOk, userPreferences: defaultUserPreferences, enableSync: false, syncDataWire: Nothing }
 
 data PageEvent = LoginPageEvent           LoginPageEvent
                | SignupPageEvent          SignupPageEvent
@@ -39,7 +40,7 @@ data PageEvent = LoginPageEvent           LoginPageEvent
                | DonationPageEvent        DonationPageEvent
 
 appView :: WidgetState -> Widget HTML PageEvent
-appView widgetState@(WidgetState overlayInfo page) =
+appView widgetState@(WidgetState overlayInfo page proxyInfo)  =
   appPages <> debugState widgetState
   <|>
   overlay overlayInfo
@@ -47,20 +48,20 @@ appView widgetState@(WidgetState overlayInfo page) =
   where 
     appPages :: Widget HTML PageEvent
     appPages = div [Props.className "mainDiv"] [
-      headerPage page (Loading Nothing) []
-    , SignupPageEvent <$> headerPage page (Signup emptyDataForm) [ do
+      headerPage proxyInfo page (Loading Nothing) []
+    , SignupPageEvent <$> headerPage proxyInfo page (Signup emptyDataForm) [ do
         let credentials = case page of
                             Signup credentials' -> credentials'
                             _                   -> emptyDataForm
         
         (signupFormView credentials)
       ]
-    , LoginPageEvent <$> headerPage page (Login emptyLoginFormData) [
+    , LoginPageEvent <$> headerPage proxyInfo page (Login emptyLoginFormData) [
         loginPage $ case page of
           Login loginFormData -> loginFormData
           _                   -> emptyLoginFormData
       ]
-    , DonationPageEvent <$> headerPage page (Donation DonationOk) [ do
+    , DonationPageEvent <$> headerPage proxyInfo page (Donation DonationOk) [ do
         let donationLevel = case page of
                               Donation donationLevel' -> donationLevel'
                               _                       -> DonationOk
@@ -68,14 +69,13 @@ appView widgetState@(WidgetState overlayInfo page) =
 
     ]
     , div [Props.classList (Just <$> ["page", "main", show $ location (Main emptyMainPageWidgetState) page])] [ do
-        let Tuple {index, userAreaState, credentials, pinExists, cardManagerState, userPreferences, donationLevel} enableShortcuts = case page of
+        let Tuple {index, userAreaState, credentials, donationInfo, pinExists, enableSync, cardManagerState, userPreferences, donationLevel, syncDataWire} enableShortcuts = case page of
                                         Main homePageWidgetState' -> Tuple homePageWidgetState'     true
                                         _                         -> Tuple emptyMainPageWidgetState false
         
         div [Props._id "homePage"] [
-          ( MainPageCardManagerEvent                         # uncurry) <$> cardsManagerView cardManagerState index (unwrap userPreferences).passwordGeneratorSettings enableShortcuts
-        , ((MainPageUserAreaEvent # flip $ cardManagerState) # uncurry) <$> userAreaView userAreaState userPreferences credentials pinExists
-        , ( DonationPageEvent                                         ) <$> donationReminder donationLevel
+          ( MainPageCardManagerEvent                         # uncurry) <$> cardsManagerView cardManagerState index (unwrap userPreferences).passwordGeneratorSettings donationLevel proxyInfo enableShortcuts enableSync syncDataWire
+        , ((MainPageUserAreaEvent # flip $ cardManagerState) # uncurry) <$> userAreaView     userAreaState userPreferences credentials donationInfo proxyInfo pinExists enableSync syncDataWire
         ] 
       ]
     ]
@@ -108,12 +108,12 @@ pageClassName (Signup _)   = "signup"
 pageClassName (Main _)     = "main"
 pageClassName (Donation _) = "donation"
 
-headerPage :: forall a. Page -> Page -> Array (Widget HTML a) -> Widget HTML a
-headerPage currentPage page innerContent = do
+headerPage :: forall a. ProxyInfo -> Page -> Page -> Array (Widget HTML a) -> Widget HTML a
+headerPage proxyInfo currentPage page innerContent = do
   commitHash <- liftEffect $ currentCommit
   div [Props.classList (Just <$> ["page", pageClassName page, show $ location page currentPage])] [
     div [Props.className "content"] [
-      proxyInfoComponent []
+      proxyInfoComponent proxyInfo []
     , headerComponent
     , div [Props.className "body"] innerContent
     , otherComponent

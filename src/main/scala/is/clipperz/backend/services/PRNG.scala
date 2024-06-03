@@ -12,4 +12,4 @@ object PRNG:
       ZIO.attempt(Array.fill(size)((scala.util.Random.nextInt(256) - 128).toByte))
 
   val live: Layer[Nothing, PRNG] =
-    ZLayer.succeed[PRNG](new BasicPRNG)(Tag[PRNG], Tracer.newTrace)
+    ZLayer.succeed[PRNG](new BasicPRNG)

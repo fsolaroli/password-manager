@@ -2,7 +2,7 @@ module Test.DebugAppMain (main) where
 
 import Concur.Core (Widget)
 import Concur.Core.FRP (demand, fireOnce, loopW)
-import Concur.React (HTML)
+import Concur.React (HTML, affAction)
 import Concur.React.DOM (button, div, span, text, textarea)
 import Concur.React.Props as Props
 import Concur.React.Run (runWidgetInDom)
@@ -22,7 +22,6 @@ import Data.String (Pattern(..), stripPrefix)
 import Data.Unit (Unit, unit)
 import DataModel.WidgetState (WidgetState)
 import Effect (Effect)
-import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Foreign (unsafeToForeign)
 import Functions.Clipboard (getClipboardContent)
@@ -37,13 +36,13 @@ import Web.HTML.Window (history, location)
 
 main :: Effect Unit
 main = do  
-  runWidgetInDom "debugApp" $ debugApp Nothing
+  runWidgetInDom "app" $ debugApp Nothing
 
 debugApp :: Maybe WidgetState -> Widget HTML Unit
 
 debugApp Nothing = do
   hash_ <- liftEffect $ (hash =<< location =<< window) <#> (\s -> stripPrefix (Pattern "#") s >>= decodeURIComponent)
-  (maybe (liftAff $ getClipboardContent) (pure <<< Just) hash_) >>= getWidgetState true Nothing >>= loop
+  (maybe (affAction $ getClipboardContent) (pure <<< Just) hash_) >>= getWidgetState true Nothing >>= loop
 
 debugApp defaultState = getWidgetState false Nothing ((stringify <<< CA.encode widgetStateCodec) <$> defaultState) >>= loop
 

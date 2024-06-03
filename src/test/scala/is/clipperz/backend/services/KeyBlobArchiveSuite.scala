@@ -40,7 +40,7 @@ object KeyBlobArchiveSpec extends ZIOSpecDefault:
           fiber <- keyBlobArchive.flatMap(_.saveBlob(testKey, testContent).fork)
           _ <- TestClock.adjust(Duration.fromMillis(KeyBlobArchive.WAIT_TIME + 10))
           _ <- fiber.join
-          content <- keyBlobArchive.flatMap(_.getBlob(testKey))
+          (content, _) <- keyBlobArchive.flatMap(_.getBlob(testKey))
           result <- testContent.zip(content).map((a, b) => a == b).toIterator.map(_.map(_.getOrElse(false)).reduce(_ && _))
         } yield assertTrue(result)
       } +
@@ -53,7 +53,7 @@ object KeyBlobArchiveSpec extends ZIOSpecDefault:
       } +
       test("getBlob - success") {
         for {
-          content <- keyBlobArchive.flatMap(_.getBlob(testKey))
+          (content, _) <- keyBlobArchive.flatMap(_.getBlob(testKey))
           result <- testContent.zip(content).map((a, b) => a == b).toIterator.map(_.map(_.getOrElse(false)).reduce(_ && _))
         } yield assertTrue(result)
       } +

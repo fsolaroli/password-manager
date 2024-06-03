@@ -1,13 +1,14 @@
 module DataModel.UserVersions.UserCodecs where
 
-import Control.Bind ((>>=))
+import Control.Bind (bind, pure, (>>=))
 import Control.Category ((<<<), (>>>))
 import Data.Bifunctor (lmap)
 import Data.Codec.Argonaut (JsonDecodeError(..), codec', decode, encode)
 import Data.Codec.Argonaut as CA
 import Data.Codec.Argonaut.Common as CAC
 import Data.Codec.Argonaut.Record as CAR
-import Data.DateTime (DateTime)
+import Data.CommutativeRing ((*))
+import Data.DateTime (DateTime, adjust)
 import Data.Either (Either)
 import Data.Formatter.DateTime (Formatter, FormatterCommand(..), format, unformat)
 import Data.Function (($))
@@ -17,6 +18,7 @@ import Data.List (List(..), (:))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Profunctor (wrapIso)
+import Data.Time.Duration (Days(..))
 import DataModel.CardVersions.CardV1 (passwordGeneratorSettingsV1Codec)
 import DataModel.IndexVersions.Index (IndexVersion, indexVersionCodec)
 import DataModel.Password (PasswordGeneratorSettings)
@@ -40,7 +42,7 @@ userInfoV1Codec = wrapIso UserInfo_V1 (
 derive instance newTypeUserInfo_V1 :: Newtype UserInfo_V1 _
 
 instance userInfov1 :: UserInfoVersions UserInfo_V1 where
- toUserInfo = toUserInfo_V2 >>> toUserInfo
+  toUserInfo = toUserInfo_V2 >>> toUserInfo_V3 >>> toUserInfo
 
 toUserInfo_V2 :: UserInfo_V1 -> UserInfo_V2
 toUserInfo_V2 (UserInfo_V1 userInfo@{indexReference: IndexReference_V1 indexReference, userPreferences: UserPreferences_V1 userPreferences}) = UserInfo_V2 {indexReference: IndexReference_V1 indexReference, userPreferences: UserPreferences_V1 userPreferences, dateOfLastDonation: Nothing, identifier: userInfo.identifier}
@@ -49,6 +51,9 @@ toUserInfo_V2 (UserInfo_V1 userInfo@{indexReference: IndexReference_V1 indexRefe
 
 iso8601DateFormatter :: Formatter
 iso8601DateFormatter = YearFull : Placeholder "-" : MonthTwoDigits : Placeholder "-" : DayOfMonthTwoDigits : Nil
+
+dateTimeCodec :: CA.JsonCodec DateTime
+dateTimeCodec = codec' (\json -> decode CA.string json >>= (lmap TypeMismatch <<< unformat iso8601DateFormatter)) (format iso8601DateFormatter >>> encode CA.string)
 
 newtype UserInfo_V2 = 
   UserInfo_V2
@@ -63,17 +68,62 @@ userInfoV2Codec = wrapIso UserInfo_V2 (
     { indexReference:  indexReferenceV1Codec
     , identifier:      hexStringCodec
     , userPreferences: userPreferencesV1Codec
-    , dateOfLastDonation: CAC.maybe $ codec' (\json -> decode CA.string json >>= (lmap TypeMismatch <<< unformat iso8601DateFormatter)) (format iso8601DateFormatter >>> encode CA.string)
+    , dateOfLastDonation: CAC.maybe dateTimeCodec
     }
 )
 
 derive instance newTypeUserInfo_V2 :: Newtype UserInfo_V2 _
 
 instance userInfov2 :: UserInfoVersions UserInfo_V2 where
- toUserInfo   (UserInfo_V2 userInfo@{indexReference: IndexReference_V1 indexReference, userPreferences: UserPreferences_V1 userPreferences}) = UserInfo (userInfo {indexReference = IndexReference indexReference, userPreferences = UserPreferences userPreferences})
+  toUserInfo = toUserInfo_V3 >>> toUserInfo
 
-fromUserInfo :: UserInfo -> UserInfo_V2
-fromUserInfo (UserInfo userInfo@{indexReference: IndexReference indexReference, userPreferences: UserPreferences userPreferences}) = UserInfo_V2 (userInfo {indexReference = IndexReference_V1 indexReference, userPreferences = UserPreferences_V1 userPreferences})
+toUserInfo_V3 :: UserInfo_V2 -> UserInfo_V3
+toUserInfo_V3 (UserInfo_V2 userInfo) = UserInfo_V3 {
+                                          indexReference  : userInfo.indexReference
+                                        , identifier      : userInfo.identifier
+                                        , userPreferences : userInfo.userPreferences
+                                        , donationInfo    : do
+                                            donationDate <- userInfo.dateOfLastDonation
+                                            nextReminder <- adjust (Days (3.0*30.0)) donationDate
+                                            pure  { dateOfLastDonation   : donationDate
+                                                  , nextDonationReminder : nextReminder
+                                                  }
+                                      }
+
+-- ----------------------------------------------------------------
+
+newtype UserInfo_V3 = 
+  UserInfo_V3
+    { indexReference  :: IndexReference_V1
+    , identifier      :: Identifier
+    , userPreferences :: UserPreferences_V1
+    , donationInfo    :: Maybe  { dateOfLastDonation   :: DateTime
+                                , nextDonationReminder :: DateTime
+                                }
+    }
+
+userInfoV3Codec :: CA.JsonCodec UserInfo_V3
+userInfoV3Codec = wrapIso UserInfo_V3 (
+  CAR.object "UserInfoV3"
+    { indexReference:  indexReferenceV1Codec
+    , identifier:      hexStringCodec
+    , userPreferences: userPreferencesV1Codec
+    , donationInfo: CAC.maybe $ CAR.object "DonationInfo"
+                                  { dateOfLastDonation: dateTimeCodec
+                                  , nextDonationReminder: dateTimeCodec
+                                  }
+
+    }
+)
+
+derive instance newTypeUserInfo_V3 :: Newtype UserInfo_V3 _
+
+instance userInfoV3 :: UserInfoVersions UserInfo_V3 where
+  toUserInfo (UserInfo_V3 userInfo@{indexReference: IndexReference_V1 indexReference, userPreferences: UserPreferences_V1 userPreferences}) = UserInfo (userInfo {indexReference = IndexReference indexReference, userPreferences = UserPreferences userPreferences})
+
+fromUserInfo :: UserInfo -> UserInfo_V3
+fromUserInfo (UserInfo userInfo@{indexReference: IndexReference indexReference, userPreferences: UserPreferences userPreferences}) = UserInfo_V3 (userInfo {indexReference = IndexReference_V1 indexReference, userPreferences = UserPreferences_V1 userPreferences})
+
 
 -- ----------------------------------------------------------------
 

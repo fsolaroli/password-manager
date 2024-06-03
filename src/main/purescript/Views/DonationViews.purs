@@ -1,55 +1,50 @@
 module Views.DonationViews where
 
 import Concur.Core (Widget)
-import Concur.React (HTML)
+import Concur.React (HTML, affAction)
 import Concur.React.DOM (button, div, iframe, span, text)
 import Concur.React.Props as Props
-import Control.Alt (void, ($>), (<$))
+import Control.Alt ((<#>), (<$))
 import Control.Alternative (pure)
-import Control.Bind (bind, discard)
-import Data.Function (($))
+import Control.Bind (bind, (=<<))
+import Control.Plus (empty)
+import Data.CommutativeRing ((*))
+import Data.Either (Either, hush)
+import Data.Function (flip, ($))
+import Data.List (List(..), fromFoldable, (:))
 import Data.Maybe (Maybe(..))
 import Data.Monoid ((<>))
-import Effect.Aff.Class (liftAff)
-import Functions.Donations (DonationLevel(..), donationLevelClass)
+import Data.Number (fromString)
+import Data.String.Regex (Regex, match, regex)
+import Data.String.Regex.Flags (noFlags)
+import Data.Time.Duration (Days(..))
+import Effect.Class (liftEffect)
+import Functions.Donations (DonationLevel(..))
+import Functions.EnvironmentalVariables (donationIFrameURL)
 import Functions.Events (getWindowMessage)
 
 
-data DonationPageEvent = UpdateDonationLevel | CloseDonationPage
+data DonationPageEvent = UpdateDonationLevel Days | CloseDonationPage
+
+donationIFrameMessageRegex :: Either String Regex
+donationIFrameMessageRegex = regex "^done_(\\d+)$" noFlags
+
 
 donationIFrame :: String -> Widget HTML DonationPageEvent
 donationIFrame destinationPage = do
   res <-  iframe [Props.className "donationIframe", Props.src destinationPage] []
           <>
-          (liftAff getWindowMessage)
-  pure $ case res of
-    "done" -> UpdateDonationLevel
-    _      -> CloseDonationPage
+          (affAction getWindowMessage)
+  pure $ case ((flip match res =<< hush donationIFrameMessageRegex) <#> fromFoldable) of
+    Just (_ : (Just monthsString) : Nil) -> case (fromString monthsString) of
+      Just months -> UpdateDonationLevel (Days (months * 30.0))
+      _           -> CloseDonationPage
+    _             -> CloseDonationPage
 
 donationPage :: DonationLevel -> Widget HTML DonationPageEvent
 donationPage DonationWarning =
   div [Props.className "donationPage"] [
     CloseDonationPage <$ div [Props.className "closeButton"] [ button [Props.onClick] [span [] [text "remove field"]] ] 
-  , donationIFrame "/donations/app/splash/"
+  , donationIFrame =<< (liftEffect $ donationIFrameURL "splash/")
   ]
-donationPage _ = text ""
-
-donationReminder :: DonationLevel -> Widget HTML DonationPageEvent
-donationReminder DonationOk = text ""
-donationReminder donationLevel = do
-  div [Props.classList [Just "donationButton", Just $ donationLevelClass donationLevel]] [
-    button [void Props.onClick] [span [] [text "Donate"]]
-  ]
-
-  event <-  div [Props.classList [Just "donationButton", Just "overlayOpen", Just $ donationLevelClass donationLevel]] [
-              div [Props.className "disableOverlay"] [
-                div [Props.className "mask", Props.onClick $> CloseDonationPage] []
-              , div [Props.className "dialog"] [
-                  donationIFrame "/donations/app/"
-                ]
-              ]
-            , button [void Props.onClick] [span [] [text "Donate"]] $> CloseDonationPage
-            ]
-  case event of
-    CloseDonationPage   -> donationReminder donationLevel
-    UpdateDonationLevel -> pure event
+donationPage _ = empty

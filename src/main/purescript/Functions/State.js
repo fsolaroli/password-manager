@@ -1,9 +1,9 @@
 "use strict"
 
-const _readTimestamp = function() {
+const _readStaticOfflineCopyTimestamp = function() {
 	return window.offlineTimestamp;
 }
 
 export {
-    _readTimestamp
+    _readStaticOfflineCopyTimestamp
 }

@@ -1,53 +1,59 @@
-import complete.DefaultParsers._
-import Dependencies._
+import complete.DefaultParsers.*
+import Dependencies.*
 import java.nio.file.Paths
 
 lazy val installPurescript = TaskKey[Unit]("installPurescript", "Install purescript")
 installPurescript := {
-  import sys.process._
+  import sys.process.*
   "npm install" !
 }
 
 lazy val buildPurescript = TaskKey[Unit]("buildPurescript", "Build frontend")
 buildPurescript := {
-  import sys.process._
+  import sys.process.*
   "npm run build" !
+}
+
+lazy val checksumHTML = TaskKey[Unit]("checksum", "Compute index.html checksum")
+checksumHTML := {
+    import sys.process.*
+    "npm run checksum" !
 }
 
 lazy val packagePurescript = TaskKey[Unit]("packagePurescript", "Package frontend")
 packagePurescript := {
-  import sys.process._
+  import sys.process.*
   Process(Seq("bash", "-c", "npm run package"), None, "CURRENT_COMMIT" -> "development").!
 }
 
 lazy val keepPackagingPurescript = TaskKey[Unit]("keepPackagingPurescript", "Keep packaging frontend")
 keepPackagingPurescript := {
-  import sys.process._
+  import sys.process.*
   "npm run keep-packaging" !
 }
 
 lazy val servePurescript = TaskKey[Unit]("servePurescript", "Serve frontend")
 servePurescript := {
-  import sys.process._
+  import sys.process.*
   "npm run go" !
 }
 
 lazy val cleanDependenciesPurescript =
   TaskKey[Unit]("cleanDependenciesPurescript", "Clean dependencies frontend")
 cleanDependenciesPurescript := {
-  import sys.process._
+  import sys.process.*
   "npm run nuke" !
 }
 
 lazy val runTestPurescript = TaskKey[Unit]("runTestPurescript", "Run test frontend")
 runTestPurescript := {
-  import sys.process._
+  import sys.process.*
   "npm run test-browser" !
 }
 
 lazy val cleanTargetSubdir = inputKey[Unit]("Clean the given subdirectory of the target directory")
 cleanTargetSubdir := {
-  import sys.process._
+  import sys.process.*
   val directory: String = spaceDelimited("<arg>").parsed(0)
   val path = Paths.get(baseDirectory.value.toString(), "target", directory)
   s"rm -rf ${path}" !
@@ -56,7 +62,7 @@ cleanTargetSubdir := {
 //=====================================================================
 
 ThisBuild / organization := "is.clipperz"
-ThisBuild / scalaVersion := "3.3.3"
+ThisBuild / scalaVersion := "3.4.2"
 
 ThisBuild / scalacOptions ++=
   Seq(
@@ -91,13 +97,13 @@ lazy val commonScalacOptions = Seq(
     (Compile / console / scalacOptions).value,
 )
 
-val zio_version =         "2.1-RC1"
-val zio_http_version =    "3.0.0-RC4"
-val zio_logging_version = "2.1.12"
-val zio_json_version =    "0.5.0"
+val zio_version =         "2.1.1"
+val zio_http_version =    "3.0.0-RC7"
+val zio_logging_version = "2.2.4"
+val zio_json_version =    "0.6.2"
 val zio_cache_version =   "0.2.3"
 val nscala_time_version = "2.32.0"
-val zio_metrics_version = "2.1.0"
+val zio_metrics_version = "2.3.1"
 val zio_nio_version =     "2.0.2"
 
 lazy val dependencies = Seq(
@@ -127,8 +133,8 @@ fork in Global := true
 
 Compile / mainClass := Some("is.clipperz.backend.Main")
 
-assemblyJarName in assembly := "clipperz.jar"
-assemblyMergeStrategy in assembly := {
+assembly / assemblyJarName := "clipperz.jar"
+assembly / assemblyMergeStrategy := {
  case PathList("META-INF", _*) => MergeStrategy.discard
  case _                        => MergeStrategy.first
 }

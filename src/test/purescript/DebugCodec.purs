@@ -1,26 +1,35 @@
 module Test.DebugCodec where
 
+import Prelude
+
+import Concur.Core (Widget)
+import Concur.Core.Patterns (Wire)
+import Concur.React (HTML)
+import Data.Argonaut.Core (Json, jsonEmptyString)
+import Data.Codec (codec')
 import Data.Codec.Argonaut as CA
 import Data.Codec.Argonaut.Common as CAC
 import Data.Codec.Argonaut.Record as CAR
 import Data.Codec.Argonaut.Variant as CAV
 import Data.Either (Either(..))
-import Data.Function (($))
 import Data.HexString (hexStringCodec)
 import Data.Maybe (Maybe(..))
 import Data.Profunctor (dimap, wrapIso)
-import Data.Unit (unit)
 import Data.Variant as V
 import DataModel.CardVersions.Card (Card(..), CardField(..), CardValues(..), cardVersionCodec)
 import DataModel.Credentials (Credentials)
 import DataModel.IndexVersions.Index (CardEntry(..), CardReference(..), Index(..))
 import DataModel.Password (PasswordGeneratorSettings)
-import DataModel.UserVersions.User (UserPreferences(..))
+import DataModel.Proxy (DataOnLocalStorage(..), ProxyInfo(..))
+import DataModel.UserVersions.User (UserPreferences(..), DonationInfo)
+import DataModel.UserVersions.UserCodecs (dateTimeCodec)
 import DataModel.WidgetState (CardFormInput(..), CardManagerState, CardViewState, ImportState, ImportStep(..), LoginFormData, LoginType(..), MainPageWidgetState, Page(..), UserAreaPage(..), UserAreaState, UserAreaSubmenu(..), WidgetState(..))
 import DataModel.WidgetState (CardViewState(..)) as CardViewState
 import Functions.Donations (DonationLevel(..))
 import IndexFilterView (Filter(..), FilterData, FilterViewStatus(..))
+import OperationalWidgets.Sync (SyncData)
 import Type.Proxy (Proxy(..))
+import Views.CreateCardView (CardFormData)
 import Views.OverlayView (OverlayColor(..), OverlayStatus(..), OverlayInfo)
 import Views.SignupFormView (SignupDataForm)
 import Web.File.File (File)
@@ -28,13 +37,13 @@ import Web.File.File (File)
 -- data WidgetState = WidgetState OverlayInfo Page
 widgetStateCodec :: CA.JsonCodec WidgetState
 widgetStateCodec = dimap toVariant fromVariant $ CAV.variantMatch
-    { widgetState: Right (CA.object "WidgetState" $ CAR.record {overlayInfo: overlayInfoCodec, page: pageCodec})
+    { widgetState: Right (CA.object "WidgetState" $ CAR.record {overlayInfo: overlayInfoCodec, proxyInfo: proxyInfoCodec, page: pageCodec})
     }
   where
     toVariant = case _ of
-      WidgetState oi p -> V.inj (Proxy :: _ "widgetState") {page: p, overlayInfo: oi}
+      WidgetState oi p pi -> V.inj (Proxy :: _ "widgetState") {page: p, overlayInfo: oi, proxyInfo: pi}
     fromVariant = V.match
-      { widgetState: \{page, overlayInfo} -> WidgetState overlayInfo page
+      { widgetState: \{page, overlayInfo, proxyInfo} -> WidgetState overlayInfo page proxyInfo
       }
 
 -- type OverlayInfo   = { status :: OverlayStatus, color :: OverlayColor, message :: String }
@@ -169,14 +178,62 @@ signupDataFormCodec =
       }
     )
 
+-- type DonationInfo = {
+--   dateOfLastDonation   :: DateTime
+-- , nextDonationReminder :: DateTime
+-- }
+
+donationInfoCodec :: CA.JsonCodec DonationInfo
+donationInfoCodec = 
+  CAR.object "DonationInfo"
+    { dateOfLastDonation: dateTimeCodec
+    , nextDonationReminder: dateTimeCodec
+    }
+
+-- data DataOnLocalStorage = WithData (List CardEntry) | NoData
+dataOnLocalStorageCodec :: CA.JsonCodec DataOnLocalStorage
+dataOnLocalStorageCodec = dimap toVariant fromVariant $ CAV.variantMatch
+    { withData : Right (CAC.list hexStringCodec)
+    , noData   : Left unit
+    }
+  where
+    toVariant = case _ of
+      WithData missing -> V.inj (Proxy :: _ "withData") missing
+      NoData           -> V.inj (Proxy :: _ "noData"  ) unit
+    fromVariant = V.match
+      { withData:       WithData
+      , noData  : \_ -> NoData
+      }
+
+-- data ProxyInfo = Static | Online | Offline DataOnLocalStorage
+proxyInfoCodec :: CA.JsonCodec ProxyInfo
+proxyInfoCodec = dimap toVariant fromVariant $ CAV.variantMatch
+    { static: Left unit
+    , online: Left unit
+    , offline: Right dataOnLocalStorageCodec
+    }
+  where
+    toVariant = case _ of
+      Static       -> V.inj (Proxy :: _ "static" ) unit
+      Online       -> V.inj (Proxy :: _ "online" ) unit
+      Offline dols -> V.inj (Proxy :: _ "offline") dols
+    fromVariant = V.match
+      { static:  \_ -> Static
+      , online:  \_ -> Online
+      , offline:       Offline
+      }
+
 -- type MainPageWidgetState = {
 --   index                         :: Index
 -- , credentials                   :: Credentials
+-- , donationInfo                  :: Maybe DonationInfo
 -- , pinExists                     :: Boolean
 -- , userAreaState                 :: UserAreaState
 -- , cardManagerState              :: CardManagerState
 -- , userPreferences               :: UserPreferences
 -- , donationLevel :: DonationLevel
+-- , enableSync :: Boolean
+-- , syncDataWire :: Maybe ((Wire (Widget HTML) SyncData))
 -- }
 mainPageWidgetStateCodec :: CA.JsonCodec MainPageWidgetState
 mainPageWidgetStateCodec = 
@@ -184,13 +241,19 @@ mainPageWidgetStateCodec =
     (CAR.record
       { index:            indexCodec
       , credentials:      credentialsCodec
+      , donationInfo:     CAC.maybe donationInfoCodec
       , pinExists:        CA.boolean
       , userAreaState:    userAreaStateCodec
       , cardManagerState: cardManagerStateCodec
       , userPreferences:  userPreferencesCodec
       , donationLevel:    donationLevelCodec
+      , enableSync:       CA.boolean
+      , syncDataWire:     syncDataWireCodec
       }
     )
+
+syncDataWireCodec :: CA.JsonCodec (Maybe ((Wire (Widget HTML) SyncData)))
+syncDataWireCodec = codec' (\(_ :: Json) -> Right Nothing) (\(_ :: Maybe ((Wire (Widget HTML) SyncData))) -> jsonEmptyString)
 
 -- newtype Index = 
 --   Index {entries :: (List CardEntry), identifier :: HexString}
@@ -258,7 +321,7 @@ userAreaStateCodec =
       }
     )
 
--- data UserAreaPage = Export | Import | Pin | Delete | Preferences | ChangePassword | About | None
+-- data UserAreaPage = Export | Import | Pin | LocalSync | Delete | Preferences | Donate | ChangePassword | About | None
 userAreaPageCodec :: CA.JsonCodec UserAreaPage
 userAreaPageCodec = dimap toVariant fromVariant $ CAV.variantMatch
     { export:         Left unit
@@ -267,8 +330,10 @@ userAreaPageCodec = dimap toVariant fromVariant $ CAV.variantMatch
     , delete:         Left unit
     , preferences:    Left unit
     , changePassword: Left unit
+    , donate:         Left unit
     , about:          Left unit
     , noPage:         Left unit
+    , deviceSync:     Left unit
     }
   where
     toVariant = case _ of
@@ -278,8 +343,10 @@ userAreaPageCodec = dimap toVariant fromVariant $ CAV.variantMatch
       Delete         -> V.inj (Proxy :: _ "delete") unit
       Preferences    -> V.inj (Proxy :: _ "preferences") unit
       ChangePassword -> V.inj (Proxy :: _ "changePassword") unit
+      Donate         -> V.inj (Proxy :: _ "donate") unit
       About          -> V.inj (Proxy :: _ "about") unit
-      None           -> V.inj (Proxy :: _ "noPage") unit     
+      None           -> V.inj (Proxy :: _ "noPage") unit
+      DeviceSync     -> V.inj (Proxy :: _ "deviceSync") unit
     fromVariant = V.match
       { export:         \_ -> Export
       , import:         \_ -> Import
@@ -287,8 +354,10 @@ userAreaPageCodec = dimap toVariant fromVariant $ CAV.variantMatch
       , delete:         \_ -> Delete
       , preferences:    \_ -> Preferences
       , changePassword: \_ -> ChangePassword
+      , donate:         \_ -> Donate
       , about:          \_ -> About
       , noPage:         \_ -> None
+      , deviceSync:     \_ -> DeviceSync
       }
 
 
@@ -334,18 +403,21 @@ importStepCodec = dimap toVariant fromVariant $ CAV.variantMatch
       , confirm:   \_ -> Confirm
       }
 
--- data UserAreaSubmenu = Account | Data
+-- data UserAreaSubmenu = Account | Device | Data
 userAreaSubmenuCodec :: CA.JsonCodec UserAreaSubmenu
 userAreaSubmenuCodec = dimap toVariant fromVariant $ CAV.variantMatch
     { account: Left unit
+    , device:  Left unit
     , data:    Left unit
     }
   where
     toVariant = case _ of
       Account -> V.inj (Proxy :: _ "account") unit
+      Device  -> V.inj (Proxy :: _ "device" ) unit
       Data    -> V.inj (Proxy :: _ "data"   ) unit
     fromVariant = V.match
       { account: \_ -> Account
+      , device:  \_ -> Device
       , data:    \_ -> Data
       }
 
@@ -420,19 +492,21 @@ passwordGeneratorSettingsCodec =
     )
 
 -- type CardManagerState = { 
---   filterData       :: FilterData
--- , highlightedEntry :: Maybe Int
--- , cardViewState    :: CardViewState
--- , showShortcutsHelp:: Boolean
+--   filterData          :: FilterData
+-- , highlightedEntry    :: Maybe Int
+-- , cardViewState       :: CardViewState
+-- , showShortcutsHelp   :: Boolean
+-- , showDonationOverlay :: Boolean
 -- }
 cardManagerStateCodec :: CA.JsonCodec CardManagerState
 cardManagerStateCodec =
   CA.object "CardManagerState"
     (CAR.record
-      { filterData       : filterDataCodec
-      , highlightedEntry : CAR.optional CA.int
-      , cardViewState    : cardViewStateCodec
-      , showShortcutsHelp: CA.boolean
+      { filterData         : filterDataCodec
+      , highlightedEntry   : CAR.optional CA.int
+      , cardViewState      : cardViewStateCodec
+      , showShortcutsHelp  : CA.boolean
+      , showDonationOverlay: CA.boolean
       }
     )
 
@@ -441,6 +515,7 @@ cardManagerStateCodec =
 -- , filter :: Filter
 -- , filterViewStatus :: FilterViewStatus
 -- , searchString :: String
+-- , isFocused :: Boolean
 -- }
 filterDataCodec :: CA.JsonCodec FilterData
 filterDataCodec =
@@ -450,6 +525,7 @@ filterDataCodec =
       , filter:           filterCodec
       , filterViewStatus: filterViewStatusCodec
       , searchString:     CA.string
+      , selected:         CA.boolean
       }
     )
 
@@ -496,18 +572,18 @@ filterViewStatusCodec = dimap toVariant fromVariant $ CAV.variantMatch
 cardViewStateCodec :: CA.JsonCodec CardViewState
 cardViewStateCodec = dimap toVariant fromVariant $ CAV.variantMatch
     { noCard:   Left   unit
-    , card:     Right (CA.object "Card" (CAR.record {card: cardCodec, cardEntry: cardEntryCodec }))
-    , cardForm: Right  cardFormInputCodec
+    , card:     Right (CAR.object "Card" {card: cardCodec, cardEntry: cardEntryCodec })
+    , cardForm: Right (CAR.object "CardForm" {cardFormData: cardFormDataCodec, cardFormInput: cardFormInputCodec})
     }
   where
     toVariant = case _ of
-      CardViewState.NoCard       -> V.inj (Proxy :: _ "noCard"  ) unit
-      CardViewState.Card c ce    -> V.inj (Proxy :: _ "card"    ) {card: c, cardEntry: ce}
-      CardViewState.CardForm cfi -> V.inj (Proxy :: _ "cardForm") cfi
+      CardViewState.NoCard           -> V.inj (Proxy :: _ "noCard"  ) unit
+      CardViewState.Card c ce        -> V.inj (Proxy :: _ "card"    ) {card: c, cardEntry: ce}
+      CardViewState.CardForm cfd cfi -> V.inj (Proxy :: _ "cardForm") {cardFormData: cfd, cardFormInput: cfi}
     fromVariant = V.match
-      { noCard:   \_                 -> CardViewState.NoCard
-      , card:     \{card, cardEntry} -> CardViewState.Card card cardEntry
-      , cardForm:                       CardViewState.CardForm
+      { noCard:   \_                             -> CardViewState.NoCard
+      , card:     \{card, cardEntry}             -> CardViewState.Card card cardEntry
+      , cardForm: \{cardFormData, cardFormInput} -> CardViewState.CardForm cardFormData cardFormInput
       }
 
 -- data CardFormInput = NewCard | NewCardFromFragment Card | ModifyCard Card CardEntry
@@ -527,6 +603,18 @@ cardFormInputCodec = dimap toVariant fromVariant $ CAV.variantMatch
       , newCardFromFragment: (\cardEntry         -> NewCardFromFragment cardEntry)
       , modifyCard:          (\{card, cardEntry} -> ModifyCard card cardEntry)
       }
+
+-- type CardFormData = {
+--   newTag  :: String
+-- , preview :: Boolean
+-- , card    :: Card
+-- }
+cardFormDataCodec :: CA.JsonCodec CardFormData
+cardFormDataCodec = CAR.object "CardFormData"
+  { newTag: CA.string
+  , preview: CA.boolean
+  , card: cardCodec
+  }
 
 -- newtype UserPreferences = 
 --   UserPreferences

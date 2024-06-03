@@ -16,7 +16,7 @@ import Concur.Core (Widget)
 import Concur.React (HTML)
 import Concur.React.DOM (a, div, footer, input, label, span, text)
 import Concur.React.Props as Props
-import Control.Bind (bind)
+import Control.Plus (empty)
 import Data.EuclideanRing ((/))
 import Data.Function (($))
 import Data.Functor ((<$>))
@@ -27,9 +27,9 @@ import Data.Semigroup ((<>))
 import Data.Semiring ((*))
 import Data.Show (show)
 import Data.Unit (unit)
-import Effect.Class (liftEffect)
 import Functions.Password (computePasswordEntropy, passwordStrengthClass, standardPasswordStrengthFunction)
-import Functions.State (_readTimestamp, isOffline)
+import DataModel.Proxy (DataOnLocalStorage(..), ProxyInfo(..))
+import Functions.State (_readStaticOfflineCopyTimestamp)
 
 newtype ClassName = ClassName String
 derive instance newtypeCharacterSet :: Newtype ClassName _
@@ -76,10 +76,17 @@ footerComponent commit =
     ]
   ]
 
-proxyInfoComponent :: Array (Maybe String) -> forall a. Widget HTML a
-proxyInfoComponent classes = do
-  offline   <- liftEffect $ isOffline
-  div [Props.classList ([Just "proxyInfo", if offline then Just "OFFLINE" else Nothing] <> classes)] [
-    span [Props.className "proxyDescription"] [text $ if offline then "Offline copy" else ""]
-  , span [Props.className "proxyDetails"]     [text $ _readTimestamp unit]
-  ]
+proxyInfoComponent :: ProxyInfo -> Array (Maybe String) -> forall a. Widget HTML a
+proxyInfoComponent proxyInfo classes = case proxyInfo of
+  Online               ->  empty
+  Static               ->  div [Props.classList ([Just "proxyInfo", Just "STATIC"] <> classes)] [
+                             span [Props.className "proxyDescription"] [text $ "Static offline copy"]
+                           , span [Props.className "proxyDetails"]     [text $ _readStaticOfflineCopyTimestamp unit]
+                           ]
+  Offline (WithData _) ->  div [Props.classList ([Just "proxyInfo", Just "OFFLINE WITH_DATA"] <> classes)] [
+                            span [Props.className "proxyDescription"] [text $ "No network connection"]
+                          , span [Props.className "proxyDetails"]     [text $ ""] -- TODO: read timestamp of last saved data in localstorage (index) [fsolaroli - 25/04/2024]
+                          ]
+  Offline NoData       ->  div [Props.classList ([Just "proxyInfo", Just "OFFLINE NO_DATA"] <> classes)] [
+                             span [Props.className "proxyDescription"] [text $ "No network connection, no local storage data available"]
+                           ]

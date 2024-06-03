@@ -33,7 +33,7 @@ object SessionManagerSpec extends ZIOSpecDefault:
   val cacheTimeToLive = 5.seconds
 
   def testRequest(key: String) = Request(
-    url = URL(Root),
+    url = URL(Path.root),
     method = Method.GET,
     headers = Headers((SessionManager.sessionKeyHeaderName, key)),
     body = Body.empty,

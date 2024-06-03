@@ -2,7 +2,7 @@ module Views.RedeemView where
 
 import Concur.Core (Widget)
 import Concur.Core.FRP (demand, fireOnce, loopW)
-import Concur.React (HTML)
+import Concur.React (HTML, affAction)
 import Concur.React.DOM (a, button, div, form, input, label, span, text, textarea)
 import Concur.React.Props as Props
 import Control.Alt ((<|>))
@@ -27,7 +27,6 @@ import Data.Unit (Unit, unit)
 import DataModel.CardVersions.Card (Card(..), toCard)
 import DataModel.CardVersions.CurrentCardVersions (currentCardCodecVersion)
 import Effect.Aff (Milliseconds(..), delay)
-import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import Functions.Clipboard (copyToClipboard)
@@ -99,10 +98,10 @@ redeemedView secret = do
                                     , Props.readOnly true
                                     ] []
                                 ]
-  , true <$ (button [Props.onClick] [text "copy"] *> (liftAff $ copyToClipboard secret))
+  , true <$ (button [Props.onClick] [text "copy"] *> (affAction $ copyToClipboard secret))
   ]
   _ <- if result then
-    redeemedView secret <|> (liftAff $ delay (Milliseconds 1000.0)) <|> overlay { status: Copy, color: Black, message: "copied" }
+    redeemedView secret <|> (affAction $ delay (Milliseconds 1000.0)) <|> overlay { status: Copy, color: Black, message: "copied" }
   else
     pure unit
   redeemedView secret

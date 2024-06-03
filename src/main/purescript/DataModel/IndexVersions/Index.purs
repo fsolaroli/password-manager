@@ -1,6 +1,7 @@
 module DataModel.IndexVersions.Index where
 
 import Control.Bind (pure, (>>=))
+import Control.Category ((<<<))
 import Data.Codec.Argonaut as CA
 import Data.Codec.Argonaut.Variant as CAV
 import Data.Either (Either(..))
@@ -8,6 +9,9 @@ import Data.Eq (class Eq, eq)
 import Data.Function (($))
 import Data.HexString (HexString, hex)
 import Data.Identifier (Identifier, computeIdentifier)
+import Data.Lens (Lens')
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.List (delete)
 import Data.List.Types (List(..), (:))
 import Data.Newtype (class Newtype, unwrap)
@@ -114,4 +118,16 @@ removeFromIndex cardEntry (Index {entries}) =
   computeIdentifier >>= 
   (\identifier -> pure $ Index {entries: (delete cardEntry entries), identifier})
 
--- --------------------------------------------
+-- ===============================================================
+
+_entries :: Lens' Index (List CardEntry)
+_entries = _Newtype <<< prop (Proxy :: _ "entries")
+
+_index_identifier :: Lens' Index Identifier
+_index_identifier = _Newtype <<< prop (Proxy :: _ "identifier")
+
+_card_reference :: Lens' CardEntry HexString
+_card_reference = _Newtype <<< prop (Proxy :: _ "cardReference") <<< _Newtype <<< prop (Proxy :: _ "reference")
+
+_card_identifier :: Lens' CardEntry Identifier
+_card_identifier = _Newtype <<< prop (Proxy :: _ "cardReference") <<< _Newtype <<< prop (Proxy :: _ "identifier")

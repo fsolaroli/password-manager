@@ -32,9 +32,9 @@ html {
                         left: 0px;
 
                         div#filterView {
-							& > .mask {
-								@include mask();
-							}
+                            & > .mask {
+                                @include mask();
+                            }
 
                             div.content {
                                 z-index: 20;
@@ -67,25 +67,25 @@ html {
                                 overflow: hidden;
                                 flex: auto;
                                 
-								form#searchForm {
-									display: flex;
-									flex-direction: row;
-									// justify-content: space-between;
-									align-items: center;
-									padding: 0 8px 10px;
+                                form#searchForm {
+                                    display: flex;
+                                    flex-direction: row;
+                                    // justify-content: space-between;
+                                    align-items: center;
+                                    padding: 0 8px 10px;
 
-									span {
-										display: none;
-										visibility: hidden;
-									}
+                                    span {
+                                        display: none;
+                                        visibility: hidden;
+                                    }
 
-									&.selected {
-										span {
-											display: block;
-											visibility: visible;
-										}
-									}
-								}
+                                    &.selected {
+                                        span {
+                                            display: block;
+                                            visibility: visible;
+                                        }
+                                    }
+                                }
 
                                 div.tags {
                                     display: flex;
@@ -123,6 +123,28 @@ html {
                                 visibility: hidden;
                             }
                         }
+
+                        h2 {
+                            visibility: hidden;
+                            display: none;
+                        }
+
+                        div.syncProgressBar {
+                            width: 100%;
+                            height: 5px;
+                            background-color: $sync_missing;
+                        
+                            .completedOperation {
+                                p {
+                                    visibility: hidden;
+                                    display: none;
+                                }
+
+                                background-color: $sync_loaded;
+                                height: 100%;
+                                color: $core-alternate-color;
+                            }
+                        }
                         
                         div#mainView {
                             display: flex;
@@ -136,6 +158,10 @@ html {
                                 // width: 100vw;
                                 flex: 1;
 
+                                &:focus {
+                                    outline: none;
+                                }
+
                                 .addCard {
                                     position: fixed;
                                     bottom: 20px;
@@ -146,17 +172,23 @@ html {
                             #card {
                                 // width: 100vw;
                                 flex: 1;
-								position: relative;
-								z-index: 7;
+                                position: relative;
+                                z-index: 8;
 
-								#cardForm div.cardForm .cardFormFields .dragAndDropList .draggableElem .fieldForm .fieldActions div.passwordGeneratorOverlay div.passwordGeneratorPopup div.passwordGeneratorForm {
-									transition: left 0.3s ease-in-out;
-									left: calc(-100vw + 90px);
-									width: 80vw
-								}
+                                #cardForm {
+                                    position: fixed;
+                                    height: 100vh;
+                                    z-index: 100;
+                                    width: 100vw;
+
+                                    .mask {
+                                        width: 0;
+                                    }
+                                }
                             }
 
                             &.CardViewOpen {
+                                // left: calc(-100vw + 250px);
                                 left: -100vw;
 
                                 #indexView {
@@ -165,6 +197,10 @@ html {
                                         visibility: hidden;
                                     }
                                 }
+                            }
+
+                            &.CardFormOpen {
+                                left: calc(-100vw + 250px);	
                             }
 
                         }
@@ -181,8 +217,14 @@ html {
                         display: flex;
                     }
 
+                    &.closed {
+                        display: none;
+                        visibility: hidden;
+                    }
+
                     &.open {
                         display: flex;
+                        visibility: visible;
                         flex-direction: row-reverse;
                         z-index: 21;
                         left: 0px;    
@@ -198,10 +240,10 @@ html {
                             width: $filterPanel_width;
                         }
                         
-						& > .mask {
-							@include mask();
-							z-index: 21;
-						}
+                        & > .mask {
+                            @include mask();
+                            z-index: 21;
+                        }
 
                         div.extraFeatureContent {
                             flex: 1;
@@ -226,94 +268,75 @@ html {
                         div.mask {
                             display: none;
                             visibility: hidden;
-                            // background-color: rgba(255, 255, 255, 0.5);
                         }
                     }
 
                 }
 
-				&:has( > div.donationButton.DonationWarning) > div#cardsManager > div.cardToolbarFrame {
-					&:has( > #mainView.CardViewClose) {
-						height: calc(100% - 40px); //TODO: put value in variable / get it from custom property
-					}
-					
-					#mainView > #indexView > div.addCard > button.addCard {
-						bottom: calc(20px + 40px); //TODO: put value in variable / get it from custom property
-					}
-				}
+                &:has(div.donationButton) > div#cardsManager > div.cardToolbarFrame {
+                    #mainView > #indexView > div.addCard > button.addCard {
+                        bottom: calc(20px + 40px);
+                    }
+                }
 
-				&:has( > div.donationButton.DonationInfo) > div#cardsManager > div.cardToolbarFrame {
-					#mainView > div#indexView {
-						height: calc(100% - 40px); //TODO: put value in variable / get it from custom property
-					}
-					
-					#mainView > #indexView > div.addCard > button.addCard {
-						bottom: calc(20px + 40px); //TODO: put value in variable / get it from custom property
-					}
-				}
+                div.donationButton {
+                    display: flex;
+                    width: 100%;
+                    margin-top: auto;
+                    z-index: 5;
+                                            
+                    button {
+                        height: 40px;
+                        margin: 0px;
+                        padding: 0px;
+                        border: 0px;
+                        flex: 1;
+                        cursor: pointer;
 
-				div.donationButton {
-					position: absolute;
-					left: 0;
-					transition: left 0.3s ease-in-out;
-					bottom: 0;
-					z-index: 5;
-					height: 40px; //TODO: put value in variable / get it from custom property
-					display: flex;
-					width: 100%;
+                        color: white;
+                        // background-color: #6e49b3;
+                        background: linear-gradient(-45deg,red, orange, yellow, green, blue, indigo, violet,indigo,blue, green,yellow,orange,red, red); 
+                        background-size: 1000% 100%;  
+                        animation: create-rainbow-gradient-shift 20s ease infinite;
 
-					&.overlayOpen {
-						z-index: 30;
-					}
-						
-					button {
-						margin: 0px;
-						padding: 0px;
-						border: 0px;
-						flex: 1;
-						cursor: pointer;
-					}
+                        &:hover {
+                            font-weight: bold;
+                            background: linear-gradient(-45deg,red, orange, yellow, green, blue, indigo, violet,indigo,blue, green,yellow,orange,red, red); 
+                        }
+                    }
 
-					div.dialog {
-						width: 100%;
-						// height: 90vh;
-						height: 80%;
-						top: 3%;
+                    @keyframes create-rainbow-gradient-shift{
+                        0%{background-position:0% 50%}
+                        100%{background-position:100% 100%}
+                    }
+                    
+                    div.dialog {
+                        width: 100vw;
+                        height: 80%;
+                        top: 3%;
                         background-color: #6e49b3;
-                        // background-color: #4e2f7a;
+                        right: 20%;
 
                         iframe {
                             width: 100%;
                             height: 100%;
                         }
-					}
-				}
-
-				&:has(> div.filterView_open) {
-					div.donationButton {
-						left: 250px; //TODO: change with variable
-					}
-				}
-
-				&:has( > div#cardsManager > div.cardToolbarFrame > div#mainView.CardViewOpen) {
-					div.donationButton {
-						visibility: hidden;
-					}
-				}
+                    }
+                }
             }
         }
     }
 }
 
 div.loadingBarContainer {
-	border-bottom: 1px solid white;
-	height: 20px;
-	margin-bottom: 10px;
+    border-bottom: 1px solid white;
+    height: 20px;
+    margin-bottom: 10px;
 
-	.loadingBar {
-		height: 100%;
-		background-color: white;
-	}
+    .loadingBar {
+        height: 100%;
+        background-color: white;
+    }
 }
 
 div.disableOverlay {
@@ -323,14 +346,14 @@ div.disableOverlay {
     // right: 0px;
     // width: 100vw;
     height: 100vh;
-	display: flex;
-	z-index: 50;
-	justify-content: center;
+    display: flex;
+    z-index: 50;
+    justify-content: center;
 
-	& > div.mask {
-		@include mask();
-		position: fixed;
-	}
+    & > div.mask {
+        @include mask();
+        position: fixed;
+    }
 
     & > div.dialog {
         border-radius: 8px;
@@ -340,7 +363,7 @@ div.disableOverlay {
         box-shadow: 4px 4px 6px 5px rgba(0, 0, 0, 0.3);
         z-index: 50;
         position: fixed;
-		color: black;
+        color: black;
 
         margin-left: auto;
         margin-right: auto;
@@ -439,7 +462,7 @@ $extraWide-minSize: 1100px;
                                 div#indexView {
 
                                     .addCard {
-										transition: left 0.3s ease-in-out;
+                                        transition: left 0.3s ease-in-out;
                                         left: calc(27% - 30px);
                                     }
                                     
@@ -464,24 +487,30 @@ $extraWide-minSize: 1100px;
                                         }
                                     }
 
-									#cardForm div.cardForm .cardFormFields .dragAndDropList .draggableElem .fieldForm .fieldActions div.passwordGeneratorOverlay div.passwordGeneratorPopup div.passwordGeneratorForm {
-										left: calc(-100vw + 90px + 33vw);
-									}
+                                    #cardForm div.cardForm .cardFormFields .dragAndDropList .draggableElem .fieldForm .fieldActions div.passwordGeneratorOverlay div.passwordGeneratorPopup div.passwordGeneratorForm {
+                                        left: calc(-100vw + 90px + 33vw);
+                                    }
+
+                                    #cardForm {
+                                        position: initial;
+                                        height: 100%;
+                                        width: 100%;
+                                    }
                                 }
                             }
                         }
 
-						&.filterView_open {
-							div.cardToolbarFrame {
-								div#mainView {
-									div#indexView {
-										.addCard {
-											left: calc(27% - 30px + 250px);
-										}
-									}
-								}
-							}
-						}
+                        &.filterView_open {
+                            div.cardToolbarFrame {
+                                div#mainView {
+                                    div#indexView {
+                                        .addCard {
+                                            left: calc(27% - 30px + 250px);
+                                        }
+                                    }
+                                }
+                            }
+                        }
 
                     }
 
@@ -503,21 +532,6 @@ $extraWide-minSize: 1100px;
                             }
                         }
                     }
-
-					div.donationButton {
-						visibility: visible !important;
-
-						&.DonationInfo {
-							&::after {
-								content: "";
-								flex: 2;
-							}
-						}
-					}
-
-					&:has( > div.donationButton.DonationWarning) > div#cardsManager > div.cardToolbarFrame {
-						height: calc(100vh - 40px); //TODO: put value in variable / get it from custom property	
-					}
                 }
             }
         }
@@ -556,28 +570,23 @@ $extraWide-minSize: 1100px;
                             }
 
                             div#mainView {								
-								div#indexView {
-									.addCard {
-										left: calc(32% + 100px);
+                                div#indexView {
+                                    .addCard {
+                                        left: calc(32% + 100px);
                                     }
                                 }
 
-								#card #cardForm div.cardForm .cardFormFields .dragAndDropList .draggableElem .fieldForm .fieldActions div.passwordGeneratorOverlay div.passwordGeneratorPopup div.passwordGeneratorForm {
-									left: calc(-100vw + 90px + 26.5vw + $filterPanel_width);
-								}
+                                #card #cardForm div.cardForm .cardFormFields .dragAndDropList .draggableElem .fieldForm .fieldActions div.passwordGeneratorOverlay div.passwordGeneratorPopup div.passwordGeneratorForm {
+                                    left: calc(-100vw + 90px + 26.5vw + $filterPanel_width);
+                                }
                             }
                         }
 
                     }
 
-					.shortcutsHelp .helpBox {
-						width: calc(100vw - 250px - 40px);
-					}
-
-					div.donationButton {
-						left: 250px;
-						width: calc(100vw - 250px);  //TODO: change with variable
-					}
+                    .shortcutsHelp .helpBox {
+                        width: calc(100vw - 250px - 40px);
+                    }
                 }
             }
         }

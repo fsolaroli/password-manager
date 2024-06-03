@@ -1,7 +1,7 @@
 module OperationalWidgets.RedeemWidget where
 
 import Concur.Core (Widget)
-import Concur.React (HTML)
+import Concur.React (HTML, affAction)
 import Concur.React.DOM (div, p, text)
 import Concur.React.Props as Props
 import Control.Alt ((<$), (<|>))
@@ -16,11 +16,10 @@ import Data.Show (show)
 import Data.Tuple (Tuple(..))
 import Data.Unit (Unit)
 import DataModel.AppError (AppError(..))
+import DataModel.Communication.ConnectionState (ConnectionState)
 import DataModel.Communication.ProtocolError (ProtocolError(..))
-import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Foreign (unsafeToForeign)
-import Functions.Communication.Backend (ConnectionState)
 import Functions.Communication.OneTimeShare (decryptSecret, redeem)
 import Functions.EnvironmentalVariables (currentCommit)
 import Views.Components (Enabled(..))
@@ -36,7 +35,7 @@ redeemWidget connectionState id cryptedKey = do
   version <- liftEffect currentCommit
   do
     pin <- redeemView (Enabled true)
-    eitherSecret <- ( liftAff $ runExceptT $ do
+    eitherSecret <- ( affAction $ runExceptT $ do
                         (Tuple secretVersion enryptedSecret) <- redeem connectionState id
                         decryptSecret CA.string secretVersion pin (toArrayBuffer $ hex cryptedKey) enryptedSecret
                     )

@@ -80,16 +80,18 @@ div.overlay {
 		width: 100%;
 	}
 
-	.icon {
+	div.icon {
 		position: relative;
-		display: inline-block;
+		display: block;
+
 		width: 128px;
 		height: 128px;
-		top: 40%;
 		left: 50%;
+		top: 40%;
+
 		margin-left: -64px;
 		margin-top: -64px;
-
+		
 		text-align: center;
 		vertical-align: middle;
 
@@ -147,6 +149,8 @@ div.overlay {
 //	http://37signals.com/svn/posts/2577-loading-spinner-animation-using-css-and-webkit
 div.spinner {
 	position: relative;
+	display: block;
+
 	width: 100px;
 	height: 100px;
 	left: 50%;
@@ -155,7 +159,6 @@ div.spinner {
 	margin-left: -50px;
 	margin-top: -50px;
 
-	display: block;
 
 	div {
 		width: 12%;

@@ -85,10 +85,10 @@ val blobsApi: Routes[BlobArchive, Throwable] = Routes(
         ZIO
         .service[BlobArchive]
         .flatMap(archive => archive.getBlob(HexString(hash)))
-        .map((bytes: ZStream[Any, Throwable, Byte]) =>
+        .map((bytes: ZStream[Any, Throwable, Byte], contentLength: Long) =>
             Response(
                 status = Status.Ok,
-                body = Body.fromStream(bytes),
+                body = Body.fromStream(bytes, contentLength),
                 headers = Headers(ContentTransferEncoding.Binary)
                             .addHeader("Content-Type", "application/octet-stream"),
             )

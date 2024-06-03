@@ -135,6 +135,14 @@ div.page {
 					border: 1px solid #ccc;
 					border-radius: 0px;
 					display: block;
+
+					&[type=tel] {
+						font-family: "clipperz-password";
+
+						&::placeholder {
+							font-family: "clipperz-font";
+						}
+					}
 				}
 	
 				div button {

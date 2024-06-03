@@ -10,10 +10,10 @@ The backend uses Scala, in particular the [ZIO](https://github.com/zio/zio) libr
 
 The implementation of SRP v6a is self implemented both in Purescript and Scala.
 
-### Current status - 10/01/2024
+### Current status - 2/06/2024
 In the current stage of development the backend is functionally complete.
-The frontend is almost functionally identical to the current version, except for the offline copy (which implementation is still ongoing) and attachments, that we are not 100% sure we are going to keep around. Another important thing yet to be implemented is a cryptographically secure prng.
-On the other hand during the development we have added a few smaller features (like Markdown in notes and saving the password preferences for each locked field).
+The frontend is functionally identical to the current version, except for attachments, that we are not 100% sure we are going to keep around. Another important thing yet to be implemented is a cryptographically secure prng.
+On the other hand during the development we have added a few smaller features (like Markdown in notes and saving the password preferences for each locked field) and a big new feature that gives the option to sync the data to the local storage, allowing access to the account with no internet connection.
 Another bigger feature implemented is the one-time share. It is yet to be incorporated in the main application, but it has a [dedicated page in the website](https://clipperz.is/share).
 
 ## License
@@ -27,22 +27,25 @@ Necessary tools:
 ### Building and running the application
 All the building and running of the application is managed by sbt, that under the hood uses yarn to manage the Purescript side.
 On a console, in the base folder run `sbt` to open the sbt console, after that the command `r` (or `runAll`) builds the whole project, both Scala and Purescript and then starts the Scala server that also serves the frontend at `localhost:8090/api/static/index.html`.
- 
+
+### Checksum
+To compute the SHA1 of the html application file, run the command `checksum` from the sbt console.
+
 ### Running tests
-Command to run inside of the sbt console to execute tests:
+Command to run inside of the `sbt` console to execute tests:
 - Scala
 	- `Test/compile`: compiles the tests
 	- `test`: runs all the Scala tests
 	- `testOnly {path of the test suit}` (ex: `testOnly is.clipperz.backend.SrpFunctionsConversionsSuite`): run a specific test suite
 	- `Test/run`: show a list of all the test suits from which you can choose one to run
 - Purescript
-	- `testPurescript`: starts a server on `https://localhost:9000`
+	- `testPurescript` (otherwise, without `sbt`, you can use `npm run test-browser`): starts a server on `https://localhost:9000`
 		- the path `/static/test_index.html` serve a page that runs the Purescript tests on browser and prints the result in the page itself
 		- the path `/static/debug_index.html` serve a page for debugging purpose, allowing to view the static page corresponding to a state of the application
 - `t` (or `testAll`): run `test` first and `testPurescript` after that. Note that if a Scala test doesn't pass `testPurescript` will not be executed.
 
 ### Debug
-As described in the above, the `testPurescript` command will execute a server that serves on address `https://localhost:9000/static/debug_index.html` the debug page.
+As described in the above, the `test-browser` command will execute a server that serves on address `https://localhost:9000/static/debug_index.html` the debug page.
 In the main application, using the key-combination `ctrl+alt+c` (or pressing the `DEBUG` button in the bottom right corner) will copy the app state.
 Keeping the `Shift` key pressed will slow down the operation's animations.
 

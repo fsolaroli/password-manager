@@ -1,28 +1,36 @@
 module Functions.State where
 
+import Concur.Core (Widget)
+import Concur.Core.Patterns (Wire(..))
+import Concur.React (HTML)
+import Control.Alt ((<#>))
 import Control.Applicative (pure)
 import Control.Bind (bind, (>>=))
+import Control.Category ((<<<))
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Data.Array (filter, catMaybes, head)
 import Data.Eq ((==))
-import Data.Function (($))
+import Data.Function ((#), ($))
 import Data.Functor ((<$>))
 import Data.HexString (HexString)
+import Data.List (List(..), (:))
 import Data.Map (Map)
 import Data.Map.Internal (empty)
 import Data.Maybe (Maybe(..), isJust)
-import Data.Traversable (sequence)
+import Data.Newtype (un)
+import Data.Traversable (fold, sequence)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Unit (Unit)
-import DataModel.AppState (Proxy(..), AppState)
-import DataModel.AsyncValue (AsyncValue(..))
+import DataModel.AppState (AppState)
 import DataModel.CardVersions.Card (Card)
 import DataModel.IndexVersions.Index (Index)
+import DataModel.Proxy (DataOnLocalStorage(..), DynamicProxy(..), Proxy(..), ProxyInfo(..), defaultOnlineProxy, defaultPathPrefix)
 import DataModel.SRPVersions.SRP (HashFunction, SRPConf, baseSRPConf, hashFuncSHA256)
 import DataModel.UserVersions.User (MasterKey, UserInfo, UserInfoReferences)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Functions.Donations (DonationLevel)
+import OperationalWidgets.Sync (SyncData, SyncOperation(..))
 import Record (merge)
 import Web.DOM (Element, Node)
 import Web.DOM.Element (fromNode, id)
@@ -31,15 +39,16 @@ import Web.DOM.NodeList (toArray)
 import Web.HTML (HTMLElement, window)
 import Web.HTML.HTMLDocument (body)
 import Web.HTML.HTMLElement (toNode)
-import Web.HTML.Window (document)
+import Web.HTML.Navigator (onLine)
+import Web.HTML.Window (document, navigator)
 
-foreign import _readTimestamp :: Unit -> String
+foreign import _readStaticOfflineCopyTimestamp :: Unit -> String
 
 offlineDataId :: String
 offlineDataId = "offlineData"
 
-isOffline :: Effect Boolean
-isOffline = isJust <$> runMaybeT do
+isStatic :: Effect Boolean
+isStatic = isJust <$> runMaybeT do
     body            :: HTMLElement                  <- MaybeT $ (window >>= document >>= body)
     childs          :: Array Node                   <- liftEffect $ (childNodes (toNode body) >>= toArray)
     elementsWithId  :: Array (Tuple Element String) <- liftEffect $ sequence $ mapIds <$> (catMaybes $ fromNode <$> childs)
@@ -49,15 +58,51 @@ isOffline = isJust <$> runMaybeT do
     mapIds :: Element -> Effect (Tuple Element String)
     mapIds e = (Tuple e) <$> (id e)
 
-computeInitialState :: Effect AppState
-computeInitialState = do
-  isOffline >>= case _ of
-    true  -> pure  withOfflineProxy
-    false -> pure (withOnlineProxy  "/api")
+getProxyInfoFromProxy :: Proxy -> ProxyInfo
+getProxyInfoFromProxy = case _ of
+  StaticProxy   _                                  -> Static
+  DynamicProxy (OnlineProxy  _ _ _               ) -> Online
+  DynamicProxy (OfflineProxy _ dataOnLocalStorage) -> Offline dataOnLocalStorage
+
+computeInitialState :: Wire (Widget HTML) SyncData -> Effect AppState
+computeInitialState wire = computeProxy >>= (\proxy -> pure $ merge baseState {proxy, syncDataWire: wire})
 
   where
-    withOfflineProxy     = merge { proxy: StaticProxy Nothing                                                        } baseState
-    withOnlineProxy  url = merge { proxy: OnlineProxy url {toll: Loading Nothing, currentChallenge: Nothing} Nothing } baseState
+    computeProxy :: Effect Proxy
+    computeProxy = isStatic >>= case _ of
+      true  -> StaticProxy Nothing # pure
+      false -> DynamicProxy <$> computeDynamicProxy
+
+    computeDynamicProxy :: Effect DynamicProxy
+    computeDynamicProxy = (window >>= navigator >>= onLine) <#> case _ of 
+      true  -> OnlineProxy defaultPathPrefix {toll: Nothing, currentChallenge: Nothing} Nothing
+      false -> OfflineProxy Nothing NoData
+
+updateProxy :: AppState -> Effect Proxy
+updateProxy state@{proxy: DynamicProxy dynamicProxy} = DynamicProxy <$> ((window >>= navigator >>= onLine) >>= case _, state of 
+      false, {enableSync: true, syncDataWire} ->
+          ((un Wire syncDataWire).value) <#> (\syncData ->
+            fold (syncData.pendingOperations <#> (case _ of
+              SaveBlobFromRef ref -> ref : Nil
+              _                   ->       Nil
+            ))
+          ) <#>  (preserveOfflineData <<< WithData)
+      false, _ -> preserveOfflineData NoData # pure
+      true,  _ -> preserveOnlineData         # pure
+)
+  where
+    preserveOfflineData :: DataOnLocalStorage -> DynamicProxy
+    preserveOfflineData dataOnLocalStorage = case dynamicProxy of
+      OfflineProxy backendSessionState _ -> OfflineProxy backendSessionState dataOnLocalStorage
+      _                                  -> OfflineProxy Nothing             dataOnLocalStorage
+
+    preserveOnlineData :: DynamicProxy
+    preserveOnlineData = case dynamicProxy of
+      OfflineProxy _ _ -> defaultOnlineProxy
+      onlineProxy      -> onlineProxy
+
+updateProxy {proxy} = pure proxy
+
 
 resetState :: AppState -> AppState
 resetState state = merge baseState state
@@ -76,6 +121,7 @@ baseState ∷ { username :: Maybe String
             , userInfo :: Maybe UserInfo
             , index :: Maybe Index
             , donationLevel :: Maybe DonationLevel
+            , enableSync :: Boolean
             }
 baseState = { username: Nothing
             , password: Nothing
@@ -91,4 +137,5 @@ baseState = { username: Nothing
             , userInfo: Nothing
             , index: Nothing
             , donationLevel: Nothing
+            , enableSync: false
             }

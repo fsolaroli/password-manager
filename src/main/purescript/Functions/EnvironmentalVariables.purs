@@ -1,11 +1,38 @@
-module Functions.EnvironmentalVariables where
+module Functions.EnvironmentalVariables
+  ( currentCommit
+  , shareURL
+  , redeemURL
+  , appURL
+  , donationIFrameURL
+  )
+  where
 
+import Control.Alt ((<#>))
+import Data.Function (flip)
+import Data.Semigroup (append)
+import Data.Unit (Unit, unit)
 import Effect (Effect)
 
-foreign import currentCommit :: Effect String
+foreign import _currentCommit :: Unit -> Effect String
+currentCommit :: Effect String
+currentCommit = _currentCommit unit
 
-foreign import shareURL :: Effect String
+foreign import _shareURL :: Unit -> Effect String
+shareURL :: Effect String
+shareURL = _shareURL unit
 
-foreign import redeemURL :: Effect String
 
-foreign import appURL :: Effect String
+foreign import _redeemURL :: Unit -> Effect String
+redeemURL :: Effect String
+redeemURL = _redeemURL unit
+
+
+foreign import _appURL :: Unit -> Effect String
+appURL :: Effect String
+appURL = _appURL unit
+
+
+foreign import _donationIFrameURL :: Unit -> Effect String
+donationIFrameURL :: String -> Effect String
+donationIFrameURL path = _donationIFrameURL unit <#> (flip append path)
+
