@@ -13,7 +13,7 @@ import Data.Array (foldl, fromFoldable, mapWithIndex)
 import Data.Boolean (otherwise)
 import Data.CommutativeRing (add)
 import Data.Either (either)
-import Data.Eq (eq, (/=), (==))
+import Data.Eq (eq, (==))
 import Data.Function (flip, ($))
 import Data.Functor ((<$>), (<$))
 import Data.HexString (HexString)
@@ -228,8 +228,8 @@ shortcutsHelp showShortcutsHelp = div [Props.classList [Just "shortcutsHelp", Ju
                                         , Tuple "<down>"    Nothing
                                         ]                                "previous/next card"
                                 ]
-      , helpBlock "Misc"        [ Tuple [ Tuple "l o c k"   Nothing   ] "lock application"
-                                ] 
+      -- , helpBlock "Misc"        [ Tuple [ Tuple "l o c k"   Nothing   ] "lock application"
+      --                           ] 
     ]
   ]
 ] $> ShowShortcutsEvent false
