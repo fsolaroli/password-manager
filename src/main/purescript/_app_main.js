@@ -42,6 +42,12 @@ function addPreventDefaults() {
         Dragover events default behaviour must be prevented, but doing so in Purescript causes perfomance problems.
     */
     document.addEventListener("dragover", ev => ev.preventDefault())
+	document.addEventListener("keydown",  e  => {
+		if (e.key == "/") {
+			e.preventDefault();
+			e.stopPropagation();
+		}
+	})
 }
 
 function debugAnimation() {
