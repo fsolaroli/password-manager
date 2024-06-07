@@ -87,15 +87,15 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
             button [Props.onClick, Props.className "addCard" ] [span [] [text "add card"]] $> OpenCardFormEvent Nothing
           ]
         , (indexView sortedCards proxyInfo getHighlightedEntry) <#> (NavigateCardsEvent <<< Open <<< Just)
-        , donationButton (donationLevel == DonationInfo) showDonationOverlay
+        , donationButton (donationLevel == DonationInfo)
         ]
       , div [Props._id "card"] [
           mainStageView cardViewState
         ]
       ]
-    , donationButton (donationLevel == DonationWarning) showDonationOverlay
+    , donationButton (donationLevel == DonationWarning)
     ]
-  ] <> (shortcutsHelp showShortcutsHelp)
+  ] <> (shortcutsHelp showShortcutsHelp) <> (donationOverlay showDonationOverlay)
   <#> (Tuple state >>> swap)
 
   where
@@ -103,7 +103,8 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
     cardViewStateClass :: String
     cardViewStateClass = case cardViewState of
       NoCard       -> "CardViewClose"
-      CardForm _ NewCard -> "CardFormOpen"
+      CardForm _ NewCard -> "CardFormOpen NewCard"
+      CardForm _ _       -> "CardFormOpen EditCard"
       _ -> "CardViewOpen"
 
     sortedCards :: List CardEntry
@@ -151,7 +152,7 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
     allTags :: Set String
     allTags = unions $ (\(CardEntry entry) -> entry.tags) <$> fromFoldable entries
 
-    shortcutsHandlers = if (not enableShortcuts || isCardForm) then [] else [
+    shortcutsHandlers = if (not enableShortcuts || isCardForm || showDonationOverlay) then [] else [
       Props.onKeyDown <#> (\e -> case (unsafeCoerce e).key of
         key
           | eq   key  "*"                          ->  ChangeFilterEvent initialFilterData
@@ -257,12 +258,17 @@ shortcutsHelp showShortcutsHelp = div [Props.classList [Just "shortcutsHelp", Ju
 
 -- ==================================================================                                                                                                                             
 
-donationButton :: Boolean -> Boolean -> Widget HTML CardManagerEvent
-donationButton false _           = empty
-donationButton true  showOverlay =
-  div [Props.classList [Just "donationButton"]] ([
+donationButton :: Boolean -> Widget HTML CardManagerEvent
+donationButton false = empty
+donationButton true  =
+  div [Props.classList [Just "donationButton"]] [
     button [Props.onClick $> ShowDonationEvent true, Props.filterProp (\e -> (unsafeCoerce e).key == "Escape") Props.onKeyDown $> ShowDonationEvent false] [span [] [text "Support Clipperz"]]
-  ] <> (if (not showOverlay) then [] else [
+  ] 
+
+donationOverlay :: Boolean -> Widget HTML CardManagerEvent
+donationOverlay false = empty
+donationOverlay true  = 
+  div [Props.className "donationOverlay"] [
     div [Props.className "disableOverlay"] [
       div [Props.className "mask", Props.onClick] [] $> ShowDonationEvent false
     , div [Props.className "dialog"] [
@@ -274,7 +280,7 @@ donationButton true  showOverlay =
         )
       ]
     ]
-  ]))
+  ]
 
 -- ==================================================================                                                                                                                             
 
