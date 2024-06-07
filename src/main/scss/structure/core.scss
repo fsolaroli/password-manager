@@ -54,7 +54,7 @@ html {
                         div.content {
                             position: relative;
                             // z-index: 20;
-                            z-index: 7;
+                            z-index: 5;
 
                             height: 100%;
                             overflow: hidden;
@@ -150,6 +150,7 @@ html {
                             display: flex;
                             flex-direction: row;
                             position: relative;
+							z-index: 5;
                             width: 200vw;
                             transition: left 0.3s ease-in-out;
                             left: 0px;
@@ -180,10 +181,6 @@ html {
                                     height: 100vh;
                                     z-index: 100;
                                     width: 100vw;
-
-                                    .mask {
-                                        width: 0;
-                                    }
                                 }
                             }
 
@@ -200,7 +197,20 @@ html {
                             }
 
                             &.CardFormOpen {
-                                left: calc(-100vw + 250px);	
+								&.NewCard {
+									left: calc(-100vw + 250px);	
+								}
+
+								&.EditCard {
+									left: -100vw;
+								}
+
+								& + div.donationButton {
+									visibility: hidden;
+									display: none;
+								}
+
+								
                             }
 
                         }
@@ -279,6 +289,21 @@ html {
                     }
                 }
 
+				div.donationOverlay {
+					div.dialog {
+                        width: 100vw;
+                        height: 80%;
+                        top: 3%;
+                        background-color: #6e49b3;
+                        right: 20%;
+
+                        iframe {
+                            width: 100%;
+                            height: 100%;
+                        }
+                    }
+				}
+
                 div.donationButton {
                     display: flex;
                     width: 100%;
@@ -310,18 +335,6 @@ html {
                         100%{background-position:100% 100%}
                     }
                     
-                    div.dialog {
-                        width: 100vw;
-                        height: 80%;
-                        top: 3%;
-                        background-color: #6e49b3;
-                        right: 20%;
-
-                        iframe {
-                            width: 100%;
-                            height: 100%;
-                        }
-                    }
                 }
             }
         }
@@ -448,6 +461,7 @@ $extraWide-minSize: 1100px;
 
                             div#mainView {
                                 position: static;
+								z-index: 5;
                                 width: auto;
 
                                 &.CardViewOpen {
@@ -458,6 +472,11 @@ $extraWide-minSize: 1100px;
                                         }
                                     }
                                 }
+
+								&.CardFormOpen + div.donationButton {
+									visibility: visible;
+									display: flex;
+								}
 
                                 div#indexView {
 
