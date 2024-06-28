@@ -170,15 +170,26 @@ div#homePage {
                             padding-right: 8px;
                             line-height: 1.2em;
 
-                            &.selectedCard {
+                            &.openedCard {
                                 margin-left: 20px;
                                 padding-right: 0px;
                                 box-shadow: -4px 0px 3px -1px rgba(0, 0, 0, 0.2);                                
                             }
 
+							&.selectedCard {
+								background-color: #e8e8e8;
+								// outline: solid gray;
+							}
+
 							&.archived {
-								background-color: #eeeeee;
-								color: #999;
+								// background-color: #eeeeee;
+								// color: #999;
+								background-color: #000;
+								color: #fff;
+
+								&.selectedCard {
+									background-color: #383838;
+								}
 							}
 
                             &::after {
