@@ -42,6 +42,15 @@ html {
                         }
                     }
 
+					&:has(#mainView.CardFormOpen.NewCard) {
+						// @supports (-webkit-appearance:none) {
+							left: -100vw;
+						// }
+						@supports (-moz-appearance:none) {
+							left: -250px;
+						}
+					}
+
                     div#filterView {
                         height: 100%;
                         overflow: hidden;
@@ -201,7 +210,8 @@ html {
 								z-index: 6;
 
 								&.NewCard {
-									left: calc(-100vw + 250px);	
+									// left: -100vw;
+									// left: calc(-100vw + 250px);	
 								}
 
 								&.EditCard {
