@@ -43,9 +43,9 @@ html {
                     }
 
 					&:has(#mainView.CardFormOpen.NewCard) {
-						// @supports (-webkit-appearance:none) {
+						@supports (-webkit-appearance:none) {
 							left: -100vw;
-						// }
+						}
 						@supports (-moz-appearance:none) {
 							left: -250px;
 						}
@@ -450,6 +450,10 @@ $extraWide-minSize: 1100px;
 
                     div#cardsManager {
 
+                        &:has(#mainView.CardFormOpen.NewCard) {
+                            left: -250px;
+                        }
+
                         div#filterView {
                             
                             div.content {
@@ -584,6 +588,10 @@ $extraWide-minSize: 1100px;
                     div#cardsManager {
                         overflow-x: hidden;
                         left: 0px;
+                        
+                        &:has(#mainView.CardFormOpen.NewCard) {
+                            left: 0px;
+                        }
 
                         div#filterView {
                             div.mask {
