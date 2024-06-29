@@ -406,6 +406,7 @@ div#homePage {
                                         flex-direction: column;
                                         padding-left: 5px;
                                         padding-right: 10px;
+                                        width: 20px;
                                         // background-color: purple;
 
                                         button, a {
@@ -418,6 +419,7 @@ div#homePage {
                                             color: #ccc;
                                             padding: 0px;
                                             margin: 10px 0 6px;
+                                            text-align: left;
                                             
                                             &:hover {
                                                 cursor: pointer;
