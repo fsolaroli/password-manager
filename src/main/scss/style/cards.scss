@@ -160,8 +160,7 @@ div#homePage {
 							overflow-wrap: anywhere;
                             white-space: pre-wrap;
                             display: flex;
-                            flex-direction: row; 
-                            justify-content: space-between;
+                            flex-direction: row;
         
                             font-size: 14pt;
                             padding-top: 16px;
@@ -183,6 +182,8 @@ div#homePage {
                             }
 
 							&.selectedCard {
+                                padding-left: 0;
+
                                 &::before {
                                     content: "";
                                     width: 0;
@@ -190,10 +191,8 @@ div#homePage {
                                     border-top: 10px solid transparent;
                                     border-bottom: 10px solid transparent;
                                     border-left: 6px solid black;
-                                    position: relative;
-                                    order: 2;
-                                    left: calc(-100% - 10px);
-                                    transition: left 0.1s ease-in-out, border-left-color 0.2s ease;;
+                                    transition: border-left-color 0.2s ease;
+                                    padding-right: 10px;
                                 }
 							}
 
@@ -214,6 +213,8 @@ div#homePage {
                                 // line-height: 48px;
                                 // margin-right: 25px;
                                 color: #ccc;
+                                flex: 1;
+                                text-align: right;
                             }
 
                             &:hover {
