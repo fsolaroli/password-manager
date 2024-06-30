@@ -173,23 +173,33 @@ div#homePage {
                             &.openedCard {
                                 margin-left: 20px;
                                 padding-right: 0px;
-                                box-shadow: -4px 0px 3px -1px rgba(0, 0, 0, 0.2);                                
+                                box-shadow: -4px 0px 3px -1px rgba(0, 0, 0, 0.2);  
+                                
+                                &.selectedCard {
+                                    &::before {
+                                        border-left-color: #b3b3b3;
+                                    }
+                                }
                             }
 
 							&.selectedCard {
-								background-color: #e8e8e8;
-								// outline: solid gray;
+                                &::before {
+                                    content: "";
+                                    width: 0;
+                                    height: 0;
+                                    border-top: 10px solid transparent;
+                                    border-bottom: 10px solid transparent;
+                                    border-left: 6px solid black;
+                                    position: relative;
+                                    order: 2;
+                                    left: calc(-100% - 10px);
+                                    transition: left 0.1s ease-in-out, border-left-color 0.2s ease;;
+                                }
 							}
 
 							&.archived {
-								// background-color: #eeeeee;
-								// color: #999;
-								background-color: #000;
-								color: #fff;
-
-								&.selectedCard {
-									background-color: #383838;
-								}
+								background-color: #eeeeee;
+								color: #999;
 							}
 
                             &::after {
