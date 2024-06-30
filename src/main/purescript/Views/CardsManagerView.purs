@@ -86,7 +86,7 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
         , div [Props.className "addCard"] [
             button [Props.onClick, Props.className "addCard" ] [span [] [text "add card"]] $> OpenCardFormEvent Nothing
           ]
-        , (indexView sortedCards proxyInfo getHighlightedEntry) <#> (NavigateCardsEvent <<< Open <<< Just)
+        , (indexView sortedCards proxyInfo getOpenedCard getHighlightedEntry) <#> (NavigateCardsEvent <<< Open <<< Just)
         , donationButton (donationLevel == DonationInfo)
         ]
       , div [Props._id "card"] [
@@ -118,6 +118,11 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
 
     getHighlightedEntry :: Maybe Int
     getHighlightedEntry = highlightedEntry <|> (selectedEntry >>= flip elemIndex sortedCards)
+
+    getOpenedCard :: Maybe CardEntry
+    getOpenedCard = case cardViewState of
+                      Card _ cardEntry -> Just cardEntry
+                      _                -> Nothing
 
     increaseIndex :: Int -> Int
     increaseIndex numberOfCards = min (numberOfCards-1) (maybe 0 (add 1)      getHighlightedEntry)
@@ -284,22 +289,23 @@ donationOverlay true  =
 
 -- ==================================================================                                                                                                                             
 
-indexView :: List CardEntry -> ProxyInfo -> Maybe Int -> Widget HTML CardEntry
-indexView sortedCards proxyInfo selectedEntry = do
+indexView :: List CardEntry -> ProxyInfo -> Maybe CardEntry -> Maybe Int -> Widget HTML CardEntry
+indexView sortedCards proxyInfo openedCard selectedEntry = do
   let disabledCards = getDisabledCards proxyInfo
   ol [] (
     flip mapWithIndex (fromFoldable sortedCards) (\index cardEntry@(CardEntry { title, archived: archived', cardReference: CardReference { reference: ref } }) -> do
       let disabled = proxyInfo == Offline NoData || elem ref disabledCards
-      li ([Props.classList [archivedClass archived', selectedClass index, disabledClass disabled]] <> if disabled then []  else [cardEntry <$ Props.onClick]) [
+      li ([Props.classList [archivedClass archived', selectedClass index, openedClass cardEntry, disabledClass disabled]] <> if disabled then []  else [cardEntry <$ Props.onClick]) [
         text title
       ]
     )
   ) 
 
   where
-    archivedClass archived' = if archived'                   then Just "archived"     else Nothing
-    selectedClass index     = if selectedEntry == Just index then Just "selectedCard" else Nothing
-    disabledClass disabled  = if disabled                    then Just "disabled"     else Nothing
+    archivedClass archived' = if archived'                       then Just "archived"     else Nothing
+    selectedClass index     = if selectedEntry == Just index     then Just "selectedCard" else Nothing
+    openedClass   cardEntry = if openedCard    == Just cardEntry then Just "openedCard"   else Nothing
+    disabledClass disabled  = if disabled                        then Just "disabled"     else Nothing
 
     getDisabledCards :: ProxyInfo -> List HexString
     getDisabledCards (Offline (WithData refList)) = refList

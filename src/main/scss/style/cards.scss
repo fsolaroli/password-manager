@@ -160,8 +160,7 @@ div#homePage {
 							overflow-wrap: anywhere;
                             white-space: pre-wrap;
                             display: flex;
-                            flex-direction: row; 
-                            justify-content: space-between;
+                            flex-direction: row;
         
                             font-size: 14pt;
                             padding-top: 16px;
@@ -170,11 +169,32 @@ div#homePage {
                             padding-right: 8px;
                             line-height: 1.2em;
 
-                            &.selectedCard {
+                            &.openedCard {
                                 margin-left: 20px;
                                 padding-right: 0px;
-                                box-shadow: -4px 0px 3px -1px rgba(0, 0, 0, 0.2);                                
+                                box-shadow: -4px 0px 3px -1px rgba(0, 0, 0, 0.2);  
+                                
+                                &.selectedCard {
+                                    &::before {
+                                        border-left-color: #b3b3b3;
+                                    }
+                                }
                             }
+
+							&.selectedCard {
+                                padding-left: 0;
+
+                                &::before {
+                                    content: "";
+                                    width: 0;
+                                    height: 0;
+                                    border-top: 10px solid transparent;
+                                    border-bottom: 10px solid transparent;
+                                    border-left: 6px solid black;
+                                    transition: border-left-color 0.2s ease;
+                                    padding-right: 10px;
+                                }
+							}
 
 							&.archived {
 								background-color: #eeeeee;
@@ -193,6 +213,8 @@ div#homePage {
                                 // line-height: 48px;
                                 // margin-right: 25px;
                                 color: #ccc;
+                                flex: 1;
+                                text-align: right;
                             }
 
                             &:hover {
@@ -395,6 +417,7 @@ div#homePage {
                                         flex-direction: column;
                                         padding-left: 5px;
                                         padding-right: 10px;
+                                        width: 20px;
                                         // background-color: purple;
 
                                         button, a {
@@ -407,6 +430,7 @@ div#homePage {
                                             color: #ccc;
                                             padding: 0px;
                                             margin: 10px 0 6px;
+                                            text-align: left;
                                             
                                             &:hover {
                                                 cursor: pointer;
