@@ -94,7 +94,7 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
 
   case userAreaEvent of
     (CloseUserAreaEvent) -> 
-      (focus "indexView" # liftEffect)
+      (focus "mainView" # liftEffect)
       *> 
       noOperation (Tuple 
                   state

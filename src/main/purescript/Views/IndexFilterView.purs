@@ -11,6 +11,8 @@ import Data.Eq (class Eq, (==))
 import Data.Function (($))
 import Data.Functor ((<$>), (<$))
 import Data.HeytingAlgebra (not, (||))
+import Data.Lens (Lens', set)
+import Data.Lens.Record (prop)
 import Data.List (List, fold, length)
 import Data.List as List
 import Data.Maybe (Maybe(..))
@@ -19,6 +21,7 @@ import Data.Semigroup ((<>))
 import Data.Set (isEmpty, member, toUnfoldable)
 import Data.String (Pattern(..), contains, toLower)
 import DataModel.IndexVersions.Index (CardEntry(..), Index(..))
+import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 numberOfRecent :: Int
@@ -35,6 +38,9 @@ type FilterData = {
 , searchString :: String
 , selected :: Boolean
 }
+
+_filterViewStatus :: Lens' FilterData FilterViewStatus
+_filterViewStatus = prop (Proxy :: _ "filterViewStatus")
 
 data FilterViewStatus = FilterViewClosed | FilterViewOpen
 
@@ -53,7 +59,8 @@ initialFilterData = {
 }
 
 indexFilterView :: FilterData -> Index -> Widget HTML FilterData
-indexFilterView filterData@{archived, filter, searchString} (Index {entries}) = div [Props._id "filterView"] [
+indexFilterView filterData@{archived, filter, searchString} (Index {entries}) = 
+  div [Props._id "filterView", Props.tabIndex 0, Props.filterProp (\e -> (unsafeCoerce e).key == "Escape") Props.onKeyDown $> set _filterViewStatus FilterViewClosed filterData] [
     (filterData {filterViewStatus = FilterViewClosed}) <$ div [Props.onClick, Props.className "mask"] []
   , div [Props.className "content"] [
       div [Props.className "filter"] [

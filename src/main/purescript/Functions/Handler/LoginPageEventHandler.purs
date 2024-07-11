@@ -1,13 +1,13 @@
 module Functions.Handler.LoginPageEventHandler where
 
-import Concur.Core (Widget, liftWidget)
+import Concur.Core (Widget)
 import Concur.React (HTML, affAction)
-import Control.Alt (void, ($>), (<|>))
+import Control.Alt ((<|>))
 import Control.Alternative ((*>))
 import Control.Applicative (pure)
 import Control.Bind (bind, discard, (=<<), (>>=))
 import Control.Category ((<<<))
-import Control.Monad.Except (ExceptT(..), throwError)
+import Control.Monad.Except (throwError)
 import Control.Monad.Except.Trans (ExceptT, runExceptT)
 import Data.CommutativeRing ((+))
 import Data.Either (Either(..))
@@ -18,7 +18,6 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (unwrap)
 import Data.Ord ((<))
 import Data.Show (show)
-import Data.Time (Millisecond)
 import Data.Tuple (Tuple(..))
 import Data.Unit (unit)
 import DataModel.AppError (AppError(..), InvalidStateError(..))
@@ -31,7 +30,6 @@ import DataModel.WidgetState (CardFormInput(..), CardViewState(..), LoginType(..
 import Effect.Aff (Milliseconds(..), delay, forkAff)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
-import Effect.Console (log)
 import Functions.Communication.Login (PrepareLoginResult, loginStep1, loginStep2, prepareLogin)
 import Functions.Communication.Users (extractUserInfoReference, getUserInfo)
 import Functions.DeviceSync (computeSyncOperations, getSyncOptionFromLocalStorage)
@@ -147,7 +145,7 @@ loadHomePageSteps state@{hash: hashFunc, proxy, srpConf, c: Just c, p: Just p, m
 
   proxy''' <- runStep (updateProxy updatedState # liftEffect) (WidgetState {status: Spinner, color: Black, message: "Compute data to sync"} page proxyInfo)
   
-  focus "indexView" # liftEffect
+  focus "mainView" # liftEffect
   pure $ Tuple
     updatedState { proxy = proxy'''}
     (WidgetState 
@@ -184,6 +182,6 @@ handlePinResult state@{proxy} page color either = do
           pure $ Login $ emptyLoginFormData {credentials = emptyCredentials {username = fromMaybe "" state.username}, loginType = CredentialLogin}
       ) <|> (defaultView (WidgetState {status: Spinner, color, message: "Compute PIN attempts"} page proxyInfo))
 
-  _ <- forkAff ((delay (Milliseconds 510.0)) *> (blur "loginUsernameInput" # liftEffect) *> (focus "indexView" # liftEffect)) # affAction
+  _ <- forkAff ((delay (Milliseconds 510.0)) *> (blur "loginUsernameInput" # liftEffect) *> (focus "mainView" # liftEffect)) # affAction
 
   pure $ Tuple newPage either

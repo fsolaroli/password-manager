@@ -7,7 +7,7 @@ module Functions.Handler.CardManagerEventHandler
 import Concur.Core (Widget)
 import Concur.React (HTML, affAction)
 import Control.Alt (void, (<#>), (<$>))
-import Control.Alternative ((*>))
+import Control.Alternative ((*>), (<*))
 import Control.Applicative (pure)
 import Control.Bind (bind, (=<<), (>>=))
 import Control.Category ((<<<))
@@ -73,8 +73,6 @@ handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just inde
     (NoEvent) -> noOperation (Tuple state (WidgetState hiddenOverlayInfo (Main defaultPage) proxyInfo))
 
     (OpenUserAreaEvent) -> 
-      (blur "indexView" # liftEffect)
-      *> 
       noOperation (Tuple 
                   state
                   (WidgetState
@@ -84,38 +82,33 @@ handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just inde
                     proxyInfo
                   )
                 )
+      <* (forkAff ((delay (Milliseconds 10.0)) *> (focus "userPage" # liftEffect)) # affAction)
 
     (ShowShortcutsEvent show) ->
       updateCardManagerState defaultPage cardManagerState {showShortcutsHelp = show}
     
     (ShowDonationEvent show) ->
-      (if show then (pure unit) else focus "indexView" # liftEffect)
+      (if show then (pure unit) else focus "mainView" # liftEffect)
       *>
       updateCardManagerState defaultPage cardManagerState {showDonationOverlay = show}
 
     (UpdateDonationLevel days) -> handleDonationPageEvent (DonationEvent.UpdateDonationLevel days) state proxyInfo f
 
     (ChangeFilterEvent filterData) ->
-      (case filterData.filterViewStatus of
-        FilterViewClosed -> focus "indexView"        # liftEffect
-        FilterViewOpen   -> 
-          case filterData.filter of
-            Search _     -> forkAff ((delay (Milliseconds 10.0)) *> ((if filterData.selected then (select "searchInputField") else (pure unit) *> blur "indexView" *> focus "searchInputField") # liftEffect)) # void # affAction
-            _            -> focus "indexView"        # liftEffect
-      )
-      *>
       updateCardManagerState defaultPage cardManagerState { filterData = filterData {selected = false}
                                                           , highlightedEntry = Nothing 
                                                           }
+      <* case filterData.filterViewStatus of
+          FilterViewOpen   -> 
+            case filterData.filter of
+              Search _     -> forkAff ((delay (Milliseconds 10.0)) *> ((if filterData.selected then select "searchInputField" else focus "searchInputField") # liftEffect)) # void # affAction
+              _            -> focus "filterView" # liftEffect
+          FilterViewClosed -> focus "mainView"   # liftEffect
 
     (UpdateCardForm cardFormData) ->
       updateCardManagerState defaultPage cardManagerState { cardViewState = updateCardViewState cardManagerState.cardViewState cardFormData }
 
     (NavigateCardsEvent navigationEvent) ->
-      ((forkAff ((delay (Milliseconds 10.0)) *> (scrollElementIntoView "selectedCard" # liftEffect))) # affAction)
-      *>
-      (focus "indexView" # liftEffect)
-      *>
       case navigationEvent of
         Move             i -> updateCardManagerState defaultPage (cardManagerState {                                 highlightedEntry = Just i })
         Close       maybei -> updateCardManagerState defaultPage (cardManagerState {cardViewState = NoCard,          highlightedEntry = maybei })
@@ -133,25 +126,25 @@ handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just inde
                 )
           # runExceptT
           >>= handleOperationResult state defaultErrorPage (isNothing $ lookup (reference entry) cardsCache) Black
+        <* ((forkAff ((delay (Milliseconds 10.0)) *> (scrollElementIntoView "selectedCard" # liftEffect))) # affAction)
+        <* (focus "mainView" # liftEffect)
     
     (OpenCardFormEvent maybeCard) ->
-      (blur "indexView" # liftEffect)
-      *> 
       updateCardManagerState defaultPage cardManagerState { cardViewState = uncurry CardForm $ case maybeCard of
                                                               Nothing                     -> Tuple  emptyCardFormData                 NewCard
                                                               Just (Tuple cardEntry card) -> Tuple (emptyCardFormData {card = card}) (ModifyCard card cardEntry)
                                                           }
+      <* (blur "mainView" # liftEffect)
 
     (AddCardEvent card) ->
-      (focus "indexView" # liftEffect)
-      *> 
-      do
-        cardOperationSteps (Add card) (spinnerWidgetState (Main $ defaultPage {cardManagerState = cardManagerState {cardViewState = CardForm (emptyCardFormData {card = card}) (NewCardFromFragment card)}})) cardManagerState state <#> wrapResponse
+      (cardOperationSteps (Add card) (spinnerWidgetState (Main $ defaultPage {cardManagerState = cardManagerState {cardViewState = CardForm (emptyCardFormData {card = card}) (NewCardFromFragment card)}})) cardManagerState state <#> wrapResponse
       # runExceptT
       >>= handleOperationResult state defaultErrorPage true Black
+      )
+      <* (focus "mainView" # liftEffect)
 
     (CloneCardEvent cardEntry) ->
-      (focus "indexView" # liftEffect)
+      (focus "mainView" # liftEffect)
       *>
       do
         ProxyResponse proxy' (Tuple cardsCache' card) <- getCardSteps connectionState cardsCache cardEntry (Main defaultPage) proxyInfo
@@ -163,7 +156,7 @@ handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just inde
       >>= handleOperationResult state defaultErrorPage true Black
   
     (DeleteCardEvent cardEntry) ->
-      (focus "indexView" # liftEffect)
+      (focus "mainView" # liftEffect)
       *>
       do
         cardOperationSteps (Delete cardEntry) (spinnerWidgetState (Main defaultPage)) cardManagerState state <#> wrapResponse
@@ -172,7 +165,7 @@ handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just inde
       >>= handleOperationResult state defaultErrorPage true Black
 
     (EditCardEvent (Tuple oldCardEntry updatedCard)) ->
-      (focus "indexView" # liftEffect)
+      (focus "mainView" # liftEffect)
       *>
       do
         cardOperationSteps (Edit updatedCard oldCardEntry) (spinnerWidgetState (Main defaultPage {cardManagerState = cardManagerState {cardViewState = CardForm (emptyCardFormData {card = updatedCard}) (ModifyCard updatedCard oldCardEntry) }})) cardManagerState state <#> wrapResponse
@@ -181,7 +174,7 @@ handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just inde
       >>= handleOperationResult state defaultErrorPage true Black
 
     (ArchiveCardEvent cardEntry) ->
-      (focus "indexView" # liftEffect)
+      (focus "mainView" # liftEffect)
       *>
       do
         ProxyResponse proxy' (Tuple _ card) <- getCardSteps  connectionState  cardsCache            cardEntry             (Main defaultPage) proxyInfo
@@ -193,7 +186,7 @@ handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just inde
       >>= handleOperationResult state defaultErrorPage true Black
     
     (RestoreCardEvent cardEntry) ->
-      (focus "indexView" # liftEffect)
+      (focus "mainView" # liftEffect)
       *>
       do
         ProxyResponse proxy' (Tuple _ card) <- getCardSteps  connectionState  cardsCache            cardEntry             (Main defaultPage) proxyInfo

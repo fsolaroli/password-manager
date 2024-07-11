@@ -25,6 +25,7 @@ import DataModel.WidgetState (ImportState, UserAreaPage(..), UserAreaState, User
 import Effect.Class (liftEffect)
 import Functions.EnvironmentalVariables (currentCommit, donationIFrameURL)
 import OperationalWidgets.Sync (SyncData)
+import Unsafe.Coerce (unsafeCoerce)
 import Views.ChangePasswordView (changePasswordView)
 import Views.Components (Enabled(..), footerComponent)
 import Views.DeleteUserView (deleteUserView)
@@ -56,7 +57,7 @@ userAreaInitialState = { showUserArea: false, userAreaOpenPage: None, importStat
 userAreaView :: UserAreaState -> UserPreferences -> Credentials -> Maybe DonationInfo -> ProxyInfo -> Boolean -> EnableSync -> Maybe (Wire (Widget HTML) SyncData) -> Widget HTML (Tuple UserAreaEvent UserAreaState)
 userAreaView state@{showUserArea, userAreaOpenPage, importState, userAreaSubmenus} userPreferences credentials donationInfo proxyInfo pinExists enableSync syncDataWire = do
   commitHash <- liftEffect currentCommit
-  ((div [Props._id "userPage", Props.className (if showUserArea then "open" else "closed")] [
+  ((div [Props._id "userPage", Props.className (if showUserArea then "open" else "closed"), Props.tabIndex 0, Props.filterProp (\e -> (unsafeCoerce e).key == "Escape") Props.onKeyDown $> CloseUserAreaEvent] [
       div [Props.onClick, Props.className "mask"] [] $> CloseUserAreaEvent
     , div [Props.className "panel"] [
         header [] [div [] [button [Props.onClick] [text "menu"]]] $> CloseUserAreaEvent

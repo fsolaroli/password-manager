@@ -80,8 +80,8 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
     indexFilterView filterData index' <#> ChangeFilterEvent
   , div [Props.className "cardToolbarFrame"] [
       toolbarHeader "frame"
-    , div [Props._id "mainView", Props.className cardViewStateClass] [
-        div ([Props._id "indexView", Props.tabIndex 0] <> shortcutsHandlers) [
+    , div ([Props._id "mainView", Props.className cardViewStateClass, Props.tabIndex 0] <> shortcutsHandlers) [
+        div [Props._id "indexView"] [
           toolbarHeader "cardList"
         , div [Props.className "addCard"] [
             button [Props.onClick, Props.className "addCard" ] [span [] [text "add card"]] $> OpenCardFormEvent Nothing

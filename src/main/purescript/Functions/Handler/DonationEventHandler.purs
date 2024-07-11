@@ -80,7 +80,7 @@ handleDonationPageEvent donationPageEvent state@{c: Just c, p: Just p, s: Just s
         let cardViewState = case fragmentState of
                         Fragment.AddCard card -> CardForm (emptyCardFormData {card = card}) (NewCardFromFragment card)
                         _                     -> NoCard
-        focus "indexView" # liftEffect
+        focus "mainView" # liftEffect
         pure $ Tuple 
           (merge (asMaybe stateUpdate) state {proxy = proxy, donationLevel = Just newDonationLevel})
           (WidgetState 
@@ -96,7 +96,7 @@ handleDonationPageEvent donationPageEvent state@{c: Just c, p: Just p, s: Just s
       # runExceptT
       >>= handleOperationResult state defaultErrorPage true Black
 
-    CloseDonationPage -> (focus "indexView" # liftEffect) *> noOperation (Tuple state $ WidgetState hiddenOverlayInfo (Main defaultPage) proxyInfo)
+    CloseDonationPage -> (focus "mainView" # liftEffect) *> noOperation (Tuple state $ WidgetState hiddenOverlayInfo (Main defaultPage) proxyInfo)
 
 handleDonationPageEvent _ state _ _ = do
   throwError $ InvalidStateError (CorruptedState "DonationPage")
