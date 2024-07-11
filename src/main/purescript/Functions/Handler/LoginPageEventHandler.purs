@@ -128,6 +128,7 @@ loadHomePageSteps state@{hash: hashFunc, proxy, srpConf, c: Just c, p: Just p, m
   ProxyResponse proxy'  userInfo <- runStep       (getUserInfo connectionState                                userInfoReferences (masterKeyEncodingVersion)) (WidgetState {status: Spinner, color: Black, message: "Get user info"      } page proxyInfo)
   ProxyResponse proxy'' index    <- runStep       (getIndex    connectionState{ proxy = proxy'} (unwrap userInfo).indexReference                           ) (WidgetState {status: Spinner, color: Black, message: "Get index"          } page proxyInfo)
   donationLevel                  <- runStep       (computeDonationLevel index userInfo # liftEffect                                                        ) (WidgetState {status: Spinner, color: Black, message: "Get index"          } page proxyInfo)                                                     
+  
   case (unwrap (unwrap userInfo).userPreferences).automaticLock of
     Right n -> liftEffect (activateTimer n)
     Left  _ -> pure unit

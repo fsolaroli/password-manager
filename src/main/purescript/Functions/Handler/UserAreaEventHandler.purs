@@ -5,9 +5,9 @@ module Functions.Handler.UserAreaEventHandler
 
 import Affjax.ResponseFormat as RF
 import Concur.Core (Widget)
-import Concur.React (HTML)
+import Concur.React (HTML, affAction)
 import Control.Alt (map, ($>), (<#>), (<$>))
-import Control.Alternative ((*>))
+import Control.Alternative ((*>), (<*))
 import Control.Applicative (pure)
 import Control.Bind (bind, discard, (>>=))
 import Control.Category (identity, (<<<))
@@ -44,6 +44,7 @@ import DataModel.IndexVersions.Index (CardEntry(..), CardReference(..), Index(..
 import DataModel.Proxy (DataOnLocalStorage(..), DynamicProxy(..), Proxy(..), ProxyInfo, ProxyResponse(..), defaultOnlineProxy, discardResult)
 import DataModel.UserVersions.User (IndexReference(..), UserInfo(..), _index_reference, _userInfo_identifier, _userInfo_reference)
 import DataModel.WidgetState (CardManagerState, CardViewState(..), ImportStep(..), LoginType(..), Page(..), UserAreaPage(..), UserAreaState, WidgetState(..), MainPageWidgetState)
+import Effect.Aff (Milliseconds(..), delay, forkAff)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Functions.Card (addTag)
@@ -379,18 +380,20 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
     (LockEvent) ->
       let page = Main defaultPage
       in
-        logoutSteps state "Lock" page proxyInfo
+        (logoutSteps state "Lock" page proxyInfo
         # runExceptT
-        >>= handleOperationResult state defaultErrorPage true White
+        >>= handleOperationResult state defaultErrorPage true White)
+        <* (forkAff ((delay (Milliseconds 10.0)) *> ((focus "loginPassphraseInput" *> focus "loginPINInput") # liftEffect)) # affAction)
   
     (LogoutEvent) ->
       let page = Main defaultPage
       in 
-        do
+        (do
           username_ <- runStep (liftEffect $ window >>= localStorage >>= getItem (makeKey "user")) (WidgetState (spinnerOverlay "Logout" White) page proxyInfo)
           logoutSteps (state {username = username_}) "Logout" page proxyInfo
         # runExceptT
-        >>= handleOperationResult state defaultErrorPage true White
+        >>= handleOperationResult state defaultErrorPage true White)
+        <* (forkAff ((delay (Milliseconds 10.0)) *> ((focus "loginUsernameInput" *> focus "loginPINInput") # liftEffect)) # affAction)
 
   where
     updateUserAreaState :: MainPageWidgetState -> UserAreaState -> Widget HTML OperationState
@@ -439,6 +442,8 @@ logoutSteps state@{username, hash: hashFunc, proxy, srpConf} message page proxyI
         let connectionState = {proxy, hashFunc, srpConf, c: hex "", p: hex ""}
         _ <- runStep (genericRequest connectionState "logout" POST Nothing RF.ignore) (WidgetState (spinnerOverlay message White) page proxyInfo)
         pure $ DynamicProxy defaultOnlineProxy
+
+    stopTimer # liftEffect
 
     passphrase <- runStep (liftEffect $ window >>= localStorage >>= getItem (makeKey "passphrase")) (WidgetState (spinnerOverlay message White) page proxyInfo)
     
