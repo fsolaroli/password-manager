@@ -99,11 +99,13 @@ handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just inde
                                                           , highlightedEntry = Nothing 
                                                           }
       <* case filterData.filterViewStatus of
-          FilterViewOpen   -> 
-            case filterData.filter of
-              Search _     -> forkAff ((delay (Milliseconds 10.0)) *> ((if filterData.selected then select "searchInputField" else focus "searchInputField") # liftEffect)) # void # affAction
-              _            -> focus "filterView" # liftEffect
-          FilterViewClosed -> focus "mainView"   # liftEffect
+          FilterViewOpen   -> affAction $ void $ forkAff ((delay (Milliseconds 10.0)) *> 
+                                (if   filterData.selected 
+                                 then select "searchInputField" # liftEffect
+                                 else focus "searchInputField"  # liftEffect
+                                )
+                              )
+          FilterViewClosed ->         focus "mainView" # liftEffect
 
     (UpdateCardForm cardFormData) ->
       updateCardManagerState defaultPage cardManagerState { cardViewState = updateCardViewState cardManagerState.cardViewState cardFormData }
