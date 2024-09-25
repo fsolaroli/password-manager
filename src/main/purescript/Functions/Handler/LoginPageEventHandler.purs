@@ -27,7 +27,6 @@ import DataModel.Credentials (Credentials, emptyCredentials)
 import DataModel.FragmentState as Fragment
 import DataModel.Proxy (Proxy(..), ProxyInfo, ProxyResponse(..), defaultOnlineProxy)
 import DataModel.WidgetState (CardFormInput(..), CardViewState(..), LoginType(..), Page(..), WidgetState(..))
-import Effect.Aff (Milliseconds(..), delay, forkAff)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Functions.Communication.Login (PrepareLoginResult, loginStep1, loginStep2, prepareLogin)
@@ -35,7 +34,7 @@ import Functions.Communication.Users (extractUserInfoReference, getUserInfo)
 import Functions.DeviceSync (computeSyncOperations, getSyncOptionFromLocalStorage)
 import Functions.Donations (DonationLevel(..), computeDonationLevel)
 import Functions.EncodeDecode (importCryptoKeyAesGCM)
-import Functions.Events (blur, focus)
+import Functions.Events (blur, effectDelayed, focus)
 import Functions.Handler.GenericHandlerFunctions (OperationState, defaultView, handleOperationResult, noOperation, runStep, runWidgetStep)
 import Functions.Index (getIndex)
 import Functions.Pin (decryptPassphraseWithPin, deleteCredentials, makeKey)
@@ -183,6 +182,6 @@ handlePinResult state@{proxy} page color either = do
           pure $ Login $ emptyLoginFormData {credentials = emptyCredentials {username = fromMaybe "" state.username}, loginType = CredentialLogin}
       ) <|> (defaultView (WidgetState {status: Spinner, color, message: "Compute PIN attempts"} page proxyInfo))
 
-  _ <- forkAff ((delay (Milliseconds 510.0)) *> (blur "loginUsernameInput" # liftEffect) *> (focus "mainView" # liftEffect)) # affAction
+  _ <- effectDelayed 510.0 (blur "loginUsernameInput" # liftEffect) *> (focus "mainView" # liftEffect) # affAction
 
   pure $ Tuple newPage either

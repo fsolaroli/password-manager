@@ -44,7 +44,6 @@ import DataModel.IndexVersions.Index (CardEntry(..), CardReference(..), Index(..
 import DataModel.Proxy (DataOnLocalStorage(..), DynamicProxy(..), Proxy(..), ProxyInfo, ProxyResponse(..), defaultOnlineProxy, discardResult)
 import DataModel.UserVersions.User (IndexReference(..), UserInfo(..), _index_reference, _userInfo_identifier, _userInfo_reference)
 import DataModel.WidgetState (CardManagerState, CardViewState(..), ImportStep(..), LoginType(..), Page(..), UserAreaPage(..), UserAreaState, WidgetState(..), MainPageWidgetState)
-import Effect.Aff (Milliseconds(..), delay, forkAff)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Functions.Card (addTag)
@@ -53,7 +52,7 @@ import Functions.Communication.Blobs (deleteBlob, getBlob)
 import Functions.Communication.Cards (deleteCard, getCard, postCard)
 import Functions.Communication.Users (asMaybe, computeRemoteUserCard, deleteUserCard, deleteUserInfo, updateUserPreferences)
 import Functions.DeviceSync (computeDeleteOperations, computeSyncOperations, updateSyncPreference)
-import Functions.Events (focus)
+import Functions.Events (eventDelayed, focus)
 import Functions.Export (BlobsList, appendCardsDataInPlace, getBasicHTML, prepareUnencryptedExport, prepareHTMLBlob)
 import Functions.Handler.DonationEventHandler (handleDonationPageEvent)
 import Functions.Handler.GenericHandlerFunctions (OperationState, defaultErrorPage, handleOperationResult, noOperation, runStep, runWidgetStep)
@@ -383,7 +382,7 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
         (logoutSteps state Lock page proxyInfo
         # runExceptT
         >>= handleOperationResult state defaultErrorPage true White)
-        <* (forkAff ((delay (Milliseconds 10.0)) *> ((focus "loginPassphraseInput" *> focus "loginPINInput") # liftEffect)) # affAction)
+        <* (eventDelayed (focus "loginPassphraseInput" *> focus "loginPINInput") # affAction)
   
     (LogoutEvent) ->
       let page = Main defaultPage
@@ -391,7 +390,7 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
         (logoutSteps state Logout page proxyInfo
         # runExceptT
         >>= handleOperationResult state defaultErrorPage true White)
-        <* (forkAff ((delay (Milliseconds 10.0)) *> ((focus "loginUsernameInput" *> focus "loginPINInput") # liftEffect)) # affAction)
+        <* (eventDelayed (focus "loginUsernameInput" *> focus "loginPINInput") # affAction)
 
   where
     updateUserAreaState :: MainPageWidgetState -> UserAreaState -> Widget HTML OperationState

@@ -102,10 +102,10 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
 
     cardViewStateClass :: String
     cardViewStateClass = case cardViewState of
-      NoCard       -> "CardViewClose"
+      NoCard             -> "CardViewClose"
       CardForm _ NewCard -> "CardFormOpen NewCard"
       CardForm _ _       -> "CardFormOpen EditCard"
-      _ -> "CardViewOpen"
+      Card     _ _       -> "CardViewOpen"
 
     sortedCards :: List CardEntry
     sortedCards  = List.sort $ filteredEntries filter (shownEntries entries selectedEntry archived)

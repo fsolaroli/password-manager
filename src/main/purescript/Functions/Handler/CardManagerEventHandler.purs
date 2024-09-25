@@ -6,7 +6,7 @@ module Functions.Handler.CardManagerEventHandler
 
 import Concur.Core (Widget)
 import Concur.React (HTML, affAction)
-import Control.Alt (void, (<#>), (<$>))
+import Control.Alt ((<#>), (<$>))
 import Control.Alternative ((*>), (<*))
 import Control.Applicative (pure)
 import Control.Bind (bind, (=<<), (>>=))
@@ -33,18 +33,17 @@ import DataModel.Proxy (ProxyInfo, ProxyResponse(..))
 import DataModel.SRPVersions.SRP (hashFuncSHA256)
 import DataModel.UserVersions.User (UserInfo(..), _indexReference, _index_reference, _userInfo_identifier, _userInfo_reference)
 import DataModel.WidgetState (CardFormInput(..), CardViewState(..), MainPageWidgetState, Page(..), WidgetState(..), CardManagerState)
-import Effect.Aff (Milliseconds(..), delay, forkAff)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Functions.Card (appendToTitle, archiveCard, createCardEntry, decryptCard, restoreCard)
 import Functions.Communication.Blobs (getBlob)
 import Functions.Communication.SyncBackend (syncBackend)
 import Functions.Communication.Users (computeMasterKey, computeRemoteUserCard, encryptUserInfo)
-import Functions.Events (blur, focus, scrollElementIntoView, select)
+import Functions.Events (blur, eventDelayed, focus, scrollElementIntoView, select)
 import Functions.Handler.DonationEventHandler (handleDonationPageEvent)
 import Functions.Handler.GenericHandlerFunctions (OperationState, defaultErrorPage, handleOperationResult, noOperation, runStep, syncLocalStorage)
 import Functions.Index (encryptIndex)
-import IndexFilterView (Filter(..), FilterViewStatus(..))
+import IndexFilterView (FilterViewStatus(..))
 import OperationalWidgets.Sync (SyncOperation(..))
 import Views.CardsManagerView (CardManagerEvent(..), NavigateCardsEvent(..))
 import Views.CreateCardView (CardFormData, emptyCardFormData)
@@ -82,7 +81,7 @@ handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just inde
                     proxyInfo
                   )
                 )
-      <* (forkAff ((delay (Milliseconds 10.0)) *> (focus "userPage" # liftEffect)) # affAction)
+      <* (eventDelayed (focus "userPage") # affAction)
 
     (ShowShortcutsEvent show) ->
       updateCardManagerState defaultPage cardManagerState {showShortcutsHelp = show}
@@ -99,13 +98,12 @@ handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just inde
                                                           , highlightedEntry = Nothing 
                                                           }
       <* case filterData.filterViewStatus of
-          FilterViewOpen   -> affAction $ void $ forkAff ((delay (Milliseconds 10.0)) *> 
+          FilterViewOpen   -> affAction $
                                 (if   filterData.selected 
-                                 then select "searchInputField" # liftEffect
-                                 else focus "searchInputField"  # liftEffect
+                                 then eventDelayed (select "searchInputField")
+                                 else eventDelayed (focus  "searchInputField")
                                 )
-                              )
-          FilterViewClosed ->         focus "mainView" # liftEffect
+          FilterViewClosed ->         liftEffect   (focus  "mainView")
 
     (UpdateCardForm cardFormData) ->
       updateCardManagerState defaultPage cardManagerState { cardViewState = updateCardViewState cardManagerState.cardViewState cardFormData }
@@ -128,8 +126,8 @@ handleCardManagerEvent cardManagerEvent cardManagerState state@{index: Just inde
                 )
           # runExceptT
           >>= handleOperationResult state defaultErrorPage (isNothing $ lookup (reference entry) cardsCache) Black
-        <* ((forkAff ((delay (Milliseconds 10.0)) *> (scrollElementIntoView "selectedCard" # liftEffect))) # affAction)
-        <* (focus "mainView" # liftEffect)
+        <* (eventDelayed (scrollElementIntoView "selectedCard") # affAction)
+        <* (liftEffect   (focus                 "mainView"))
     
     (OpenCardFormEvent maybeCard) ->
       updateCardManagerState defaultPage cardManagerState { cardViewState = uncurry CardForm $ case maybeCard of
