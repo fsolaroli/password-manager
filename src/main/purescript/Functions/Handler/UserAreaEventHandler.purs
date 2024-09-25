@@ -68,7 +68,7 @@ import OperationalWidgets.Sync (SyncOperation(..), addPendingOperation, updateCo
 import Record (merge)
 import Views.DonationViews as DonationEvent
 import Views.ExportView (ExportEvent(..))
-import Views.LoginFormView (emptyLoginFormData)
+import Views.LoginFormView (Username, emptyLoginFormData)
 import Views.OverlayView (OverlayColor(..), OverlayStatus(..), hiddenOverlayInfo, spinnerOverlay)
 import Views.SetPinView (PinEvent(..))
 import Views.UserAreaView (UserAreaEvent(..), userAreaInitialState)
@@ -380,7 +380,7 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
     (LockEvent) ->
       let page = Main defaultPage
       in
-        (logoutSteps state "Lock" page proxyInfo
+        (logoutSteps state Lock page proxyInfo
         # runExceptT
         >>= handleOperationResult state defaultErrorPage true White)
         <* (forkAff ((delay (Milliseconds 10.0)) *> ((focus "loginPassphraseInput" *> focus "loginPINInput") # liftEffect)) # affAction)
@@ -388,9 +388,7 @@ handleUserAreaEvent userAreaEvent cardManagerState userAreaState state@{proxy, s
     (LogoutEvent) ->
       let page = Main defaultPage
       in 
-        (do
-          username_ <- runStep (liftEffect $ window >>= localStorage >>= getItem (makeKey "user")) (WidgetState (spinnerOverlay "Logout" White) page proxyInfo)
-          logoutSteps (state {username = username_}) "Logout" page proxyInfo
+        (logoutSteps state Logout page proxyInfo
         # runExceptT
         >>= handleOperationResult state defaultErrorPage true White)
         <* (forkAff ((delay (Milliseconds 10.0)) *> ((focus "loginUsernameInput" *> focus "loginPINInput") # liftEffect)) # affAction)
@@ -433,9 +431,21 @@ downloadBlobsSteps referenceList connectionState page proxyInfo =
   where
     nToDownload = List.length referenceList
 
-logoutSteps :: AppState -> String -> Page -> ProxyInfo -> ExceptT AppError (Widget HTML) OperationState
-logoutSteps state@{username, hash: hashFunc, proxy, srpConf} message page proxyInfo =
+data LogoutType = Lock | Logout
+
+logoutTypeMessage :: LogoutType -> String
+logoutTypeMessage Lock   = "Lock"
+logoutTypeMessage Logout = "Logout"
+
+logoutTypeUserame :: Maybe Username -> LogoutType -> Username
+logoutTypeUserame username = case _ of
+  Lock   -> fromMaybe "" username
+  Logout ->           ""
+
+logoutSteps :: AppState -> LogoutType -> Page -> ProxyInfo -> ExceptT AppError (Widget HTML) OperationState
+logoutSteps state@{username, hash: hashFunc, proxy, srpConf} logoutType page proxyInfo =
   do
+    let message = logoutTypeMessage logoutType
     proxy' <- case proxy of
       DynamicProxy (OfflineProxy _ _) -> pure $ DynamicProxy $ OfflineProxy Nothing NoData
       _ -> do 
@@ -451,7 +461,7 @@ logoutSteps state@{username, hash: hashFunc, proxy, srpConf} message page proxyI
             ((resetState state) {username = username, pinEncryptedPassword = hex <$> passphrase, proxy = proxy'})
             (WidgetState
               hiddenOverlayInfo
-              (Login emptyLoginFormData { credentials = emptyCredentials {username = fromMaybe "" username}
+              (Login emptyLoginFormData { credentials = emptyCredentials {username = logoutTypeUserame username logoutType}
                                         , loginType   = if isNothing passphrase then CredentialLogin else PinLogin
                                         }
               )

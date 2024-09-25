@@ -21,7 +21,7 @@ import Views.OverlayView (OverlayColor(..), hiddenOverlayInfo, spinnerOverlay)
 import Views.SignupFormView (SignupPageEvent(..), getSignupDataFromCredentials)
 
 getLoginFormData :: AppState -> LoginFormData
-getLoginFormData {username: Just username, pinEncryptedPassword: Just _} = emptyLoginFormData { credentials = {username, password: ""}, loginType = PinLogin }
+getLoginFormData {username: Just _, pinEncryptedPassword: Just _} = emptyLoginFormData { loginType = PinLogin }
 getLoginFormData _ = emptyLoginFormData
 
 handleSignupPageEvent :: SignupPageEvent -> AppState -> ProxyInfo -> Fragment.FragmentState -> Widget HTML OperationState
