@@ -3,7 +3,7 @@ module Views.CardViews where
 import Concur.Core (Widget)
 import Concur.Core.FRP (Signal, fireOnce, loopW)
 import Concur.React (HTML, affAction)
-import Concur.React.DOM (a, a_, button, div, h3, li', li_, p_, text, textarea, ul)
+import Concur.React.DOM (a, a_, button, div, h3, h4, li', li_, p_, text, textarea, ul)
 import Concur.React.Props as Props
 import Control.Alt (($>), (<|>))
 import Control.Alternative (empty, (*>))
@@ -93,7 +93,7 @@ cardContent (CardValues {title: t, tags: ts, fields: fs, notes: n}) = div [Props
 , if (isEmpty ts) then (empty) else div [Props.className "card_tags"] [ul [] $ (\s -> li' [text s]) <$> (toUnfoldable ts)]
 , if (null    fs) then (empty) else div [Props.className "card_fields"] $ cardField false <$> fs
 , div [Props.className "card_notes"] [
-    if (isEmpty ts && null fs) then (empty) else h3 [] [text "Notes"]
+    if (isEmpty ts && null fs) then (empty) else h4 [] [text "Notes"]
   , div [Props.className "markdown-body", Props.dangerouslySetInnerHTML { __html: unsafePerformEffect $ renderString n}] []
   ]
 ]
