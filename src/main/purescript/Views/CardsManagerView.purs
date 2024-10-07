@@ -19,7 +19,6 @@ import Data.Functor ((<$>), (<$))
 import Data.HexString (HexString)
 import Data.HeytingAlgebra (not, (||))
 import Data.List (List(..), elem, elemIndex, index, length)
-import Data.List as List
 import Data.Maybe (Maybe(..), maybe)
 import Data.Ord (max, min)
 import Data.Ring (sub, (-))
@@ -108,7 +107,7 @@ cardsManagerView state@{filterData: filterData@{filterViewStatus, filter, archiv
       Card     _ _       -> "CardViewOpen"
 
     sortedCards :: List CardEntry
-    sortedCards  = List.sort $ filteredEntries filter (shownEntries entries selectedEntry archived)
+    sortedCards  = filteredEntries filter (shownEntries entries selectedEntry archived)
 
     selectedEntry :: Maybe CardEntry
     selectedEntry = case cardViewState of
