@@ -160,12 +160,12 @@ object HashCashMiddlewareSpec extends ZIOSpecDefault:
         response2 <- idApp.runZIO(newGet)
       } yield assertTrue(response2.status == Status.Ok)
     },
-    // test("402 if repeated hashcash") {
-    //   assertNever("Yet to be implemented")
-    // },
-    // test("Can manage multiple challenges simultaneously") {
-    //   assertNever("Yet to be implemented")
-    // }, //TODO: implement
+    test("402 if repeated hashcash") {
+      assertNever("Yet to be implemented")  //TODO: implement
+    } @@ TestAspect.ignore,
+    test("Can manage multiple challenges simultaneously") {
+      assertNever("Yet to be implemented")  //TODO: implement
+    } @@ TestAspect.ignore,
   ).provideSomeLayer(layers) @@
     TestAspect.sequential
 
