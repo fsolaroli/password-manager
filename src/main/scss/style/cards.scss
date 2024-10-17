@@ -18,7 +18,7 @@ div#homePage {
 
 			@include offlineHeader();
         
-            header.cardList {
+            header {
 				display: flex;
 				flex-direction: column;
 
