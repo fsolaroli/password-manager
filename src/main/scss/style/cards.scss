@@ -18,9 +18,14 @@ div#homePage {
 
 			@include offlineHeader();
         
-            header {
+            header.cardList {
 				display: flex;
 				flex-direction: column;
+
+                & > h2 {
+                    visibility: hidden;
+                    display: none;
+                }
 
 				div.toolbar {
 					display: flex;
