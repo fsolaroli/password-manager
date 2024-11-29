@@ -7,7 +7,6 @@ import java.time.LocalDate
 import java.time.format.DateTimeParseException
 // import java.nio.charset.StandardCharsets
 
-import is.clipperz.backend.Main.ClipperzHttpApp
 import is.clipperz.backend.LogAspect
 import is.clipperz.backend.data.HexString
 import is.clipperz.backend.Exceptions.*
@@ -20,6 +19,7 @@ import zio.http.{ Method, Path, Response, Request, Status, Routes, Headers, Body
 import zio.json.{ EncoderOps, JsonDecoder, DeriveJsonDecoder, JsonEncoder, DeriveJsonEncoder }
 import zio.stream.{ ZStream }
 import zio.nio.charset.Charset
+import zio.telemetry.opentelemetry.tracing.Tracing
 
 // ------------------------------------------------------------------------------------
 
@@ -43,26 +43,29 @@ object OneTimeSecretData:
 
 // ------------------------------------------------------------------------------------
 
-val oneTimeShareApi = Routes (
+val oneTimeShareApi: Routes[OneTimeShareArchive & Tracing, Throwable] = Routes (
     Method.POST / "api" / "share" -> handler : (request: Request) =>
-        ZIO
-        .service[OneTimeShareArchive]
-        .zip(ZIO.succeed(request.body.asStream))
-        .flatMap((archive: OneTimeShareArchive, stream: ZStream[Any, Throwable, Byte]) =>
-            fromStream[OneTimeSecretData](stream)
-            .map ((secretData: OneTimeSecretData) => 
-                val start = DateTime.now().withZone(DateTimeZone.UTC).nn
-                OneTimeSecret(secretData.secret, start + secretData.duration.toLong, Option(secretData.version))
-            )
-            .flatMap ((secret: OneTimeSecret) =>
-                Charset.Standard.utf8.encodeString(secret.toJson)
-                .flatMap(data => archive.saveSecret(ZStream.fromChunks(data)))
-                // archive.saveSecret(ZStream.fromChunks(Chunk.fromArray((secret).toJson.getBytes(StandardCharsets.UTF_8).nn)))
-            )
-        ) 
-        .map(id => Response.text(s"${id}")) @@ LogAspect.logAnnotateRequestData(request)
+        // ZIO.serviceWithZIO[Tracing](tracing => tracing.span(s"${request.method} ${request.url.path}") {
+            ZIO
+            .service[OneTimeShareArchive]
+            .zip(ZIO.succeed(request.body.asStream))
+            .flatMap((archive: OneTimeShareArchive, stream: ZStream[Any, Throwable, Byte]) =>
+                fromStream[OneTimeSecretData](stream)
+                .map ((secretData: OneTimeSecretData) => 
+                    val start = DateTime.now().withZone(DateTimeZone.UTC).nn
+                    OneTimeSecret(secretData.secret, start + secretData.duration.toLong, Option(secretData.version))
+                )
+                .flatMap ((secret: OneTimeSecret) =>
+                    Charset.Standard.utf8.encodeString(secret.toJson)
+                    .flatMap(data => archive.saveSecret(ZStream.fromChunks(data)))
+                    // archive.saveSecret(ZStream.fromChunks(Chunk.fromArray((secret).toJson.getBytes(StandardCharsets.UTF_8).nn)))
+                )
+            ) 
+            .map(id => Response.text(s"${id}"))
+        // })
     ,
-    Method.GET / "api" / "redeem" / string("id") -> handler : (id: String, request: Request)=>
+    Method.GET / "api" / "redeem" / string("id") -> handler : (id: String, request: Request) =>
+        // ZIO.serviceWithZIO[Tracing](_.span(s"${request.method} ${request.url.path}") {
         ZIO
         .service[OneTimeShareArchive]
         .flatMap(archive =>
@@ -82,12 +85,15 @@ val oneTimeShareApi = Routes (
                         )
                     )
             )
-        )
-        .map((version: Option[SecretVersion], bytes: ZStream[Any, Throwable, Byte], contentLength: Long) => 
-            Response(
-                status  = Status.Ok,
-                headers = version.map(v => Headers("clipperz-onetimesecret-version", v.toJson)).getOrElse(Headers.empty),
-                body    = Body.fromStream(bytes, contentLength)
+            .flatMap((version: Option[SecretVersion], bytes: ZStream[Tracing, Throwable, Byte], contentLength: Long) => 
+                Body.fromStreamEnv[Tracing](bytes, contentLength).map(body =>
+                    Response(
+                        status  = Status.Ok,
+                        headers = version.map(v => Headers("clipperz-onetimesecret-version", v.toJson)).getOrElse(Headers.empty),
+                        body    = body
+                    )
+                )
             )
-        ) @@ LogAspect.logAnnotateRequestData(request)
+        )
+        // })
 )

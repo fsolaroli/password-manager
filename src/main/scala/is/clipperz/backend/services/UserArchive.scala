@@ -7,9 +7,10 @@ import is.clipperz.backend.Exceptions.{ BadRequestException, ResourceConflictExc
 import zio.nio.file.Path
 import zio.nio.charset.Charset
 
-import zio.{ ZIO, ZLayer, Tag, Task, Chunk }
+import zio.{ RIO, ZIO, ZLayer, Tag, Task, Chunk }
 import zio.json.{ JsonDecoder, JsonEncoder, DeriveJsonDecoder, DeriveJsonEncoder, EncoderOps }
 import zio.stream.{ ZSink, ZStream }
+import zio.telemetry.opentelemetry.tracing.Tracing
 
 // ============================================================================
 
@@ -74,13 +75,13 @@ object UserCard:
 // ============================================================================
 
 trait UserArchive:
-    def getUser(username: HexString): Task[Option[RemoteUserCard]]
-    def saveUser(user: RemoteUserCard, overwrite: Boolean): Task[HexString]
-    def deleteUser(c: HexString): Task[Unit]
+    def getUser(username: HexString): RIO[Tracing, Option[RemoteUserCard]]
+    def saveUser(user: RemoteUserCard, overwrite: Boolean): RIO[Tracing, HexString]
+    def deleteUser(c: HexString): RIO[Tracing, Unit]
 
 object UserArchive:
     case class FileSystemUserArchive(keyBlobArchive: KeyBlobArchive) extends UserArchive:
-        override def getUser(username: HexString): Task[Option[RemoteUserCard]] =
+        override def getUser(username: HexString): RIO[Tracing, Option[RemoteUserCard]] =
             keyBlobArchive
             .getBlob(username.toString).map(_._1)
             .flatMap(fromStream[RemoteUserCard](_).map(Some.apply))
@@ -88,8 +89,8 @@ object UserArchive:
                 case ex: ResourceNotFoundException => ZIO.succeed(None)
                 case ex => ZIO.fail(ex)
 
-        override def saveUser(userCard: RemoteUserCard, overwrite: Boolean): Task[HexString] =
-            def saveUserCard(userCard: RemoteUserCard): Task[HexString] =
+        override def saveUser(userCard: RemoteUserCard, overwrite: Boolean): RIO[Tracing, HexString] =
+            def saveUserCard(userCard: RemoteUserCard): RIO[Tracing, HexString] =
                 Charset.Standard.utf8.encodeString(userCard.toJson)
                 .flatMap(blobChunks =>
                     keyBlobArchive
@@ -108,7 +109,7 @@ object UserArchive:
                 else saveUserCard(userCard)
             )
 
-        override def deleteUser(c: HexString): Task[Unit] =
+        override def deleteUser(c: HexString): RIO[Tracing, Unit] =
             this
             .getUser(c)
             .flatMap(optional =>
@@ -121,8 +122,8 @@ object UserArchive:
         basePath: Path,
         levels: Int,
         requireExistingPath: Boolean = true,
-    ): ZLayer[Any, Throwable, UserArchive] =
-        ZLayer.fromZIO[Any, Throwable, UserArchive](
+    ): ZLayer[Tracing, Throwable, UserArchive] =
+        ZLayer.fromZIO[Tracing, Throwable, UserArchive](
         KeyBlobArchive.FileSystemKeyBlobArchive(basePath, levels, requireExistingPath)
             .map(new FileSystemUserArchive(_))
     )

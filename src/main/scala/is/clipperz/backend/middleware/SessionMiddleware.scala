@@ -2,15 +2,15 @@ package is.clipperz.backend.middleware
 
 import is.clipperz.backend.data.HexString
 import is.clipperz.backend.functions.{ customErrorHandler, customMapError, fromString }
-import is.clipperz.backend.Main.ClipperzHttpApp
 import is.clipperz.backend.services.{ ChallengeType, Session, SessionManager, TollManager, TollChallenge }
 
-import zio.{ ZIO, Task }
+import zio.{ RIO, ZIO, Task }
 import zio.json.EncoderOps
 import zio.http.{ HandlerAspect, Headers, Middleware, Request, Response, Status }
 import zio.http.Status.{ InternalServerError, Unauthorized }
+import zio.telemetry.opentelemetry.tracing.Tracing
 
-type SessionMiddleware = HandlerAspect[SessionManager, Any]
+type SessionMiddleware = HandlerAspect[SessionManager & Tracing, Any]
 
 def authorizedMiddleware(cExtractor: (Request) => Task[String]): SessionMiddleware =
     Middleware.ifRequestThenElseZIO(req =>

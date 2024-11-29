@@ -13,10 +13,11 @@ import java.io.{ FileNotFoundException, IOException, FileOutputStream }
 import zio.nio.file.{ Files, Path }
 import java.security.MessageDigest
 
-import zio.{ Chunk, Duration, ZIO, ZLayer, Task }
+import zio.{ Chunk, Duration, RIO, ZIO, ZLayer, Task }
 import zio.stream.{ ZStream, ZSink }
 import zio.json.{ JsonDecoder, JsonEncoder, DeriveJsonDecoder, DeriveJsonEncoder }
 import zio.nio.charset.Charset
+import zio.telemetry.opentelemetry.tracing.Tracing
 // import java.nio.file.attribute.FileAttribute
 
 // ----------------------------------------------------------------------------
@@ -26,22 +27,20 @@ type BlobHash = HexString
 // ----------------------------------------------------------------------------
 
 trait BlobArchive:
-    def getBlob             (hash: BlobHash): Task[(ZStream[Any, Throwable, Byte], Long)]
-    def getBlobIdentifier   (hash: BlobHash): Task[HexString]
-    def saveBlob            (hash: BlobHash, identifier: HexString, content:  ZStream[Any, Throwable, Byte]): Task[BlobHash]
-    def saveBlob_path       (identifier: HexString, filename: String, hash: BlobHash, content: Path): Task[BlobHash]
-    // def getReadyToSaveBlob  (hash: BlobHash, identifier: HexString, content:  ZStream[Any, Throwable, Byte]): Task[BlobHash]
-    // def commitSavedBlob     (hash: BlobHash, identifier: HexString): Task[BlobHash]
-    def deleteBlob          (hash: BlobHash, identifier: HexString): Task[Unit]
+    def getBlob             (hash: BlobHash): RIO[Tracing, (ZStream[Any, Throwable, Byte], Long)]
+    def getBlobIdentifier   (hash: BlobHash): RIO[Tracing, HexString]
+    def saveBlob            (hash: BlobHash, identifier: HexString, content:  ZStream[Any, Throwable, Byte]): RIO[Tracing, BlobHash]
+    def saveBlob_path       (identifier: HexString, filename: String, hash: BlobHash, content: Path): RIO[Tracing, BlobHash]
+    def deleteBlob          (hash: BlobHash, identifier: HexString): RIO[Tracing, Unit]
 
 object BlobArchive:
     val WAIT_TIME = 10000
 
     case class FileSystemBlobArchive(keyBlobArchive: KeyBlobArchive, tmpDir: Path) extends BlobArchive:
-        override def getBlob(hash: BlobHash): Task[(ZStream[Any, Throwable, Byte], Long)] =
+        override def getBlob(hash: BlobHash): RIO[Tracing, (ZStream[Any, Throwable, Byte], Long)] =
             keyBlobArchive.getBlob(hash.toString)
 
-        override def getBlobIdentifier(hash: BlobHash): Task[HexString] =
+        override def getBlobIdentifier(hash: BlobHash): RIO[Tracing, HexString] =
             keyBlobArchive
                 .getMetadata(hash.toString)
                 .flatMap(_.run(ZSink.collectAll[Byte]))
@@ -83,7 +82,7 @@ object BlobArchive:
                     case ex => ZIO.fail(new NonWritableArchiveException(s"${ex}"))
 */
 
-        private def _saveBlob_nio (hash: BlobHash, identifier: HexString, content: ZStream[Any, Throwable, Byte]): Task[BlobHash] =
+        private def _saveBlob_nio (hash: BlobHash, identifier: HexString, content: ZStream[Any, Throwable, Byte]): RIO[Tracing, BlobHash] =
            ZIO.scoped:
                 Files.createTempFileInScoped(dir=tmpDir, suffix=".tmp", prefix=None, fileAttributes = Nil)
                 // Files.createTempFileIn(
@@ -94,10 +93,8 @@ object BlobArchive:
                 // )
                 .flatMap { tmpFile => content
                     .timeoutFail(new EmptyContentException)(Duration.fromMillis(WAIT_TIME))
-                    // .tap(_ => ZIO.log(s"TEMP FILE: ${tmpFile}"))
                     .tapSink(ZSink.fromOutputStream(new FileOutputStream(tmpFile.toFile)))
                     .run(ZSink.digest(MessageDigest.getInstance("SHA-256").nn))
-                    // .tapBoth(error => ZIO.log(s"SAVE ERROR: ${error}"), result => ZIO.log(s"SAVE RESULT: ${result}"))
                     .map((chunk: Chunk[Byte]) => HexString.bytesToHex(chunk.toArray))
                     .flatMap { hash_ =>
                         if (hash_ == hash)
@@ -128,12 +125,10 @@ object BlobArchive:
                         case ex: Exception              => ZIO.fail(new NonWritableArchiveException(s"${ex}"))
                 }
 
-        override def saveBlob(hash: BlobHash, identifier: HexString, content: ZStream[Any, Throwable, Byte]): Task[BlobHash] =
-        // override def getReadyToSaveBlob(hash: BlobHash, identifier: HexString, content: ZStream[Any, Throwable, Byte]): Task[BlobHash] =
-            // _saveBlob(hash, identifier, content)
+        override def saveBlob(hash: BlobHash, identifier: HexString, content: ZStream[Any, Throwable, Byte]): RIO[Tracing, BlobHash] =
             _saveBlob_nio(hash, identifier, content)
 
-        override def saveBlob_path(identifier: HexString, filename: String, hash: BlobHash, content: Path): Task[BlobHash] =
+        override def saveBlob_path(identifier: HexString, filename: String, hash: BlobHash, content: Path): RIO[Tracing, BlobHash] =
             if HexString(filename) == hash
             then 
                 Charset.Standard.utf8.encodeString(identifier.toString())
@@ -145,7 +140,7 @@ object BlobArchive:
         // override def commitSavedBlob     (hash: BlobHash, identifier: HexString): Task[BlobHash] =
         //     ???
 
-        override def deleteBlob(hash: BlobHash, identifier: HexString): Task[Unit] =
+        override def deleteBlob(hash: BlobHash, identifier: HexString): RIO[Tracing, Unit] =
             ZIO.scoped:
                 this.getBlobIdentifier(hash)
                     .flatMap(storedIdentifier =>
@@ -157,46 +152,22 @@ object BlobArchive:
   // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
     def initializeBlobArchive (baseTmpPath: Path): Task[Unit] =
-        // println(s"===> INIZIALIZE BLOB ARCHIVE: baseTmpPath: ${baseTmpPath}")
-        // ZIO.attempt:
         Files.exists(baseTmpPath)
         .zip(Files.isDirectory(baseTmpPath))
-        // .tap(checks => ZIO.log(s"INIZIALIZE BLOB ARCHIVE: baseTmpPath: ${baseTmpPath}, checks: ${baseTmpPath}"))
         .flatMap(checks => 
             val result = checks match {
-                // case (true, false)  => Files.delete(baseTmpPath).map(_ => baseTmpPath.toFile.mkdirs())
                 case (true, false)  => Files.delete(baseTmpPath) *> Files.createDirectories(baseTmpPath)
                 case (true, true)   => ZIO.succeed(())
-                // case (false, _)     => ZIO.succeed(baseTmpPath.toFile.mkdirs())
                 case (false, _)     => Files.createDirectories(baseTmpPath)
             }
             result
         )
-        // .tap(_ => ZIO.log(s"<<<<<< DONE INIZIALIZING BLOG ARCHIVE"))
-        // .tapBoth(_ => ZIO.log(s"===> ERROR"), _ => ZIO.log(s"===> OK"))
-        // .tapError(error => ZIO.log(s">>> ERROR: ${error}"))
-        // .tap(_ => Files.exists(basePath).zip(Files.isDirectory(basePath)).tap((exists, isDirectory) => ZIO.log(s"<<<<<< DONE INIZIALIZING BLOG ARCHIVE: exists: ${exists} - isDirectory: ${isDirectory}")))
-            // .map(result =>
-            //     if (result == false)
-            //         throw new IOException("Failed initialization of temporary blob directory")
-            // )
-
-        // ZIO.attempt:
-        //     val file = basePath.toFile()
-        //     val tempFolderSuccessfullyCreated: Boolean = (file match
-        //         case null   => None
-        //         case _      => Some(file)
-        //     )
-        //     .map(p => if p.exists() then true else p.mkdirs())
-        //     .getOrElse(false)
-        //     if (tempFolderSuccessfullyCreated == false)
-        //         throw new IOException("Failed initialization of temporary blob directory")
 
     def fs (
         basePath: Path,
         levels: Int,
         requireExistingPath: Boolean = true,
-    ): ZLayer[Any, Throwable, BlobArchive] =
+    ): ZLayer[Tracing, Throwable, BlobArchive] =
         val keyBlobArchive = KeyBlobArchive.FileSystemKeyBlobArchive(basePath, levels, requireExistingPath)
         val baseTmpPath: Path = basePath / "tmp"
         ZLayer.scoped(

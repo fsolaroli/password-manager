@@ -8,24 +8,26 @@ import java.io.{ FileNotFoundException, FileOutputStream }
 // import java.nio.file.{ Files, Path }
 import zio.nio.file.{ Files, Path }
 
-import zio.{ Duration, Task, ZIO }
+import zio.{ Duration, Task, RIO, ZIO }
 import zio.stream.{ ZSink, ZStream }
 import zio.http.codec.HttpCodec.Metadata
 import zio.http.Header.ContentType
 import zio.nio.file.Files.Attribute
 import zio.nio.file.Files.Attributes
+import zio.telemetry.opentelemetry.tracing.Tracing
+
 
 // ============================================================================
 
 type Key = String
 
 trait KeyBlobArchive:
-    def saveBlob             (key: Key, content:  ZStream[Any, Throwable, Byte]): Task[Unit]
-    def saveBlobWithMetadata (key: Key, content:  ZStream[Any, Throwable, Byte], metadata: ZStream[Any, Throwable, Byte]): Task[Unit]
-    def saveBlobWithMetadata_fromPath (key: Key, content:  Path, metadata: ZStream[Any, Throwable, Byte]): Task[Unit]
-    def getBlob              (key: Key): Task[(ZStream[Any, Throwable, Byte], Long)]
-    def getMetadata          (key: Key): Task[ZStream[Any, Throwable, Byte]]
-    def deleteBlob           (key: Key): Task[Unit]
+    def saveBlob             (key: Key, content:  ZStream[Any, Throwable, Byte]): RIO[Tracing, Unit]
+    def saveBlobWithMetadata (key: Key, content:  ZStream[Any, Throwable, Byte], metadata: ZStream[Any, Throwable, Byte]): RIO[Tracing, Unit]
+    def saveBlobWithMetadata_fromPath (key: Key, content:  Path, metadata: ZStream[Any, Throwable, Byte]): RIO[Tracing, Unit]
+    def getBlob              (key: Key): RIO[Tracing, (ZStream[Any, Throwable, Byte], Long)]
+    def getMetadata          (key: Key): RIO[Tracing, ZStream[Any, Throwable, Byte]]
+    def deleteBlob           (key: Key): RIO[Tracing, Unit]
 
 object KeyBlobArchive:
     val WAIT_TIME = 10000
@@ -39,61 +41,86 @@ object KeyBlobArchive:
 
     class FileSystemKeyBlobArchive private (basePath: Path, levels: Int) extends KeyBlobArchive:
 
-        private def getContent (key: Key, contentType: ContentType): Task[(ZStream[Any, Throwable, Byte], Long)] =
-            getBlobPath(key, false)
-            .map(path => pathForContentType(key, path, contentType))
-            .flatMap(path =>
-                Files.exists(path)
-                .flatMap(exists => exists match {
-                    // case true   => ZStream.fromPath(path)
-                    case true   => (Files.readAllBytes(path).map(ZStream.fromChunk)).zip(Files.size(path))
-                    case false  => ZIO.fail(new ResourceNotFoundException("Referenced blob does not exists"))
-                })
-            )
-            // .getOrElse(ZIO.fail(new ResourceNotFoundException("Blob metadata not found")))
-
-        override def getBlob (key: Key): Task[(ZStream[Any, Throwable, Byte], Long)] = getContent(key, ContentType.Blob)
-
-        override def getMetadata(key: Key): Task[ZStream[Any, Throwable, Byte]] = getContent(key, ContentType.Metadata).map(_._1)
-
-        private def saveData (key: Key, contentType: ContentType, content: ZStream[Any, Throwable, Byte]): Task[Unit] = 
-            getBlobPath(key, true)
-            .map(path => pathForContentType(key, path, contentType))
-            .mapError(_ => new NonWritableArchiveException("Could not create blob file"))
-            .flatMap(path => content
-                .timeoutFail(new EmptyContentException)(Duration.fromMillis(WAIT_TIME))
-                // .run(ZSink.fromPath(path))
-                .run(ZSink.fromOutputStream(new FileOutputStream(path.toFile)))
-                .map(_ => ())
-            )
-            .catchSome:
-                case ex: EmptyContentException => ZIO.fail(ex)
-                case ex: NonReadableArchiveException => ZIO.fail(ex)
-                case ex => ZIO.fail(new NonWritableArchiveException(s"${ex}"))
-
-        private def moveFile (key: Key, content: Path): Task[Unit] =
-            getBlobPath(key, true)
-            .map(path => pathForContentType(key, path, ContentType.Blob))
-            .flatMap(path => Files.move(content, path))
-
-        private  def saveMetadata (key: Key, metadata: ZStream[Any, Throwable, Byte]): Task[Unit]   = saveData(key, ContentType.Metadata, metadata)
-        override def saveBlob     (key: Key, content:  ZStream[Any, Throwable, Byte]): Task[Unit]   = saveData(key, ContentType.Blob,     content)
-
-        override def saveBlobWithMetadata (key: Key, content: ZStream[Any, Throwable, Byte], metadata: ZStream[Any, Throwable, Byte]): Task[Unit] =
-            saveBlob(key, content) <&> saveMetadata(key, metadata)
-
-        override def saveBlobWithMetadata_fromPath (key: Key, content:  Path, metadata: ZStream[Any, Throwable, Byte]): Task[Unit] =
-            moveFile(key, content) <&> saveMetadata(key, metadata)
-
-        override def deleteBlob (key: Key): Task[Unit] =
-            getBlobPath(key, false)
+        private def getContent (key: Key, contentType: ContentType): RIO[Tracing, (ZStream[Any, Throwable, Byte], Long)] =
+            ZIO.serviceWithZIO[Tracing](tracing => tracing.span("getContent") {
+                getBlobPath(key, false)
+                .map(path => pathForContentType(key, path, contentType))
                 .flatMap(path =>
-                    Files.deleteIfExists(pathForContentType(key, path, ContentType.Blob))
-                    <&>
-                    Files.deleteIfExists(pathForContentType(key, path, ContentType.Metadata))
+                    Files.exists(path)
+                    .flatMap(exists => exists match {
+                        // case true   => ZStream.fromPath(path)
+                        case true   => (Files.readAllBytes(path).map(ZStream.fromChunk)).zip(Files.size(path))
+                        case false  => ZIO.fail(new ResourceNotFoundException("Referenced blob does not exists"))
+                    })
                 )
-            // TODO: delete empty folder?
-            .foldZIO(err => ZIO.fail(new NonWritableArchiveException(err.toString())), _ => ZIO.succeed(()))
+                // .getOrElse(ZIO.fail(new ResourceNotFoundException("Blob metadata not found")))
+            })
+
+        override def getBlob (key: Key): RIO[Tracing, (ZStream[Any, Throwable, Byte], Long)] = 
+            ZIO.serviceWithZIO[Tracing](tracing => tracing.span("getBlob") {
+                getContent(key, ContentType.Blob)
+            })
+
+        override def getMetadata(key: Key): RIO[Tracing, ZStream[Any, Throwable, Byte]] = 
+            ZIO.serviceWithZIO[Tracing](tracing => tracing.span("getMetadata") {
+                getContent(key, ContentType.Metadata).map(_._1)
+            })
+
+        private def saveData (key: Key, contentType: ContentType, content: ZStream[Any, Throwable, Byte]): RIO[Tracing, Unit] = 
+            ZIO.serviceWithZIO[Tracing](tracing => tracing.span("saveData") {
+                getBlobPath(key, true)
+                .map(path => pathForContentType(key, path, contentType))
+                .mapError(_ => new NonWritableArchiveException("Could not create blob file"))
+                .flatMap(path => content
+                    .timeoutFail(new EmptyContentException)(Duration.fromMillis(WAIT_TIME))
+                    // .run(ZSink.fromPath(path))
+                    .run(ZSink.fromOutputStream(new FileOutputStream(path.toFile)))
+                    .map(_ => ())
+                )
+                .catchSome:
+                    case ex: EmptyContentException => ZIO.fail(ex)
+                    case ex: NonReadableArchiveException => ZIO.fail(ex)
+                    case ex => ZIO.fail(new NonWritableArchiveException(s"${ex}"))
+            })
+
+        private def moveFile (key: Key, content: Path): RIO[Tracing, Unit] =
+            ZIO.serviceWithZIO[Tracing](tracing => tracing.span("moveFile") {
+                getBlobPath(key, true)
+                .map(path => pathForContentType(key, path, ContentType.Blob))
+                .flatMap(path => Files.move(content, path))
+            })
+
+        private  def saveMetadata (key: Key, metadata: ZStream[Any, Throwable, Byte]): RIO[Tracing, Unit]   =
+            ZIO.serviceWithZIO[Tracing](tracing => tracing.span("saveMetadata") {
+                saveData(key, ContentType.Metadata, metadata)
+            })
+
+        override def saveBlob     (key: Key, content:  ZStream[Any, Throwable, Byte]): RIO[Tracing, Unit]   =
+            ZIO.serviceWithZIO[Tracing](tracing => tracing.span("saveBlob") { 
+                saveData(key, ContentType.Blob,     content)
+            })
+
+        override def saveBlobWithMetadata (key: Key, content: ZStream[Any, Throwable, Byte], metadata: ZStream[Any, Throwable, Byte]): RIO[Tracing, Unit] =
+            ZIO.serviceWithZIO[Tracing](tracing => tracing.span("saveBlobWithMetadata") {
+                saveBlob(key, content) <&> saveMetadata(key, metadata)
+            })
+
+        override def saveBlobWithMetadata_fromPath (key: Key, content:  Path, metadata: ZStream[Any, Throwable, Byte]): RIO[Tracing, Unit] =
+            ZIO.serviceWithZIO[Tracing](tracing => tracing.span("saveBlobWithMetadata_fromPath") {
+                moveFile(key, content) <&> saveMetadata(key, metadata)
+            })
+
+        override def deleteBlob (key: Key): RIO[Tracing, Unit] =
+            ZIO.serviceWithZIO[Tracing](tracing => tracing.span("saveMetadata") {
+                getBlobPath(key, false)
+                    .flatMap(path =>
+                        Files.deleteIfExists(pathForContentType(key, path, ContentType.Blob))
+                        <&>
+                        Files.deleteIfExists(pathForContentType(key, path, ContentType.Metadata))
+                    )
+                // TODO: delete empty folder?
+                .foldZIO(err => ZIO.fail(new NonWritableArchiveException(err.toString())), _ => ZIO.succeed(()))
+            })
 
         private def computeBlobPath (key: Key): Path =
             val piecesLength: Int = key.length / levels
@@ -104,16 +131,18 @@ object KeyBlobArchive:
             // val subPathString: String = pieces.mkString("/")
             basePath / pieces.mkString("/")
 
-        private def getBlobPath (key: Key, createFolders: Boolean): Task[Path] =
+        private def getBlobPath (key: Key, createFolders: Boolean): RIO[Tracing, Path] =
             val path: Path = computeBlobPath(key)
-            Files.exists(path)
-            .zip(Files.isDirectory(path))
-            // .tap((exists, isDirectory) => ZIO.log(s"GET BLOB PATH: ${key} => ${exists} - ${isDirectory} - ${createFolders}"))
-            .flatMap((exists, isDirectory) => (exists, isDirectory, createFolders) match {
-                case (true,  true,  _    ) => ZIO.succeed(path)
-                case (true,  false, _    ) => ZIO.fail(new ResourceNotFoundException(s"Referenced blob does not exists"))
-                case (false, _,     false) => ZIO.fail(new ResourceNotFoundException(s"Referenced blob does not exists"))
-                case (false, _,     true ) => Files.createDirectories(path) *> ZIO.succeed(path)
+            ZIO.serviceWithZIO[Tracing](tracing => tracing.span("getBlobPath") {
+                Files.exists(path)
+                .zip(Files.isDirectory(path))
+                // .tap((exists, isDirectory) => ZIO.log(s"GET BLOB PATH: ${key} => ${exists} - ${isDirectory} - ${createFolders}"))
+                .flatMap((exists, isDirectory) => (exists, isDirectory, createFolders) match {
+                    case (true,  true,  _    ) => ZIO.succeed(path)
+                    case (true,  false, _    ) => ZIO.fail(new ResourceNotFoundException(s"Referenced blob does not exists"))
+                    case (false, _,     false) => ZIO.fail(new ResourceNotFoundException(s"Referenced blob does not exists"))
+                    case (false, _,     true ) => Files.createDirectories(path) *> ZIO.succeed(path)
+                })
             })
 
     object FileSystemKeyBlobArchive:
@@ -121,15 +150,7 @@ object KeyBlobArchive:
             basePath: Path,
             levels: Int,
             requireExistingPath: Boolean = true,
-        ): Task[FileSystemKeyBlobArchive] =
-            // if (Files.exists(basePath) && Files.isDirectory(basePath)) || !requireExistingPath
-            // then
-            //     scheduledFileSystemMetricsCollection(basePath).forkDaemon
-            //     *>
-            //     ZIO.succeed(new FileSystemKeyBlobArchive(basePath, levels))
-            // else
-            //     ZIO.fail(new IllegalArgumentException("Base path does not exist"))
-
+        ): RIO[Tracing, FileSystemKeyBlobArchive] =
             Files.exists(basePath)
             .zip(Files.isDirectory(basePath))
             .flatMap((exists, isDirectory) => {
@@ -143,14 +164,4 @@ object KeyBlobArchive:
                 })
                 *>  scheduledFileSystemMetricsCollection(basePath).forkDaemon
                 *>  ZIO.succeed(new FileSystemKeyBlobArchive(basePath, levels))
-
-                // println(s"===> FileSystemKeyBlogArchive: path: ${basePath}, exists: ${exists}, ${isDirectory}, requireExistingPath: ${requireExistingPath} => ${((exists && isDirectory) || !requireExistingPath)}")
-                // if ((exists && isDirectory) || !requireExistingPath)
-                // then
-                //     scheduledFileSystemMetricsCollection(basePath).forkDaemon
-                //     *>
-                //     ZIO.succeed(new FileSystemKeyBlobArchive(basePath, levels))
-                // else
-                //     ZIO.fail(new IllegalArgumentException("Base path does not exist"))
-            // .tap(result => ZIO.log(s"===> FileSystemKeyBlogArchive - result: ${result}"))
             })

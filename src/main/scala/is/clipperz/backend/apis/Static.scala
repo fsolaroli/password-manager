@@ -2,9 +2,9 @@ package is.clipperz.backend.apis
 
 import java.io.File
 import zio.http.{ Handler, Method, Path, Request, Routes, handler, trailing }
-import is.clipperz.backend.Main.ClipperzHttpApp
 import zio.metrics.{ Metric, MetricLabel }
 import zio.ZIO
+import zio.telemetry.opentelemetry.tracing.Tracing
 
 val staticApi = Routes(
     Method.GET / "api" / "static" / trailing -> handler:

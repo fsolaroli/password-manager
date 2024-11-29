@@ -16,10 +16,11 @@ import zio.nio.file.{ Files, Path }
 import java.security.MessageDigest
 import java.util.UUID
 
-import zio.{ Duration, ZIO, ZLayer, Task, Chunk }
+import zio.{ Duration, RIO, ZIO, ZLayer, Task, Chunk }
 import zio.json.{ JsonDecoder, JsonEncoder, DeriveJsonDecoder, DeriveJsonEncoder }
 import zio.stream.{ ZStream, ZSink }
 import is.clipperz.backend.apis.SecretVersion
+import zio.telemetry.opentelemetry.tracing.Tracing
 
 // ----------------------------------------------------------------------------
 
@@ -41,20 +42,20 @@ implicit val encoder: JsonEncoder[DateTime] = JsonEncoder[String].contramap(_.to
 // ----------------------------------------------------------------------------
 
 trait OneTimeShareArchive:
-    def getSecret(id: SecretId): Task[(OneTimeSecret, Long)]
-    def saveSecret(content: ZStream[Any, Throwable, Byte]): Task[SecretId]
-    def deleteSecret(id: SecretId): Task[Unit]
+    def getSecret(id: SecretId): RIO[Tracing, (OneTimeSecret, Long)]
+    def saveSecret(content: ZStream[Any, Throwable, Byte]): RIO[Tracing, SecretId]
+    def deleteSecret(id: SecretId): RIO[Tracing, Unit]
 
 object OneTimeShareArchive:
 
     case class FileSystemOneTimeShareArchive(keyBlobArchive: KeyBlobArchive) extends OneTimeShareArchive:
-        override def getSecret(id: SecretId): Task[(OneTimeSecret, Long)] =
+        override def getSecret(id: SecretId): RIO[Tracing, (OneTimeSecret, Long)] =
             keyBlobArchive.getBlob(id).flatMap((content, contentLength) => fromStream[OneTimeSecret](content).zip(ZIO.succeed(contentLength)))
         
-        override def deleteSecret(id: SecretId): Task[Unit] = 
+        override def deleteSecret(id: SecretId): RIO[Tracing, Unit] = 
             keyBlobArchive.deleteBlob(id)
 
-        override def saveSecret(content: ZStream[Any, Throwable, Byte]): Task[SecretId] =
+        override def saveSecret(content: ZStream[Any, Throwable, Byte]): RIO[Tracing, SecretId] =
             val id = UUID.randomUUID().nn.toString();
             ZIO
                 .scoped:
@@ -72,7 +73,7 @@ object OneTimeShareArchive:
 
   // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
-    def initializeOneTimeShareArchive(basePath: Path): Task[Unit] =
+    def initializeOneTimeShareArchive(basePath: Path): RIO[Tracing, Unit] =
         // ZIO.attempt:
         //     val file = basePath.toFile()
         //     val tempFolderSuccessfullyCreated: Boolean =
@@ -101,6 +102,6 @@ object OneTimeShareArchive:
         basePath: Path,
         levels: Int,
         requireExistingPath: Boolean = true,
-    ): ZLayer[Any, Throwable, OneTimeShareArchive] =
+    ): ZLayer[Tracing, Throwable, OneTimeShareArchive] =
         val keyBlobArchive = KeyBlobArchive.FileSystemKeyBlobArchive(basePath, levels, requireExistingPath)
-        ZLayer.fromZIO[Any, Throwable, OneTimeShareArchive](keyBlobArchive.map(new FileSystemOneTimeShareArchive(_)))
+        ZLayer.fromZIO[Tracing, Throwable, OneTimeShareArchive](keyBlobArchive.map(new FileSystemOneTimeShareArchive(_)))

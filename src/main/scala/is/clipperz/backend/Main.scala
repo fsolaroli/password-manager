@@ -2,7 +2,7 @@ package is.clipperz.backend
 
 import is.clipperz.backend.apis.{ blobsApi, loginApi, logoutApi, staticApi, usersApi, oneTimeShareApi }
 import is.clipperz.backend.functions.{ customErrorHandler }
-import is.clipperz.backend.middleware.{ hashcash, metrics }
+import is.clipperz.backend.middleware.{ hashcash }
 import is.clipperz.backend.services.{ BlobArchive, PRNG, SessionManager, SrpManager, TollManager, UserArchive, OneTimeShareArchive }
 import is.clipperz.backend.services.ChallengeType
 
@@ -20,6 +20,13 @@ import zio.http.Server.RequestStreaming
 import zio.http.Routes
 import java.io.File
 import zio.http.Path
+import is.clipperz.backend.otel.OtelSdk
+import zio.telemetry.opentelemetry.OpenTelemetry
+import is.clipperz.backend.middleware.trace
+import zio.telemetry.opentelemetry.tracing.Tracing
+import zio.metrics.Metrics
+import io.opentelemetry.api.trace.Tracer
+import is.clipperz.backend.otel.TracerProvider
 
 object Main extends zio.ZIOAppDefault:
     override val bootstrap =
@@ -27,7 +34,7 @@ object Main extends zio.ZIOAppDefault:
         Runtime.removeDefaultLoggers ++ Runtime.addLogger(CustomLogger.basicColoredLogger(LogLevel.Info)) // >>> SLF4J.slf4j(logFormat)
 
     type ClipperzEnvironment =
-        PRNG & SessionManager & TollManager & UserArchive & BlobArchive & OneTimeShareArchive & SrpManager
+        PRNG & SessionManager & TollManager & UserArchive & BlobArchive & OneTimeShareArchive & SrpManager & Tracing & io.opentelemetry.api.OpenTelemetry
 
     type ClipperzHttpApp = Routes[
         ClipperzEnvironment
@@ -44,12 +51,15 @@ object Main extends zio.ZIOAppDefault:
     )
     .handleErrorCauseZIO(customErrorHandler)
   
+    val resourceName = "epsilon.clipperz"
+    val instrumentationScopeName = "scala-backend"
+
     val middlewares =
-        Middleware.debug ++                                                         //  print debug info about request and response
-        Middleware.timeout(20.seconds) ++                                           //  TODO: add timeout time to configuration file [fsolaroli - 10/01/2024]
-        Middleware.requestLogging(logRequestBody = true, logResponseBody = true) ++ //  loggingMiddleware
-        Middleware.serveDirectory(Path.root / "api" / "static", File("./target/output.webpack")) ++
-        metrics()
+            Middleware.debug                                                        //  print debug info about request and response
+        ++  Middleware.timeout(20.seconds)                                              //  TODO: add timeout time to configuration file [fsolaroli - 10/01/2024]
+        // Middleware.requestLogging(logRequestBody = true, logResponseBody = true) ++ //  loggingMiddleware
+        ++  Middleware.serveDirectory(Path.root / "api" / "static", File("./target/output.webpack"))
+        // ++  trace(instrumentationScopeName)
 
     val completeClipperzBackend: ClipperzHttpApp = clipperzBackend @@ middlewares
 
@@ -98,10 +108,15 @@ object Main extends zio.ZIOAppDefault:
                     ZLayer.succeed(config),
                     ZLayer.succeed(nettyConfig),
                     Server.customized,
-                    
-                    datadog.datadogLayer,
-                    ZLayer.succeed(datadog.DatadogConfig("dd-agent", 8125)),
-                    ZLayer.succeed(MetricsConfig(100.millis)),
+
+                    OtelSdk.custom(resourceName),
+                    OpenTelemetry.metrics(instrumentationScopeName),
+                    OpenTelemetry.logging(instrumentationScopeName),
+                    OpenTelemetry.tracing(instrumentationScopeName),
+                    // OpenTelemetry.baggage(),
+                    OpenTelemetry.zioMetrics,
+                    OpenTelemetry.contextZIO,
+                    zio.metrics.jvm.DefaultJvmMetrics.live.unit
                 )
 
         else ZIO.logFatal("Not enough arguments")

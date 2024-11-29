@@ -8,10 +8,11 @@ import java.util.concurrent.TimeUnit
 import scala.collection.immutable.HashMap
 import scala.concurrent.duration.fromNow
 
-import zio.{ Duration, Ref, ZIO, Layer, ZLayer, Tag, Task, UIO, durationInt }
+import zio.{ Duration, Ref, RIO, ZIO, Layer, ZLayer, Tag, Task, UIO, durationInt }
 import zio.cache.{ Cache, Lookup }
 import zio.internal.stacktracer.Tracer
 import zio.http.Request
+import zio.telemetry.opentelemetry.tracing.Tracing
 
 type SessionKey = String
 type SessionContent = Map[String, String]
@@ -46,33 +47,6 @@ object SessionManager:
     private def getSessionKey(prng: PRNG, request: Request): Task[SessionKey] =
         extractSessionKey(request)
         .catchAll(_ => prng.nextBytes(32).map(bytesToHex(_).toString()))
-
-    case class TrivialSessionManager(prng: PRNG) extends SessionManager:
-        var sessions: Map[SessionKey, Session] = new HashMap[SessionKey, Session]()
-        def emptySession(key: SessionKey) = Session(key, new HashMap[String, String]())
-
-        override def getSession (request: Request): Task[Session] =
-            getSessionKey(prng, request)
-            .map(key => 
-                sessions.getOrElse(key, emptySession(key))
-            )
-
-        override def saveSession (content: Session): Task[SessionKey] =
-            sessions = sessions + ((content._1, content))
-            ZIO.succeed(content._1)
-
-        override def deleteSession (request: Request): Task[Unit] =
-            extractSessionKey(request)
-            .map(key => 
-                sessions = sessions - key
-            )
-        
-    val liveTrivial: ZLayer[PRNG, Throwable, SessionManager] =
-        ZLayer.scoped(
-            for {
-                prng <- ZIO.service[PRNG]
-            } yield TrivialSessionManager(prng)
-        )
 
     case class ZioCacheSessionManager (prng: PRNG, sessions: Cache[String, Nothing, Ref[Session]]) extends SessionManager:
         

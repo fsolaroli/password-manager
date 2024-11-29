@@ -3,7 +3,6 @@ package is.clipperz.backend.middleware
 import is.clipperz.backend.data.HexString
 import is.clipperz.backend.Exceptions.*
 import is.clipperz.backend.functions.{ fromString, customMapError }
-import is.clipperz.backend.Main.ClipperzHttpApp
 import is.clipperz.backend.LogAspect
 import is.clipperz.backend.services.{ ChallengeType, SessionManager, TollManager, TollChallenge, PRNG, BlobArchive, OneTimeShareArchive, SessionKey, SrpManager, UserArchive }
 
@@ -13,6 +12,7 @@ import zio.{ZIO, Cause, Trace}
 import zio.http.{ Handler, HandlerAspect, Header, Headers, Middleware, Request, Response, Routes, Status }
 import zio.http.Handler.RequestHandlerSyntax
 import zio.json.EncoderOps
+import zio.telemetry.opentelemetry.tracing.Tracing
 
 type TollMiddleware = HandlerAspect[TollManager & SessionManager, Any]
 
@@ -34,10 +34,10 @@ def verifyRequestToll(request: Request, challengeType: ChallengeType, nextChalle
           } yield (tollIsValid, challengeForNextStep, session.key)
         )
       })
-    }.mapError(customMapError) @@ LogAspect.logAnnotateRequestData(request)
+    }.mapError(customMapError)
 
-def hashcash(challengeType: ChallengeType, nextChallengeType: ChallengeType) = new Middleware[SessionManager & TollManager]:
-  override def apply[Env1 <: SessionManager & TollManager, Err](routes: Routes[Env1, Err]): Routes[Env1, Err] =
+def hashcash(challengeType: ChallengeType, nextChallengeType: ChallengeType) = new Middleware[SessionManager & TollManager & Tracing]:
+  override def apply[Env1 <: SessionManager & TollManager & Tracing, Err](routes: Routes[Env1, Err]): Routes[Env1, Err] =
     routes.transform(handler => 
         Handler.fromFunctionZIO[Request] { request =>
             verifyRequestToll(request, challengeType, nextChallengeType)
