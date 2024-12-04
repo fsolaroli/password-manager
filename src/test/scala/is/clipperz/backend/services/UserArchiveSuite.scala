@@ -23,12 +23,19 @@ import zio.test.TestEnvironment
 import zio.ZLayer
 import zio.test.TestConsole
 import is.clipperz.backend.TestUtilities
+import is.clipperz.backend.otel.OtelSdk
+import zio.telemetry.opentelemetry.OpenTelemetry
 
 object UserArchiveSpec extends ZIOSpecDefault:
   val userBasePath = FileSystem.default.getPath("target", "tests", "archive", "users")
 
   val keyBlobArchiveFolderDepth = 16
-  val environment = UserArchive.fs(userBasePath, keyBlobArchiveFolderDepth, false)
+  val environment =
+    ((OtelSdk.test ++ OpenTelemetry.contextZIO) >>> OpenTelemetry.tracing("test")) >>>
+    (   UserArchive.fs(userBasePath, keyBlobArchiveFolderDepth, false)
+     ++ ((OtelSdk.test ++ OpenTelemetry.contextZIO) >>> OpenTelemetry.tracing("test"))
+    )
+
 
   val c = HexString("abcdef0192837465")
   val testUser = RemoteUserCard(

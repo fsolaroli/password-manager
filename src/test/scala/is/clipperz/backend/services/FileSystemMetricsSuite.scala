@@ -8,6 +8,8 @@ import zio.nio.file.{ FileSystem }
 import zio.ZIO
 
 import is.clipperz.backend.middleware.collectFileSystemMetrics
+import is.clipperz.backend.otel.OtelSdk
+import zio.telemetry.opentelemetry.OpenTelemetry
 
 object FileSystemMetricsSuite extends ZIOSpecDefault:
 
@@ -27,5 +29,7 @@ object FileSystemMetricsSuite extends ZIOSpecDefault:
         result <- collectFileSystemMetrics(FileSystem.default.getPath("./src/test/resources/sizeTest/multipleNestedFolders"))
       } yield assertTrue(result._1 == 23, result._2 == 3376)
     }
+  ).provideSomeLayerShared(
+    ((OtelSdk.test ++ OpenTelemetry.contextZIO) >>> OpenTelemetry.tracing("test"))
   )
 

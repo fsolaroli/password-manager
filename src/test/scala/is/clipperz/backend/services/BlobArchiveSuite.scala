@@ -21,12 +21,19 @@ import is.clipperz.backend.data.HexString
 import zio.test.TestEnvironment
 import zio.ZLayer
 import is.clipperz.backend.TestUtilities
+import is.clipperz.backend.otel.OtelSdk
+import zio.telemetry.opentelemetry.OpenTelemetry
+import zio.telemetry.opentelemetry.tracing.Tracing
 
 object BlobArchiveSpec extends ZIOSpecDefault:
   val blobBasePath = FileSystem.default.getPath("target", "tests", "archive", "blobs")
 
   val keyBlobArchiveFolderDepth = 16
-  val environment = BlobArchive.fs(blobBasePath, keyBlobArchiveFolderDepth, false)
+  val environment =
+    ((OtelSdk.test ++ OpenTelemetry.contextZIO) >>> OpenTelemetry.tracing("test")) >>> 
+    (   BlobArchive.fs(blobBasePath, keyBlobArchiveFolderDepth, false)
+     ++ ((OtelSdk.test ++ OpenTelemetry.contextZIO) >>> OpenTelemetry.tracing("test"))
+    )
 
   val testContent = ZStream.fromIterable("testContent".getBytes().nn)
   val failingContent = ZStream.never

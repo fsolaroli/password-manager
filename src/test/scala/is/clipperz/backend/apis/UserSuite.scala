@@ -36,6 +36,8 @@ import is.clipperz.backend.services.MasterKeyEncodingVersion
 import zio.nio.charset.Charset
 import is.clipperz.backend.TestUtilities
 import is.clipperz.backend.apis.BlobSpec.readSampleBlob
+import is.clipperz.backend.otel.OtelSdk
+import zio.telemetry.opentelemetry.OpenTelemetry
 
 object UserSpec extends ZIOSpec[SessionManager]:
     override def bootstrap: ZLayer[Any, Any, SessionManager] =
@@ -51,13 +53,15 @@ object UserSpec extends ZIOSpec[SessionManager]:
     val keyBlobArchiveFolderDepth = 16
 
     val environment =
-        PRNG.live ++
+        ((OtelSdk.test ++ OpenTelemetry.contextZIO) >>> OpenTelemetry.tracing("test")) >>>
+        (PRNG.live ++
         sessionManagerLayer ++
         UserArchive.fs(userBasePath, keyBlobArchiveFolderDepth, false) ++
         BlobArchive.fs(blobBasePath, keyBlobArchiveFolderDepth, false) ++
         OneTimeShareArchive.fs(oneTimeShareBasePath, keyBlobArchiveFolderDepth, false) ++
         ((UserArchive.fs(userBasePath, keyBlobArchiveFolderDepth, false) ++ PRNG.live) >>> SrpManager.v6a()) ++
-        (PRNG.live >>> TollManager.live)
+        (PRNG.live >>> TollManager.live) ++
+        ((OtelSdk.test ++ OpenTelemetry.contextZIO) >>> OpenTelemetry.tracing("test")))
 
     val sessionKey = "sessionKey"
 

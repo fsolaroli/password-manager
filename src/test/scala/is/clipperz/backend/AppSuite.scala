@@ -52,6 +52,8 @@ import is.clipperz.backend.services.RequestUserCard
 import is.clipperz.backend.services.CardsSignupData
 import is.clipperz.backend.services.MasterKeyEncodingVersion
 import is.clipperz.backend.services.SRPVersion
+import is.clipperz.backend.otel.OtelSdk
+import zio.telemetry.opentelemetry.OpenTelemetry
 
 object AppSpec extends ZIOSpecDefault:
     val app = Main.completeClipperzBackend
@@ -62,13 +64,17 @@ object AppSpec extends ZIOSpecDefault:
     val keyBlobArchiveFolderDepth = 16
 
     val environment =
-        PRNG.live ++
-        (PRNG.live >>> SessionManager.live()) ++
-        UserArchive.fs(userBasePath, keyBlobArchiveFolderDepth, false) ++
-        BlobArchive.fs(blobBasePath, keyBlobArchiveFolderDepth, false) ++
-        OneTimeShareArchive.fs(oneTimeShareBasePath, keyBlobArchiveFolderDepth, false) ++
-        ((UserArchive.fs(userBasePath, keyBlobArchiveFolderDepth, false) ++ PRNG.live) >>> SrpManager.v6a()) ++
-        (PRNG.live >>> TollManager.live)
+        ((OtelSdk.test ++ OpenTelemetry.contextZIO) >>> OpenTelemetry.tracing("test")) >>>
+        (   PRNG.live
+         ++ OtelSdk.test
+         ++ ((OtelSdk.test ++ OpenTelemetry.contextZIO) >>> OpenTelemetry.tracing("test"))
+         ++ (PRNG.live >>> SessionManager.live())
+         ++ UserArchive.fs(userBasePath, keyBlobArchiveFolderDepth, false)
+         ++ BlobArchive.fs(blobBasePath, keyBlobArchiveFolderDepth, false)
+         ++ OneTimeShareArchive.fs(oneTimeShareBasePath, keyBlobArchiveFolderDepth, false)
+         ++ ((UserArchive.fs(userBasePath, keyBlobArchiveFolderDepth, false) ++ PRNG.live) >>> SrpManager.v6a())
+         ++ (PRNG.live >>> TollManager.live)
+        )
 
     val srpFunctions = new SrpFunctionsV6a()
 
@@ -101,7 +107,7 @@ object AppSpec extends ZIOSpecDefault:
                 logoutResult2,
             )
         }
-    ).provideLayerShared(environment) @@
+    ).provideSomeLayerShared(environment) @@
         TestAspect.sequential @@
         TestAspect.beforeAll(TestUtilities.deleteFilesInFolder(blobBasePath)) @@
         TestAspect.afterAll(TestUtilities.deleteFilesInFolder(blobBasePath)) @@

@@ -25,6 +25,8 @@ import is.clipperz.backend.TestUtilities
 import zio.nio.charset.Charset
 
 import zio.schema.codec.JsonCodec.zioJsonBinaryCodec
+import is.clipperz.backend.otel.OtelSdk
+import zio.telemetry.opentelemetry.OpenTelemetry
 
 object BlobSpec extends ZIOSpecDefault:
 
@@ -170,14 +172,16 @@ object BlobSpec extends ZIOSpecDefault:
     val keyBlobArchiveFolderDepth = 16
 
     val environment =
-        ZLayer.succeed(Server.Config.default.requestStreaming(RequestStreaming.Enabled)) ++
+        ((OtelSdk.test ++ OpenTelemetry.contextZIO) >>> OpenTelemetry.tracing("test")) >>>
+        (ZLayer.succeed(Server.Config.default.requestStreaming(RequestStreaming.Enabled)) ++
         PRNG.live ++
         (PRNG.live >>> SessionManager.live()) ++
         UserArchive.fs(userBasePath, keyBlobArchiveFolderDepth, false) ++
         BlobArchive.fs(blobBasePath, keyBlobArchiveFolderDepth, false) ++
         OneTimeShareArchive.fs(oneTimeShareBasePath, keyBlobArchiveFolderDepth, false) ++
         ((UserArchive.fs(userBasePath, keyBlobArchiveFolderDepth, false) ++ PRNG.live) >>> SrpManager.v6a()) ++
-        (PRNG.live >>> TollManager.live)
+        (PRNG.live >>> TollManager.live) ++
+        ((OtelSdk.test ++ OpenTelemetry.contextZIO) >>> OpenTelemetry.tracing("test")))
 
     val blob_1K     = "0dfba6266bcebf53a0ed863f5df4edf56066e6a5194df242a2b31f13bf7bb9f8"
     val blob_2K     = "8960c75f721872b381f4e81ca7219bd268a47019e019264de3418088e4b1fbb0"

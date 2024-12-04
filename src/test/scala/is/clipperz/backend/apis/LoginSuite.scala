@@ -47,13 +47,19 @@ import is.clipperz.backend.functions.customErrorHandler
 import is.clipperz.backend.services.SRPVersion
 import is.clipperz.backend.services.MasterKeyEncodingVersion
 import is.clipperz.backend.TestUtilities
+import zio.telemetry.opentelemetry.tracing.Tracing
+import is.clipperz.backend.otel.OtelSdk
+import zio.telemetry.opentelemetry.OpenTelemetry
 
 object LoginSpec extends ZIOSpec[UserArchive & BlobArchive]:
     val keyBlobArchiveFolderDepth = 16
 
     override def bootstrap: ZLayer[Any, Any, UserArchive & BlobArchive] =
-        UserArchive.fs(userBasePath, keyBlobArchiveFolderDepth, false) ++
-        BlobArchive.fs(blobBasePath, keyBlobArchiveFolderDepth, false)
+        ((OtelSdk.test ++ OpenTelemetry.contextZIO) >>> OpenTelemetry.tracing("test")) >>>
+        (
+            UserArchive.fs(userBasePath, keyBlobArchiveFolderDepth, false) ++
+            BlobArchive.fs(blobBasePath, keyBlobArchiveFolderDepth, false)
+        )
 
     val app =   loginApi
                 .handleErrorCauseZIO(customErrorHandler)
@@ -63,13 +69,14 @@ object LoginSpec extends ZIOSpec[UserArchive & BlobArchive]:
     val oneTimeShareBasePath    = FileSystem.default.getPath("target", "tests", "archive", "one_time_share")
 
     val environment =
-        PRNG.live ++
-        (PRNG.live >>> SessionManager.live()) ++
+        ((OtelSdk.test ++ OpenTelemetry.contextZIO) >>> OpenTelemetry.tracing("test")) >>>
+        ((PRNG.live >>> SessionManager.live()) ++
         UserArchive.fs(userBasePath, keyBlobArchiveFolderDepth, false) ++
         BlobArchive.fs(blobBasePath, keyBlobArchiveFolderDepth, false) ++
         OneTimeShareArchive.fs(oneTimeShareBasePath, keyBlobArchiveFolderDepth, false) ++
         ((UserArchive.fs(userBasePath, keyBlobArchiveFolderDepth, false) ++ PRNG.live) >>> SrpManager.v6a()) ++
-        (PRNG.live >>> TollManager.live)
+        (PRNG.live >>> TollManager.live) ++ 
+        ((OtelSdk.test ++ OpenTelemetry.contextZIO) >>> OpenTelemetry.tracing("test")))
 
     val c = HexString("7815018e9d84b5b0f319c87dee46c8876e85806823500e03e72c5d66e5d40456")
     val p = HexString("597ed0c523f50c6db089a92845693a3f2454590026d71d6a9028a69967d33f6d")
@@ -88,7 +95,7 @@ object LoginSpec extends ZIOSpec[UserArchive & BlobArchive]:
 
     val identifier = HexString("abba")
 
-    val saveUser: ZIO[UserArchive & BlobArchive, Throwable, Unit] =
+    val saveUser: ZIO[UserArchive & BlobArchive & Tracing, Throwable, Unit] =
         ZIO
         .service[UserArchive]
         .zip(ZIO.service[BlobArchive])
@@ -261,6 +268,6 @@ object LoginSpec extends ZIOSpec[UserArchive & BlobArchive]:
                 stepResponse <- fromStream[SRPStep2Response](response2.body.asStream)
             } yield assertTrue(response2.status.code == 200, stepResponse.masterKey._1 == testUser.masterKey._1)
         },
-    ).provideLayerShared(environment) @@
-        TestAspect.sequential @@
-        TestAspect.afterAll(TestUtilities.deleteFilesInFolder(blobBasePath))
+    ).provideSomeLayerShared(environment)
+    @@ TestAspect.sequential
+    @@ TestAspect.afterAll(TestUtilities.deleteFilesInFolder(blobBasePath))

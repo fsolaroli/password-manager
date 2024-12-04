@@ -18,6 +18,8 @@ import zio.test.TestClock
 import zio.Duration
 import is.clipperz.backend.TestUtilities
 import zio.test.TestResult.{ allSuccesses }
+import is.clipperz.backend.otel.OtelSdk
+import zio.telemetry.opentelemetry.OpenTelemetry
 
 object KeyBlobArchiveSpec extends ZIOSpecDefault:
   val blobBasePath = FileSystem.default.getPath("target", "tests", "archive", "blobs")
@@ -67,7 +69,7 @@ object KeyBlobArchiveSpec extends ZIOSpecDefault:
             _   <- keyBlobArchive.flatMap(_.deleteBlob(testKey))
         } yield allSuccesses(res, assertCompletes)
     }
-  ) @@
-    TestAspect.sequential @@
-    TestAspect.beforeAll(TestUtilities.deleteFilesInFolder(blobBasePath)) @@
-    TestAspect.afterAll (TestUtilities.deleteFilesInFolder(blobBasePath))
+  ).provideSomeLayer(((OtelSdk.test ++ OpenTelemetry.contextZIO) >>> OpenTelemetry.tracing("test"))) 
+  @@ TestAspect.sequential
+  @@ TestAspect.beforeAll(TestUtilities.deleteFilesInFolder(blobBasePath))
+  @@ TestAspect.afterAll (TestUtilities.deleteFilesInFolder(blobBasePath))

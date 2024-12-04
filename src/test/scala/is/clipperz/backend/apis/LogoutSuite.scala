@@ -42,6 +42,8 @@ import is.clipperz.backend.services.SRPStep2Response
 import is.clipperz.backend.services.OneTimeShareArchive
 import is.clipperz.backend.functions.customErrorHandler
 import is.clipperz.backend.TestUtilities
+import is.clipperz.backend.otel.OtelSdk
+import zio.telemetry.opentelemetry.OpenTelemetry
 
 object LogoutSpec extends ZIOSpecDefault:
   val app =  ( logoutApi
@@ -54,13 +56,15 @@ object LogoutSpec extends ZIOSpecDefault:
   val keyBlobArchiveFolderDepth = 16
 
   val environment =
-    PRNG.live ++
-      (PRNG.live >>> SessionManager.live()) ++
-      UserArchive.fs(userBasePath, keyBlobArchiveFolderDepth, false) ++
-      BlobArchive.fs(blobBasePath, keyBlobArchiveFolderDepth, false) ++
-      OneTimeShareArchive.fs(oneTimeShareBasePath, keyBlobArchiveFolderDepth, false) ++
-      ((UserArchive.fs(userBasePath, keyBlobArchiveFolderDepth, false) ++ PRNG.live) >>> SrpManager.v6a()) ++
-      (PRNG.live >>> TollManager.live)
+    ((OtelSdk.test ++ OpenTelemetry.contextZIO) >>> OpenTelemetry.tracing("test")) >>>
+    (   (PRNG.live >>> SessionManager.live())
+     ++ UserArchive.fs(userBasePath, keyBlobArchiveFolderDepth, false)
+     ++ BlobArchive.fs(blobBasePath, keyBlobArchiveFolderDepth, false)
+     ++ OneTimeShareArchive.fs(oneTimeShareBasePath, keyBlobArchiveFolderDepth, false)
+     ++ ((UserArchive.fs(userBasePath, keyBlobArchiveFolderDepth, false) ++ PRNG.live) >>> SrpManager.v6a())
+     ++ (PRNG.live >>> TollManager.live)
+     ++ ((OtelSdk.test ++ OpenTelemetry.contextZIO) >>> OpenTelemetry.tracing("test"))
+    )
 
   val sessionKey = "sessionKey"
 
