@@ -23,7 +23,7 @@ private case class Identifier(value: HexString)
 // private case class Blob(hash: HexString, data: ZStream[Any, Nothing, Byte])
 private case class Blob(filename: String, hash: HexString, data: PathNIO)
 
-val blobsApi: Routes[BlobArchive, Throwable] = Routes(
+val blobsApi = Routes(
     Method.POST / "api" / "blobs" -> handler: (request: Request) =>
         TracingAspect.endpointTracing:
             ZIO.scoped:
