@@ -13,6 +13,7 @@ import zio.cache.{ Cache, Lookup }
 import zio.internal.stacktracer.Tracer
 import zio.http.Request
 import zio.telemetry.opentelemetry.tracing.Tracing
+import is.clipperz.backend.otel.TracingAspect
 
 type SessionKey = String
 type SessionContent = Map[String, String]
@@ -48,33 +49,36 @@ object SessionManager:
         extractSessionKey(request)
         .catchAll(_ => prng.nextBytes(32).map(bytesToHex(_).toString()))
 
-    case class ZioCacheSessionManager (prng: PRNG, sessions: Cache[String, Nothing, Ref[Session]]) extends SessionManager:
+    case class ZioCacheSessionManager (prng: PRNG, sessions: Cache[String, Nothing, Ref[Session]], tracing: Tracing) extends SessionManager:
         
         private def refreshSessionTimeout(session: Session) =
-            for {
+            (for {
                 _       <- sessions.invalidate(session.key)
                 ref     <- sessions.get(session.key)
                 _       <- ref.set(session)
-            } yield ()
+            } yield ()) @@ TracingAspect.methodTracing("refreshSessionTimeout", tracing)
 
         override def getSession (request: Request): Task[Session] =
-            for {
+            (for {
                 key     <- getSessionKey(prng, request)
                 session <- sessions.get(key).flatMap(_.get)
                 _       <- refreshSessionTimeout(session)
-            } yield session
+            } yield session) @@ TracingAspect.methodTracing("getSession", tracing)
 
         override def saveSession (session: Session): Task[SessionKey] =
             refreshSessionTimeout(session).map(_ => session.key)
+            @@ TracingAspect.methodTracing("saveSession", tracing)
 
         override def deleteSession (request: Request): Task[Unit] =
             extractSessionKey(request)
             .flatMap (key => sessions.invalidate(key))
+            @@ TracingAspect.methodTracing("deleteSession", tracing)
 
-    def live(timeToLive: Duration = 10.minutes): ZLayer[PRNG, Throwable, SessionManager] =
+    def live(timeToLive: Duration = 10.minutes): ZLayer[PRNG & Tracing, Throwable, SessionManager] =
         ZLayer.scoped(
             for {
                 prng      <- ZIO.service[PRNG]
+                tracing   <- ZIO.service[Tracing]
                 sessions  <- Cache.make(capacity = 100, timeToLive = timeToLive, lookup = Lookup((key: SessionKey) => Ref.make(Session(key, HashMap.empty))))
-            } yield ZioCacheSessionManager(prng, sessions)
+            } yield ZioCacheSessionManager(prng, sessions, tracing)
         )

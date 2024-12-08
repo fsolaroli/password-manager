@@ -7,10 +7,11 @@ import is.clipperz.backend.Exceptions.{ BadRequestException, ResourceConflictExc
 import zio.nio.file.Path
 import zio.nio.charset.Charset
 
-import zio.{ RIO, ZIO, ZLayer, Tag, Task, Chunk }
+import zio.{ ZIO, ZLayer, Tag, Task, Chunk }
 import zio.json.{ JsonDecoder, JsonEncoder, DeriveJsonDecoder, DeriveJsonEncoder, EncoderOps }
 import zio.stream.{ ZSink, ZStream }
 import zio.telemetry.opentelemetry.tracing.Tracing
+import is.clipperz.backend.otel.TracingAspect
 
 // ============================================================================
 
@@ -75,22 +76,23 @@ object UserCard:
 // ============================================================================
 
 trait UserArchive:
-    def getUser(username: HexString): RIO[Tracing, Option[RemoteUserCard]]
-    def saveUser(user: RemoteUserCard, overwrite: Boolean): RIO[Tracing, HexString]
-    def deleteUser(c: HexString): RIO[Tracing, Unit]
+    def getUser(username: HexString): Task[Option[RemoteUserCard]]
+    def saveUser(user: RemoteUserCard, overwrite: Boolean): Task[HexString]
+    def deleteUser(c: HexString): Task[Unit]
 
 object UserArchive:
-    case class FileSystemUserArchive(keyBlobArchive: KeyBlobArchive) extends UserArchive:
-        override def getUser(username: HexString): RIO[Tracing, Option[RemoteUserCard]] =
+    case class FileSystemUserArchive(keyBlobArchive: KeyBlobArchive, tracing: Tracing) extends UserArchive:
+        override def getUser(username: HexString): Task[Option[RemoteUserCard]] =
             keyBlobArchive
             .getBlob(username.toString).map(_._1)
             .flatMap(fromStream[RemoteUserCard](_).map(Some.apply))
             .catchSome:
                 case ex: ResourceNotFoundException => ZIO.succeed(None)
                 case ex => ZIO.fail(ex)
+            @@ TracingAspect.methodTracing("getUser", tracing)
 
-        override def saveUser(userCard: RemoteUserCard, overwrite: Boolean): RIO[Tracing, HexString] =
-            def saveUserCard(userCard: RemoteUserCard): RIO[Tracing, HexString] =
+        override def saveUser(userCard: RemoteUserCard, overwrite: Boolean): Task[HexString] =
+            def saveUserCard(userCard: RemoteUserCard): Task[HexString] =
                 Charset.Standard.utf8.encodeString(userCard.toJson)
                 .flatMap(blobChunks =>
                     keyBlobArchive
@@ -100,30 +102,32 @@ object UserArchive:
                         ZStream.fromChunks(blobChunks),
                     )
                     .map(_ => userCard.c)
-                )
+                ) @@ TracingAspect.methodTracing("saveUserCard", tracing)
 
             this.getUser(userCard.c).flatMap(optional => if optional.isDefined
                 then (if (overwrite) 
                         then saveUserCard(userCard)
                         else ZIO.fail(new ResourceConflictException("User already present")))
                 else saveUserCard(userCard)
-            )
+            ) @@ TracingAspect.methodTracing("saveUser", tracing)
 
-        override def deleteUser(c: HexString): RIO[Tracing, Unit] =
+        override def deleteUser(c: HexString): Task[Unit] =
             this
             .getUser(c)
             .flatMap(optional =>
                 if optional.isDefined
                 then keyBlobArchive.deleteBlob(c.toString)
                 else ZIO.fail(new ResourceNotFoundException("User does not exist"))
-            )
+            ) @@ TracingAspect.methodTracing("deleteUser", tracing)
 
     def fs(
         basePath: Path,
         levels: Int,
         requireExistingPath: Boolean = true,
     ): ZLayer[Tracing, Throwable, UserArchive] =
-        ZLayer.fromZIO[Tracing, Throwable, UserArchive](
-        KeyBlobArchive.FileSystemKeyBlobArchive(basePath, levels, requireExistingPath)
-            .map(new FileSystemUserArchive(_))
-    )
+        ZLayer(
+            for {
+                tracing        <- ZIO.service[Tracing]
+                keyBlobArchive <- KeyBlobArchive.FileSystemKeyBlobArchive(basePath, levels, requireExistingPath)
+            } yield (new FileSystemUserArchive(keyBlobArchive, tracing))
+        )

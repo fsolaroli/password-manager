@@ -8,14 +8,13 @@ import java.util
 
 import zio.{ ZIO, Cause }
 import zio.http.{ Method, Path, Response, Request, Routes, handler }
-import zio.telemetry.opentelemetry.tracing.Tracing
+import is.clipperz.backend.otel.TracingAspect
 
 val logoutApi = Routes(
     Method.POST / "api" / "logout" -> handler: (request: Request) =>
-        ZIO.serviceWithZIO[Tracing](tracing => tracing.span(s"${request.method} ${request.url.path}") {
+        TracingAspect.endpointTracing:
             for {
                 sessionManager <- ZIO.service[SessionManager]
                 _              <- sessionManager.deleteSession(request)
             } yield Response.ok
-        })
 )

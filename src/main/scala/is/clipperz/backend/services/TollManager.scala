@@ -7,6 +7,8 @@ import is.clipperz.backend.functions.crypto.HashFunction
 import zio.{ ZIO, Layer, ZLayer, Tag, Task }
 import zio.internal.stacktracer.Tracer
 import zio.json.{ JsonDecoder, JsonEncoder, DeriveJsonDecoder, DeriveJsonEncoder, EncoderOps }
+import zio.telemetry.opentelemetry.tracing.Tracing
+import is.clipperz.backend.otel.TracingAspect
 
 type TollCost = Int // bit
 type TollReceipt = HexString
@@ -38,22 +40,25 @@ object TollManager:
 
   val tollChallengeContentKey = "tollChallenge"
 
-  case class DefaultTollManager(prng: PRNG) extends TollManager:
+  case class DefaultTollManager(prng: PRNG, tracing: Tracing) extends TollManager:
     override def getToll(cost: TollCost): Task[TollChallenge] =
-      if cost >= 0 then
+      (if cost >= 0 then
         prng
           .nextBytes(tollByteSize)
-          .map(bytes => TollChallenge(HexString.bytesToHex(bytes), cost))
+          .flatMap(bytes => ZIO.succeed(HexString.bytesToHex(bytes)) @@ TracingAspect.methodTracing("bytesToHex", tracing))
+          .flatMap(hex   => ZIO.succeed(TollChallenge(hex, cost)) @@ TracingAspect.methodTracing("tollChallangeConstructor", tracing))
       else ZIO.fail(new IllegalArgumentException("Toll cost can not be negative"))
+      )@@ TracingAspect.methodTracing("getToll", tracing)
 
     override def verifyToll(challenge: TollChallenge, receipt: TollReceipt): Task[Boolean] =
-      if challenge.cost >= 0 then
+      (if challenge.cost >= 0 then
         val binaryToll = challenge.toll.toByteArray.map(byteToBinary).mkString
         ByteArrays
           .hashOfArrays(HashFunction.hashSHA256, receipt.toByteArray) // receipt hash
           .map(hash => hash.map(byteToBinary).mkString)
           .map(binaryHash => binaryHash.take(challenge.cost) == binaryToll.take(challenge.cost))
       else ZIO.fail(new IllegalArgumentException("Invalid challenge cost"))
+      )@@ TracingAspect.methodTracing("verifyToll", tracing)
 
     override def getChallengeCost(challengeType: ChallengeType): TollCost =
       challengeType match
@@ -62,11 +67,12 @@ object TollManager:
         case ChallengeType.MESSAGE  => 2
         case ChallengeType.SHARE    => 3 
 
-  val live: ZLayer[PRNG, Throwable, TollManager] =
+  val live: ZLayer[PRNG & Tracing, Throwable, TollManager] =
     ZLayer.scoped(
       for {
-        prng <- ZIO.service[PRNG]
-      } yield DefaultTollManager(prng)
+        prng    <- ZIO.service[PRNG]
+        tracing <- ZIO.service[Tracing]
+      } yield DefaultTollManager(prng, tracing)
     )
 
   def computeReceipt(prng: PRNG, tollManager: TollManager)(challenge: TollChallenge): Task[TollReceipt] =

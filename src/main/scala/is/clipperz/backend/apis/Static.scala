@@ -4,7 +4,7 @@ import java.io.File
 import zio.http.{ Handler, Method, Path, Request, Routes, handler, trailing }
 import zio.metrics.{ Metric, MetricLabel }
 import zio.ZIO
-import zio.telemetry.opentelemetry.tracing.Tracing
+import is.clipperz.backend.otel.TracingAspect
 
 val staticApi = Routes(
     Method.GET / "api" / "static" / trailing -> handler:

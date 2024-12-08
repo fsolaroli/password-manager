@@ -10,11 +10,9 @@ import io.opentelemetry.exporter.otlp.http.trace.OtlpHttpSpanExporter
 import io.opentelemetry.semconv.ServiceAttributes
 import io.opentelemetry.*
 import io.opentelemetry.context.ContextStorage
-import zio.telemetry.opentelemetry.tracing.Tracing
 import io.opentelemetry.api.trace.Tracer
 import io.opentelemetry.context.propagation.ContextPropagators
 import io.opentelemetry.api.OpenTelemetry
-// import io.opentelemetry.exporter.logging.otlp.OtlpJsonLoggingSpanExporter
 
 object TracerProvider:
 
@@ -33,25 +31,3 @@ object TracerProvider:
                     )
                 )
         } yield tracerProvider
-
-    // def tracing(
-    //     instrumentationScopeName: String,
-    //     // instrumentationVersion: Option[String] = None,
-    //     // schemaUrl: Option[String] = None,
-    //     logAnnotated: Boolean = false
-    // ): URLayer[OpenTelemetry, (io.opentelemetry.api.trace.Tracer)] = {
-    //     val t = ZLayer.fromZIO(
-    //         // ZIO.serviceWith[OpenTelemetry] { openTelemetry =>
-    //             // val builder = openTelemetry.tracerBuilder(instrumentationScopeName)
-
-    //             // instrumentationVersion.foreach(builder.setInstrumentationVersion)
-    //             // schemaUrl.foreach(builder.setSchemaUrl)
-
-    //             // val tracer = builder.build
-
-    //             // tracer.nn
-    //         // }
-    //         ZIO.service[OpenTelemetry].map(_.tracerBuilder(instrumentationScopeName).build().nn)
-    //     )
-    //     t
-    // }

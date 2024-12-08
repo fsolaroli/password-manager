@@ -13,11 +13,12 @@ import java.io.{ FileNotFoundException, IOException, FileOutputStream }
 import zio.nio.file.{ Files, Path }
 import java.security.MessageDigest
 
-import zio.{ Chunk, Duration, RIO, ZIO, ZLayer, Task }
+import zio.{ Chunk, Duration, ZIO, ZLayer, Task }
 import zio.stream.{ ZStream, ZSink }
 import zio.json.{ JsonDecoder, JsonEncoder, DeriveJsonDecoder, DeriveJsonEncoder }
 import zio.nio.charset.Charset
 import zio.telemetry.opentelemetry.tracing.Tracing
+import is.clipperz.backend.otel.TracingAspect
 // import java.nio.file.attribute.FileAttribute
 
 // ----------------------------------------------------------------------------
@@ -27,20 +28,20 @@ type BlobHash = HexString
 // ----------------------------------------------------------------------------
 
 trait BlobArchive:
-    def getBlob             (hash: BlobHash): RIO[Tracing, (ZStream[Any, Throwable, Byte], Long)]
-    def getBlobIdentifier   (hash: BlobHash): RIO[Tracing, HexString]
-    def saveBlob            (hash: BlobHash, identifier: HexString, content:  ZStream[Any, Throwable, Byte]): RIO[Tracing, BlobHash]
-    def saveBlob_path       (identifier: HexString, filename: String, hash: BlobHash, content: Path): RIO[Tracing, BlobHash]
-    def deleteBlob          (hash: BlobHash, identifier: HexString): RIO[Tracing, Unit]
+    def getBlob             (hash: BlobHash): Task[(ZStream[Any, Throwable, Byte], Long)]
+    def getBlobIdentifier   (hash: BlobHash): Task[HexString]
+    def saveBlob            (hash: BlobHash, identifier: HexString, content:  ZStream[Any, Throwable, Byte]): Task[BlobHash]
+    def saveBlob_path       (identifier: HexString, filename: String, hash: BlobHash, content: Path): Task[BlobHash]
+    def deleteBlob          (hash: BlobHash, identifier: HexString): Task[Unit]
 
 object BlobArchive:
     val WAIT_TIME = 10000
 
-    case class FileSystemBlobArchive(keyBlobArchive: KeyBlobArchive, tmpDir: Path) extends BlobArchive:
-        override def getBlob(hash: BlobHash): RIO[Tracing, (ZStream[Any, Throwable, Byte], Long)] =
-            keyBlobArchive.getBlob(hash.toString)
+    case class FileSystemBlobArchive(keyBlobArchive: KeyBlobArchive, tmpDir: Path, tracing: Tracing) extends BlobArchive:
+        override def getBlob(hash: BlobHash): Task[(ZStream[Any, Throwable, Byte], Long)] =
+            keyBlobArchive.getBlob(hash.toString) @@ TracingAspect.methodTracing("getBlob", tracing)
 
-        override def getBlobIdentifier(hash: BlobHash): RIO[Tracing, HexString] =
+        override def getBlobIdentifier(hash: BlobHash): Task[HexString] =
             keyBlobArchive
                 .getMetadata(hash.toString)
                 .flatMap(_.run(ZSink.collectAll[Byte]))
@@ -48,41 +49,9 @@ object BlobArchive:
                 .flatMap(Charset.Standard.utf8.decodeChunk(_))  //  TODO: how are we messing with this data? Why aren't we going directly from byte[] to HexString 🤔
                 .map(chunk => chunk.toArray.mkString)
                 .map(HexString(_))
-/*
-        private def _saveBlob (hash: BlobHash, identifier: HexString, content: ZStream[Any, Throwable, Byte]): Task[BlobHash] =
-            val tmpFile = File.createTempFile("pre", "suff", tmpDir.toFile())
-            ZIO.scoped:
-                content
-                    .timeoutFail(new EmptyContentException)(Duration.fromMillis(WAIT_TIME))
-                    .tapSink(ZSink.fromOutputStream(new FileOutputStream(tmpFile)))
-                    .run(ZSink.digest(MessageDigest.getInstance("SHA-256").nn))
-                    .map((chunk: Chunk[Byte]) => HexString.bytesToHex(chunk.toArray))
-                .flatMap { hash_ =>
-                    if (hash_ == hash)
-                    then ZIO.scoped:
-                        Charset.Standard.utf8.encodeString(identifier.toString())
-                            .map(ZStream.fromChunk)
-                            .flatMap(identifierStream =>
-                                keyBlobArchive
-                                    .saveBlobWithMetadata(hash.toString, ZStream.fromPath(tmpFile.nn.toPath().nn), identifierStream)
-                                    .map(_ => tmpFile.nn.delete())
-                                    .map(_ => hash)
-                            )
-                    else ZIO.fail(new BadRequestException(s"Hash of content does not match with hash in request"))
-                }
-                .catchSome:
-                    case ex: FileNotFoundException =>
-                        val str: String =
-                            if ex.getMessage() == null
-                            then "The temporary file or the blob could not be saved"
-                            else ex.getMessage().nn
-                        ZIO.fail(new NonWritableArchiveException(str))
-                    case ex: BadRequestException => ZIO.fail(ex)
-                    case ex: EmptyContentException => ZIO.fail(ex)
-                    case ex => ZIO.fail(new NonWritableArchiveException(s"${ex}"))
-*/
+                @@ TracingAspect.methodTracing("getBlobIdentifier", tracing)
 
-        private def _saveBlob_nio (hash: BlobHash, identifier: HexString, content: ZStream[Any, Throwable, Byte]): RIO[Tracing, BlobHash] =
+        private def _saveBlob_nio (hash: BlobHash, identifier: HexString, content: ZStream[Any, Throwable, Byte]): Task[BlobHash] =
            ZIO.scoped:
                 Files.createTempFileInScoped(dir=tmpDir, suffix=".tmp", prefix=None, fileAttributes = Nil)
                 // Files.createTempFileIn(
@@ -124,23 +93,25 @@ object BlobArchive:
                         case ex: EmptyContentException  => ZIO.fail(ex)
                         case ex: Exception              => ZIO.fail(new NonWritableArchiveException(s"${ex}"))
                 }
+            @@ TracingAspect.methodTracing("_saveBlob_nio", tracing)
 
-        override def saveBlob(hash: BlobHash, identifier: HexString, content: ZStream[Any, Throwable, Byte]): RIO[Tracing, BlobHash] =
-            _saveBlob_nio(hash, identifier, content)
+        override def saveBlob(hash: BlobHash, identifier: HexString, content: ZStream[Any, Throwable, Byte]): Task[BlobHash] =
+            _saveBlob_nio(hash, identifier, content) @@ TracingAspect.methodTracing("saveBlob", tracing)
 
-        override def saveBlob_path(identifier: HexString, filename: String, hash: BlobHash, content: Path): RIO[Tracing, BlobHash] =
-            if HexString(filename) == hash
+        override def saveBlob_path(identifier: HexString, filename: String, hash: BlobHash, content: Path): Task[BlobHash] =
+            (if HexString(filename) == hash
             then 
                 Charset.Standard.utf8.encodeString(identifier.toString())
                 .map(ZStream.fromChunk)
                 .flatMap(identifierStream => keyBlobArchive.saveBlobWithMetadata_fromPath(filename, content, identifierStream))
                 .map(_ => hash)
             else ZIO.fail(new BadRequestException(s"Hash of content does not match with hash field provided"))
+            )@@ TracingAspect.methodTracing("saveBlob_path", tracing)
 
         // override def commitSavedBlob     (hash: BlobHash, identifier: HexString): Task[BlobHash] =
         //     ???
 
-        override def deleteBlob(hash: BlobHash, identifier: HexString): RIO[Tracing, Unit] =
+        override def deleteBlob(hash: BlobHash, identifier: HexString): Task[Unit] =
             ZIO.scoped:
                 this.getBlobIdentifier(hash)
                     .flatMap(storedIdentifier =>
@@ -148,6 +119,7 @@ object BlobArchive:
                         then keyBlobArchive.deleteBlob(hash.toString)
                         else ZIO.fail(new BadRequestException(s"Wrong blob identifier provided"))
                     )
+            @@ TracingAspect.methodTracing("deleteBlob", tracing)
 
   // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
@@ -173,5 +145,5 @@ object BlobArchive:
         ZLayer.scoped(
             initializeBlobArchive(baseTmpPath)
             *>
-            keyBlobArchive.map(FileSystemBlobArchive(_, baseTmpPath))
+            ZIO.serviceWithZIO[Tracing](tracing => keyBlobArchive.map(FileSystemBlobArchive(_, baseTmpPath, tracing)))
         )

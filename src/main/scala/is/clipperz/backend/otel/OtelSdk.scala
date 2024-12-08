@@ -25,6 +25,21 @@ object OtelSdk:
                                 )
             } yield openTelemetry
         )
+    
+    def tracing(resourceName: String): TaskLayer[api.OpenTelemetry] =
+        OpenTelemetry.custom(
+            for {
+                tracerProvider <- TracerProvider.otlpGrpc(resourceName)
+                openTelemetry  <- ZIO.fromAutoCloseable(
+                                    ZIO.succeed(
+                                    OpenTelemetrySdk
+                                        .builder()
+                                        .setTracerProvider(tracerProvider)
+                                        .build
+                                    )
+                                )
+            } yield openTelemetry
+        )
 
     val test: TaskLayer[api.OpenTelemetry] = 
         OpenTelemetry.custom(

@@ -12,11 +12,11 @@ import zio.http.{ Method, Response, Request, Routes, Status, handler, string }
 import zio.json.EncoderOps
 import zio.stream.ZStream
 import is.clipperz.backend.services.CardsSignupData
-import zio.telemetry.opentelemetry.tracing.Tracing
+import is.clipperz.backend.otel.TracingAspect
 
-val usersApi: Routes[BlobArchive & UserArchive & SessionManager & Tracing, Throwable] = Routes(
+val usersApi = Routes(
     Method.POST / "api" / "users" / string("c") -> (handler: (c: String, request: Request) =>
-        ZIO.serviceWithZIO[Tracing](tracing => tracing.span(s"${request.method} ${request.url.path}") {
+        TracingAspect.endpointTracing:
             ZIO
             .service[UserArchive]
             .zip(ZIO.service[BlobArchive])
@@ -52,12 +52,11 @@ val usersApi: Routes[BlobArchive & UserArchive & SessionManager & Tracing, Throw
                 )
             )
             .map(results => Response.text(results._1.toString))
-        })
     )
 ) ++
 Routes( 
     Method.PUT / "api"  / "users" / string("c") -> handler: (c: String, request: Request) =>
-        ZIO.serviceWithZIO[Tracing](tracing => tracing.span(s"${request.method} ${request.url.path}") {
+        TracingAspect.endpointTracing:
             ZIO
             .service[UserArchive]
             .zip(ZIO.service[BlobArchive])
@@ -96,10 +95,9 @@ Routes(
                 )
             )
             .map(_ => Response.ok)
-        })
 ,  
     Method.PATCH / "api" / "users" / string("c") -> handler: (c: String, request: Request) =>
-        ZIO.serviceWithZIO[Tracing](tracing => tracing.span(s"${request.method} ${request.url.path}") {
+        TracingAspect.endpointTracing:
             ZIO
             .service[UserArchive]
             .zip(ZIO.service[BlobArchive])
@@ -123,10 +121,9 @@ Routes(
                 )
             )
             .map(_ => Response.ok)
-        })
 ,
     Method.GET / "api" / "users" / string("c") -> handler: (c: String, request: Request) =>
-        ZIO.serviceWithZIO[Tracing](tracing => tracing.span(s"${request.method} ${request.url.path}") {
+        TracingAspect.endpointTracing:
             (for {
                 userArchive  <- ZIO.service[UserArchive]
                 optionalUser <- userArchive.getUser(HexString(c))
@@ -134,15 +131,13 @@ Routes(
                 case None       => Response(status = Status.NotFound)
                 case Some(card) => Response.json(card.masterKey.toJson)
             ))
-        })
 ,
     Method.DELETE / "api" / "users" / string("c") -> handler: (c: String, request: Request) =>
-        ZIO.serviceWithZIO[Tracing](tracing => tracing.span(s"${request.method} ${request.url.path}") {
+        TracingAspect.endpointTracing:
             (for {
                 userArchive    <- ZIO.service[UserArchive]
                 sessionManager <- ZIO.service[SessionManager]
                 _              <- userArchive.deleteUser(HexString(c))
                 _              <- sessionManager.deleteSession(request)
             } yield Response.text(c))
-        })
 ) @@ authorizedMiddleware(req => ZIO.attempt(req.path.segments.last))

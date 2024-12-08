@@ -16,16 +16,16 @@ import zio.stream.{ ZStream, ZSink }
 import zio.nio.file.{ Files, Path as PathNIO }
 import java.io.FileOutputStream
 import java.security.MessageDigest
-import zio.telemetry.opentelemetry.tracing.Tracing
+import is.clipperz.backend.otel.TracingAspect
 
 private case class BlobData(identifier: Option[Identifier], blob: Option[Blob])
 private case class Identifier(value: HexString)
 // private case class Blob(hash: HexString, data: ZStream[Any, Nothing, Byte])
 private case class Blob(filename: String, hash: HexString, data: PathNIO)
 
-val blobsApi: Routes[BlobArchive & Tracing, Throwable] = Routes(
+val blobsApi: Routes[BlobArchive, Throwable] = Routes(
     Method.POST / "api" / "blobs" -> handler: (request: Request) =>
-        ZIO.serviceWithZIO[Tracing](tracing => tracing.span(s"${request.method} ${request.url.path}") {
+        TracingAspect.endpointTracing:
             ZIO.scoped:
                 ZIO.service[BlobArchive]
                 .zip(request.body.asMultipartFormStream)
@@ -62,10 +62,9 @@ val blobsApi: Routes[BlobArchive & Tracing, Throwable] = Routes(
                     })
                 )
                 .map(result => Response.ok)
-        })
 ,
     Method.DELETE / "api" / "blobs" / string("hash") -> handler: (hash: String, request: Request) =>
-        ZIO.serviceWithZIO[Tracing](tracing => tracing.span(s"${request.method} ${request.url.path}") {
+        TracingAspect.endpointTracing:
             ZIO
             .service[BlobArchive]
             .zip(request.body.asMultipartFormStream)
@@ -81,10 +80,9 @@ val blobsApi: Routes[BlobArchive & Tracing, Throwable] = Routes(
             .map:
                 case 1  => Response.ok
                 case _  => Response(status = Status.NotFound)
-        }) 
 ,
     Method.GET / "api" / "blobs" / string("hash") -> handler: (hash: String, request: Request) =>
-        ZIO.serviceWithZIO[Tracing](tracing => tracing.span(s"${request.method} ${request.url.path}") {
+        TracingAspect.endpointTracing:
             ZIO
             .service[BlobArchive]
             .flatMap(archive => archive.getBlob(HexString(hash)))
@@ -96,5 +94,4 @@ val blobsApi: Routes[BlobArchive & Tracing, Throwable] = Routes(
                                 .addHeader("Content-Type", "application/octet-stream"),
                 )
             )
-        })
 )

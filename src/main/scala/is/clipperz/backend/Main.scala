@@ -20,13 +20,15 @@ import zio.http.Server.RequestStreaming
 import zio.http.Routes
 import java.io.File
 import zio.http.Path
-import is.clipperz.backend.otel.OtelSdk
+import is.clipperz.backend.otel.{ OtelSdk, PropagatorProvider }
 import zio.telemetry.opentelemetry.OpenTelemetry
 import is.clipperz.backend.middleware.trace
 import zio.telemetry.opentelemetry.tracing.Tracing
 import zio.metrics.Metrics
 import io.opentelemetry.api.trace.Tracer
 import is.clipperz.backend.otel.TracerProvider
+import zio.telemetry.opentelemetry.context.ContextStorage
+import is.clipperz.backend.middleware.scheduledFileSystemMetricsCollection
 
 object Main extends zio.ZIOAppDefault:
     override val bootstrap =
@@ -34,7 +36,7 @@ object Main extends zio.ZIOAppDefault:
         Runtime.removeDefaultLoggers ++ Runtime.addLogger(CustomLogger.basicColoredLogger(LogLevel.Info)) // >>> SLF4J.slf4j(logFormat)
 
     type ClipperzEnvironment =
-        PRNG & SessionManager & TollManager & UserArchive & BlobArchive & OneTimeShareArchive & SrpManager & Tracing & io.opentelemetry.api.OpenTelemetry
+        PRNG & SessionManager & TollManager & UserArchive & BlobArchive & OneTimeShareArchive & SrpManager & Tracing & io.opentelemetry.api.OpenTelemetry & PropagatorProvider & zio.telemetry.opentelemetry.context.ContextStorage
 
     type ClipperzHttpApp = Routes[
         ClipperzEnvironment
@@ -59,7 +61,7 @@ object Main extends zio.ZIOAppDefault:
         ++  Middleware.timeout(20.seconds)                                              //  TODO: add timeout time to configuration file [fsolaroli - 10/01/2024]
         // Middleware.requestLogging(logRequestBody = true, logResponseBody = true) ++ //  loggingMiddleware
         ++  Middleware.serveDirectory(Path.root / "api" / "static", File("./target/output.webpack"))
-        // ++  trace(instrumentationScopeName)
+        ++  trace(instrumentationScopeName)
 
     val completeClipperzBackend: ClipperzHttpApp = clipperzBackend @@ middlewares
 
@@ -94,6 +96,8 @@ object Main extends zio.ZIOAppDefault:
                 .flatMap(port =>
                     println("SERVER STARTED")
                         ZIO.logInfo(s"Server started on port ${port}")
+                    *>  scheduledFileSystemMetricsCollection(userBasePath).forkDaemon
+                    *>  scheduledFileSystemMetricsCollection(blobBasePath).forkDaemon
                     *>  ZIO.never
                 )
                 .provide(
@@ -112,7 +116,8 @@ object Main extends zio.ZIOAppDefault:
                     OtelSdk.custom(resourceName),
                     OpenTelemetry.metrics(instrumentationScopeName),
                     OpenTelemetry.logging(instrumentationScopeName),
-                    OpenTelemetry.tracing(instrumentationScopeName),
+                    OpenTelemetry.tracing(instrumentationScopeName, Some("1_0")),
+                    PropagatorProvider.live(),
                     // OpenTelemetry.baggage(),
                     OpenTelemetry.zioMetrics,
                     OpenTelemetry.contextZIO,

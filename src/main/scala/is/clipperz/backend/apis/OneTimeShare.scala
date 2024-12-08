@@ -19,7 +19,7 @@ import zio.http.{ Method, Path, Response, Request, Status, Routes, Headers, Body
 import zio.json.{ EncoderOps, JsonDecoder, DeriveJsonDecoder, JsonEncoder, DeriveJsonEncoder }
 import zio.stream.{ ZStream }
 import zio.nio.charset.Charset
-import zio.telemetry.opentelemetry.tracing.Tracing
+import is.clipperz.backend.otel.TracingAspect
 
 // ------------------------------------------------------------------------------------
 
@@ -43,9 +43,9 @@ object OneTimeSecretData:
 
 // ------------------------------------------------------------------------------------
 
-val oneTimeShareApi: Routes[OneTimeShareArchive & Tracing, Throwable] = Routes (
+val oneTimeShareApi = Routes (
     Method.POST / "api" / "share" -> handler : (request: Request) =>
-        // ZIO.serviceWithZIO[Tracing](tracing => tracing.span(s"${request.method} ${request.url.path}") {
+        TracingAspect.endpointTracing:
             ZIO
             .service[OneTimeShareArchive]
             .zip(ZIO.succeed(request.body.asStream))
@@ -62,38 +62,34 @@ val oneTimeShareApi: Routes[OneTimeShareArchive & Tracing, Throwable] = Routes (
                 )
             ) 
             .map(id => Response.text(s"${id}"))
-        // })
     ,
     Method.GET / "api" / "redeem" / string("id") -> handler : (id: String, request: Request) =>
-        // ZIO.serviceWithZIO[Tracing](_.span(s"${request.method} ${request.url.path}") {
-        ZIO
-        .service[OneTimeShareArchive]
-        .flatMap(archive =>
-            archive.getSecret(id).flatMap((oneTimeSecret, contentLength) => 
-                if (oneTimeSecret.expirationDate < DateTime.now())
-                then
-                    archive.deleteSecret(id).flatMap(_ =>
-                        ZIO.fail(new ResourceExpiredException("Secret Expired"))
-                    )
-                else
-                    ZIO.succeed(
-                        ( oneTimeSecret.version
-                        , ZStream
-                            .fromChunk(Chunk.fromArray(oneTimeSecret.secret.toByteArray))
-                            .ensuring(archive.deleteSecret(id).isSuccess)
-                        , contentLength
+        TracingAspect.endpointTracing:
+            ZIO
+            .service[OneTimeShareArchive]
+            .flatMap(archive =>
+                archive.getSecret(id).flatMap((oneTimeSecret, contentLength) => 
+                    if (oneTimeSecret.expirationDate < DateTime.now())
+                    then
+                        archive.deleteSecret(id).flatMap(_ =>
+                            ZIO.fail(new ResourceExpiredException("Secret Expired"))
                         )
-                    )
-            )
-            .flatMap((version: Option[SecretVersion], bytes: ZStream[Tracing, Throwable, Byte], contentLength: Long) => 
-                Body.fromStreamEnv[Tracing](bytes, contentLength).map(body =>
-                    Response(
-                        status  = Status.Ok,
-                        headers = version.map(v => Headers("clipperz-onetimesecret-version", v.toJson)).getOrElse(Headers.empty),
-                        body    = body
-                    )
+                    else
+                        ZIO.succeed(
+                            ( oneTimeSecret.version
+                            , ZStream
+                                .fromChunk(Chunk.fromArray(oneTimeSecret.secret.toByteArray))
+                                .ensuring(archive.deleteSecret(id).isSuccess)
+                            , contentLength
+                            )
+                        )
+                )
+                .map((version: Option[SecretVersion], bytes: ZStream[Any, Throwable, Byte], contentLength: Long) => 
+                        Response(
+                            status  = Status.Ok,
+                            headers = version.map(v => Headers("clipperz-onetimesecret-version", v.toJson)).getOrElse(Headers.empty),
+                            body    = Body.fromStream(bytes, contentLength)
+                        )
                 )
             )
-        )
-        // })
 )

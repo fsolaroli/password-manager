@@ -6,10 +6,11 @@ import is.clipperz.backend.functions.Conversions.{ bigIntToBytes, bytesToBigInt 
 import is.clipperz.backend.functions.SrpFunctions.SrpFunctionsV6a
 import is.clipperz.backend.Exceptions.*
 
-import zio.{ RIO, ZIO, ZLayer, Task }
+import zio.{ ZIO, ZLayer, Task }
 import zio.json.{ JsonDecoder, JsonEncoder, DeriveJsonDecoder, DeriveJsonEncoder }
 import zio.stream.ZStream
 import zio.telemetry.opentelemetry.tracing.Tracing
+import is.clipperz.backend.otel.TracingAspect
 
 // ============================================================================
 
@@ -66,19 +67,20 @@ object SRPStep2Response:
 // ============================================================================
 
 trait SrpManager:
-  def srpStep1(step1Data: SRPStep1Data, session: Session): RIO[Tracing, (SRPStep1Response, Session)]
-  def srpStep2(step2Data: SRPStep2Data, session: Session): RIO[Tracing, (SRPStep2Response, Session)]
+  def srpStep1(step1Data: SRPStep1Data, session: Session): Task[(SRPStep1Response, Session)]
+  def srpStep2(step2Data: SRPStep2Data, session: Session): Task[(SRPStep2Response, Session)]
 
 object SrpManager:
   case class SrpManagerV6a(
       userArchive: UserArchive,
       prng: PRNG,
       srpFunctions: SrpFunctionsV6a,
+      tracing: Tracing
     ) extends SrpManager:
     val newRandomValue = () => prng.nextBytes(64)
     val configuration = srpFunctions.configuration
     val nn = configuration.group.nn
-    override def srpStep1(step1Data: SRPStep1Data, session: Session): RIO[Tracing, (SRPStep1Response, Session)] =
+    override def srpStep1(step1Data: SRPStep1Data, session: Session): Task[(SRPStep1Response, Session)] =
       userArchive
         .getUser(step1Data.c)
         .flatMap(optionalUser =>
@@ -97,26 +99,27 @@ object SrpManager:
             session + (("c", step1Data.c.toString)) + (("b", b.toString)) + (("B", bb.toString)) + (("A", step1Data.aa.toString))
           (SRPStep1Response(s = s, bb = bb), newSessionContext)
         }
+        @@ TracingAspect.methodTracing("srpStep1", tracing)
 
-    override def srpStep2(step2Data: SRPStep2Data, session: Session): RIO[Tracing, (SRPStep2Response, Session)] =
+    override def srpStep2(step2Data: SRPStep2Data, session: Session): Task[(SRPStep2Response, Session)] =
       val aa = HexString(session("A").get)
       val bb = HexString(session("B").get)
       val b = HexString(session("b").get)
       val c = HexString(session("c").get)
       val zioUser = userArchive.getUser(c).flatMap(u => ZIO.attempt(u.get))
-      val zioK: RIO[Tracing, Array[Byte]] = for {
+      val zioK: Task[Array[Byte]] = (for {
         u : Array[Byte] <- srpFunctions.computeU(aa.toByteArray, bb.toByteArray)
         user: RemoteUserCard <- zioUser
         v: BigInt <- ZIO.attempt(user.v.toBigInt)
         secret: BigInt <- ZIO.succeed(srpFunctions.computeSecretServer(aa.toBigInt, b.toBigInt, v, bytesToBigInt(u)))
         kk: Array[Byte] <- srpFunctions.computeK(secret)
         kk: Array[Byte] <- configuration.hash(ZStream.fromIterable(bigIntToBytes(secret)))
-      } yield kk
-      val zioM1: RIO[Tracing, Array[Byte]] = for {
+      } yield kk)
+      val zioM1: Task[Array[Byte]] = (for {
         user: RemoteUserCard <- zioUser
         kk: Array[Byte] <- zioK
         m1: Array[Byte] <- srpFunctions.computeM1(user.c.toByteArray, user.s.toByteArray, aa.toByteArray, bb.toByteArray, kk)
-      } yield m1
+      } yield m1)
 
       zioM1.flatMap { m1 =>
         val m1Server = bytesToBigInt(m1)
@@ -130,12 +133,14 @@ object SrpManager:
           } yield result
         else ZIO.fail(new BadRequestException(s"M1 is not correct => M1 SERVER ${bytesToHex(m1)} != M1 CLIENT ${step2Data.m1}"))
       }
+      @@ TracingAspect.methodTracing("srpStep2", tracing)
 
-  def v6a(): ZLayer[UserArchive & PRNG, Throwable, SrpManager] =
+  def v6a(): ZLayer[UserArchive & PRNG & Tracing, Throwable, SrpManager] =
     val srpFunctions = new SrpFunctionsV6a()
     ZLayer.scoped(
       for {
         userArchive <- ZIO.service[UserArchive]
-        prng <- ZIO.service[PRNG]
-      } yield SrpManagerV6a(userArchive, prng, srpFunctions)
+        prng        <- ZIO.service[PRNG]
+        tracing     <- ZIO.service[Tracing]
+      } yield SrpManagerV6a(userArchive, prng, srpFunctions, tracing)
     )
