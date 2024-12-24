@@ -86,7 +86,7 @@ object SrpManangerSpec extends ZIOSpecDefault:
             username <- userAchive.saveUser(card, true)
 
             session <- ZIO.service[SessionManager]
-            sessionContext <- session.getSession(testRequestEmpty)
+            sessionContext <- session.getSessionFromRequest(testRequestEmpty)
 
             srp <- ZIO.service[SrpManager]
             aa <- ZIO.succeed(srpFunctions.computeA(bytesToBigInt(a)))
@@ -119,7 +119,7 @@ object SrpManangerSpec extends ZIOSpecDefault:
           for {
             srp <- ZIO.service[SrpManager]
             session <- ZIO.service[SessionManager]
-            sessionContext <- session.getSession(testRequestEmpty)
+            sessionContext <- session.getSessionFromRequest(testRequestEmpty)
             aa <- ZIO.succeed(srpFunctions.computeA(bytesToBigInt(a)))
             res <- assertZIO(srp.srpStep1(SRPStep1Data(cHex, bigIntToHex(aa)), sessionContext).exit)(
               fails(isSubtype[ResourceNotFoundException](anything))
@@ -165,7 +165,7 @@ object SrpManangerSpec extends ZIOSpecDefault:
             username <- userAchive.saveUser(card, true)
 
             session <- ZIO.service[SessionManager]
-            sessionContext <- session.getSession(testRequestEmpty)
+            sessionContext <- session.getSessionFromRequest(testRequestEmpty)
             srp <- ZIO.service[SrpManager]
             aa <- ZIO.succeed(srpFunctions.computeA(bytesToBigInt(a)))
             (step1Response, context) <- srp.srpStep1(SRPStep1Data(cHex, bigIntToHex(aa)), sessionContext)

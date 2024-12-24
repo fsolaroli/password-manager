@@ -19,7 +19,7 @@ type TollMiddleware = HandlerAspect[TollManager & SessionManager, Any]
 def verifyRequestToll(request: Request, challengeType: ChallengeType, nextChallengeType: ChallengeType) =
   ZIO.service[SessionManager].zip(ZIO.service[TollManager])
     .flatMap { (sessionManager, tollManager) =>
-      sessionManager.getSession(request).flatMap(session => {
+      sessionManager.getSessionFromRequest(request).flatMap(session => {
         (for {
           challengeJson     <-  ZIO.attempt(session(TollManager.tollChallengeContentKey).get)
           challenge         <-  fromString[TollChallenge](challengeJson)
@@ -40,6 +40,7 @@ def hashcash(challengeType: ChallengeType, nextChallengeType: ChallengeType) = n
   override def apply[Env1 <: SessionManager & TollManager, Err](routes: Routes[Env1, Err]): Routes[Env1, Err] =
     routes.transform(handler => 
         Handler.fromFunctionZIO[Request] { request =>
+            ZIO.log(s"REQUEST [${request.url.path.toString}] => ${request.body.toString()}") *>
             verifyRequestToll(request, challengeType, nextChallengeType)
             .map((isRequestTollValid, newToll, sessionKey) =>
                 ( if isRequestTollValid

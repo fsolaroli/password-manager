@@ -1,10 +1,16 @@
 package is.clipperz.backend
 
+import zio.schema.Schema
+import zio.schema.DeriveSchema
+
 object Exceptions:
-    class BadRequestException(error: String) extends Exception(error):
+    case class BadRequestException(error: String) extends Exception(error):
         def this(message: String, cause: Throwable) =
             this(message)
             initCause(cause)
+    
+    object BadRequestException:
+        implicit val schema: Schema[BadRequestException] = DeriveSchema.gen
 
     class ConflictualRequestException(error: String) extends Exception(error):
         def this(message: String, cause: Throwable) =
@@ -44,7 +50,10 @@ object Exceptions:
             this(message)
             initCause(cause)
 
-    class ResourceNotFoundException(error: String) extends Exception(error):
+    case class ResourceNotFoundException(error: String) extends Exception(error):
         def this(message: String, cause: Throwable) =
             this(message)
             initCause(cause)
+            
+    object ResourceNotFoundException:
+        implicit val schema: Schema[ResourceNotFoundException] = DeriveSchema.gen

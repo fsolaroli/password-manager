@@ -106,6 +106,7 @@ val zio_cache_version =          "0.2.3"
 val zio_metrics_version =        "2.3.1"
 val zio_nio_version =            "2.0.2"
 val zio_opentelemetry_version =  "3.0.1"
+val zio_schema_version =         "1.4.1"
 
 val nscala_time_version =        "2.34.0"
 
@@ -122,6 +123,9 @@ lazy val dependencies = Seq(
     "dev.zio" %% "zio-metrics-connectors-datadog" % zio_metrics_version,
     "dev.zio" %% "zio-nio"                        % zio_nio_version,
     "dev.zio" %% "zio-opentelemetry"              % zio_opentelemetry_version,
+    "dev.zio" %% "zio-schema"                     % zio_schema_version,
+    "dev.zio" %% "zio-schema-derivation"          % zio_schema_version,
+    "dev.zio" %% "zio-schema-json"                % zio_schema_version,
     
     "com.github.nscala-time"   %% "nscala-time"                 % nscala_time_version,
 

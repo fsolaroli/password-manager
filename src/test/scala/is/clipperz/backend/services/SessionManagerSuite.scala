@@ -47,14 +47,14 @@ object SessionManagerSpec extends ZIOSpecDefault:
     test("get session - empty") {
         for {
             manager <- ZIO.service[SessionManager]
-            session <- manager.getSession(testRequest(testSessionKey))
+            session <- manager.getSessionFromRequest(testRequest(testSessionKey))
         } yield assertTrue(session.isEmpty)
     },
     test("save/get session - success") {
         for {
             manager      <- ZIO.service[SessionManager]
             savedKey     <- manager.saveSession(testSession)
-            savedSession <- manager.getSession(testRequest(savedKey))
+            savedSession <- manager.getSessionFromRequest(testRequest(savedKey))
         } yield assertTrue(savedSession == testSession, savedKey == testSessionKey)
     },
     test("verifySessionUser - success") {
@@ -75,7 +75,7 @@ object SessionManagerSpec extends ZIOSpecDefault:
             manager      <- ZIO.service[SessionManager]
             key          <- manager.saveSession(testSession)
             _            <- manager.deleteSession(testRequest(key))
-            savedSession <- manager.getSession(testRequest(key))
+            savedSession <- manager.getSessionFromRequest(testRequest(key))
         } yield assertTrue(savedSession.isEmpty)
     },
     test("verifySessionUser - fail - no c") {
@@ -88,7 +88,7 @@ object SessionManagerSpec extends ZIOSpecDefault:
             manager      <- ZIO.service[SessionManager]
             savedKey     <- manager.saveSession(testSession)
             _            <- TestClock.adjust(cacheTimeToLive.plusNanos(1).nn)
-            savedSession <- manager.getSession(testRequest(savedKey))
+            savedSession <- manager.getSessionFromRequest(testRequest(savedKey))
         } yield assertTrue(savedSession.isEmpty)
     },
     test("session timeout is refreshed when used") {
@@ -96,9 +96,9 @@ object SessionManagerSpec extends ZIOSpecDefault:
             manager      <- ZIO.service[SessionManager]
             savedKey     <- manager.saveSession(testSession)
             _            <- TestClock.adjust(cacheTimeToLive.minusSeconds(1).nn)
-            _            <- manager.getSession(testRequest(savedKey))
+            _            <- manager.getSessionFromRequest(testRequest(savedKey))
             _            <- TestClock.adjust(cacheTimeToLive)
-            savedSession <- manager.getSession(testRequest(savedKey))
+            savedSession <- manager.getSessionFromRequest(testRequest(savedKey))
         } yield assertTrue(savedSession == testSession)
     }
   )).provideLayer(layers)

@@ -12,6 +12,8 @@ import zio.{ Duration, Ref, ZIO, Layer, ZLayer, Tag, Task, UIO, durationInt }
 import zio.cache.{ Cache, Lookup }
 import zio.internal.stacktracer.Tracer
 import zio.http.Request
+import zio.http.codec.HeaderCodec
+import zio.http.codec.HttpCodec
 
 type SessionKey = String
 type SessionContent = Map[String, String]
@@ -25,10 +27,11 @@ case class Session(val key: SessionKey, val content: SessionContent):
     content.isEmpty
 
 trait SessionManager:
-  def getSession(request: Request): Task[Session]
+  def getSession(sessionKey: String): Task[Session]
+  def getSessionFromRequest(request: Request): Task[Session]
   def saveSession(content: Session): Task[SessionKey]
-  def updateSession(req: Request, newC: String): Task[SessionKey] =
-    getSession(req).map(_ + ("c", newC)).flatMap(saveSession(_))
+  def updateSession(request: Request, newC: String): Task[SessionKey] =
+    getSessionFromRequest(request).map(_ + ("c", newC)).flatMap(saveSession(_))
   def verifySessionUser(c: String, session: Session): Boolean =
     session("c") match
       case Some(session_c) => session_c == c
@@ -37,6 +40,8 @@ trait SessionManager:
 
 object SessionManager:
     val sessionKeyHeaderName = "clipperz-usersession-id"
+
+    val sessionHeaderCodec: HeaderCodec[String] = HttpCodec.name[String](sessionKeyHeaderName)
 
     private def extractSessionKey(request: Request): Task[SessionKey] =
         ZIO
@@ -47,33 +52,6 @@ object SessionManager:
         extractSessionKey(request)
         .catchAll(_ => prng.nextBytes(32).map(bytesToHex(_).toString()))
 
-    case class TrivialSessionManager(prng: PRNG) extends SessionManager:
-        var sessions: Map[SessionKey, Session] = new HashMap[SessionKey, Session]()
-        def emptySession(key: SessionKey) = Session(key, new HashMap[String, String]())
-
-        override def getSession (request: Request): Task[Session] =
-            getSessionKey(prng, request)
-            .map(key => 
-                sessions.getOrElse(key, emptySession(key))
-            )
-
-        override def saveSession (content: Session): Task[SessionKey] =
-            sessions = sessions + ((content._1, content))
-            ZIO.succeed(content._1)
-
-        override def deleteSession (request: Request): Task[Unit] =
-            extractSessionKey(request)
-            .map(key => 
-                sessions = sessions - key
-            )
-        
-    val liveTrivial: ZLayer[PRNG, Throwable, SessionManager] =
-        ZLayer.scoped(
-            for {
-                prng <- ZIO.service[PRNG]
-            } yield TrivialSessionManager(prng)
-        )
-
     case class ZioCacheSessionManager (prng: PRNG, sessions: Cache[String, Nothing, Ref[Session]]) extends SessionManager:
         
         private def refreshSessionTimeout(session: Session) =
@@ -83,14 +61,16 @@ object SessionManager:
                 _       <- ref.set(session)
             } yield ()
 
-        override def getSession (request: Request): Task[Session] =
+        override def getSessionFromRequest(request: Request): Task[Session] =
+            getSessionKey(prng, request).flatMap(getSession(_))
+
+        override def getSession (key: String): Task[Session] =
             for {
-                key     <- getSessionKey(prng, request)
                 session <- sessions.get(key).flatMap(_.get)
                 _       <- refreshSessionTimeout(session)
             } yield session
 
-        override def saveSession (session: Session): Task[SessionKey] =
+        override def saveSession(session: Session): Task[SessionKey] =
             refreshSessionTimeout(session).map(_ => session.key)
 
         override def deleteSession (request: Request): Task[Unit] =

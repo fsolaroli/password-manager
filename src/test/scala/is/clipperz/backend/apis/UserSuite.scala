@@ -89,7 +89,7 @@ object UserSpec extends ZIOSpec[SessionManager]:
     val indexCardReference = HexString("e1f5080437681904a79d72c5cd9e2a58a2933297b363b83a970d3fdf3db93abb")
     val indexCardIdentifier = HexString("indexcardidentifier")
 
-    val testSignupData = SignupData(testUser, userInfoReference, userInfoIdentifier, userInfoContent, indexCardReference, indexCardIdentifier, indexCardContent, Array[CardsSignupData]())
+    val testSignupData = SignupData(testUser, userInfoReference, userInfoIdentifier, userInfoContent, indexCardReference, indexCardIdentifier, indexCardContent, List[CardsSignupData]())
 
     val testUser2 = RequestUserCard(
         c,

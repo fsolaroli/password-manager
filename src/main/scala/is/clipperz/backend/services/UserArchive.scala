@@ -7,9 +7,13 @@ import is.clipperz.backend.Exceptions.{ BadRequestException, ResourceConflictExc
 import zio.nio.file.Path
 import zio.nio.charset.Charset
 
-import zio.{ ZIO, ZLayer, Tag, Task, Chunk }
+import zio.{ IO, RIO, ZIO, ZLayer, Tag, Task, Chunk }
 import zio.json.{ JsonDecoder, JsonEncoder, DeriveJsonDecoder, DeriveJsonEncoder, EncoderOps }
 import zio.stream.{ ZSink, ZStream }
+import zio.telemetry.opentelemetry.tracing.Tracing
+import zio.schema.Schema
+import zio.schema.DeriveSchema
+import is.clipperz.backend.Exceptions.FailedConversionException
 
 // ============================================================================
 
@@ -20,6 +24,7 @@ case class MasterKeyEncodingVersion (
 object MasterKeyEncodingVersion:
     implicit val decoder: JsonDecoder[MasterKeyEncodingVersion] = DeriveJsonDecoder.gen[MasterKeyEncodingVersion]
     implicit val encoder: JsonEncoder[MasterKeyEncodingVersion] = DeriveJsonEncoder.gen[MasterKeyEncodingVersion]
+    implicit val schema:  Schema[MasterKeyEncodingVersion]      = DeriveSchema.gen[MasterKeyEncodingVersion]
   
 case class SRPVersion(
     tag: String
@@ -28,6 +33,7 @@ case class SRPVersion(
 object SRPVersion:
     implicit val decoder: JsonDecoder[SRPVersion] = DeriveJsonDecoder.gen[SRPVersion]
     implicit val encoder: JsonEncoder[SRPVersion] = DeriveJsonEncoder.gen[SRPVersion]
+    implicit val schema:  Schema[SRPVersion]      = DeriveSchema.gen[SRPVersion]
 
 case class RequestUserCard (
     c: HexString,
@@ -41,6 +47,7 @@ case class RequestUserCard (
 object RequestUserCard:
     implicit val decoder: JsonDecoder[RequestUserCard] = DeriveJsonDecoder.gen[RequestUserCard]
     implicit val encoder: JsonEncoder[RequestUserCard] = DeriveJsonEncoder.gen[RequestUserCard]
+    implicit val schema:  Schema[RequestUserCard]      = DeriveSchema.gen[RequestUserCard]
 
 case class RemoteUserCard (
     c: HexString,

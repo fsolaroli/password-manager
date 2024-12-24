@@ -87,7 +87,7 @@ object LogoutSpec extends ZIOSpecDefault:
       val request = logoutWithSession
       for {
         sessionManager <- ZIO.service[SessionManager]
-        _ <- sessionManager.getSession(request)
+        _ <- sessionManager.getSessionFromRequest(request)
         responseCode <- app.runZIO(request).map(response => response.status.code)
       } yield assertTrue(responseCode == 200)
     },

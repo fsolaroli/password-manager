@@ -16,7 +16,7 @@ def authorizedMiddleware(cExtractor: (Request) => Task[String]): SessionMiddlewa
     Middleware.ifRequestThenElseZIO(req =>
         (for {
             sessionManager <- ZIO.service[SessionManager]
-            session        <- sessionManager.getSession(req)
+            session        <- sessionManager.getSessionFromRequest(req)
             c              <- cExtractor(req)
         } yield sessionManager.verifySessionUser(c, session)
         ).mapError(customMapError)

@@ -7,6 +7,8 @@ import is.clipperz.backend.functions.crypto.HashFunction
 import zio.{ ZIO, Layer, ZLayer, Tag, Task }
 import zio.internal.stacktracer.Tracer
 import zio.json.{ JsonDecoder, JsonEncoder, DeriveJsonDecoder, DeriveJsonEncoder, EncoderOps }
+import zio.http.codec.HeaderCodec
+import zio.http.codec.HttpCodec
 
 type TollCost = Int // bit
 type TollReceipt = HexString
@@ -37,6 +39,10 @@ object TollManager:
   val tollReceiptHeader = "clipperz-hashcash-tollreceipt"
 
   val tollChallengeContentKey = "tollChallenge"
+
+  val tollChallangeHeaderCodec: HeaderCodec[String] = HttpCodec.name[String](tollHeader)
+  val tollCostHeaderCodec:      HeaderCodec[String] = HttpCodec.name[String](tollCostHeader)
+  val tollReceiptHeaderCodec:   HeaderCodec[String] = HttpCodec.name[String](tollReceiptHeader)
 
   case class DefaultTollManager(prng: PRNG) extends TollManager:
     override def getToll(cost: TollCost): Task[TollChallenge] =

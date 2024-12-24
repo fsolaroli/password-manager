@@ -131,7 +131,7 @@ object AppSpec extends ZIOSpecDefault:
         indexCardReference = HexString("726f1d8bc207725f2225623f300b9e78d20685406c4096f97ac8a2c864bd52b4"),
         indexCardIdentifier = HexString("indexCardIdentifier"),
         indexCardContent = HexString("89d6"),
-        cards = Array[CardsSignupData]()
+        cards = List[CardsSignupData]()
     )
 
     private def manageRequestWithTollPayment(request: Task[Request]): ZIO[ClipperzEnvironment, Any, Response] =

@@ -4,13 +4,13 @@ import is.clipperz.backend.Exceptions.*
 
 // import java.nio.charset.StandardCharsets
 
-import zio.{ ZIO, Task }
+import zio.{ IO, ZIO, Task }
 import zio.json.{ JsonDecoder, DecoderOps }
 import zio.stream.{ ZSink, ZStream }
 import zio.nio.charset.Charset
 
 
-def fromStream[A](using decoder: JsonDecoder[A])(content: ZStream[Any, Throwable, Byte]): Task[A] =
+def fromStream[A](using decoder: JsonDecoder[A])(content: ZStream[Any, Throwable, Byte]): IO[FailedConversionException, A] =
   content
     .run(ZSink.collectAll[Byte])
     .flatMap(chunk => Charset.Standard.utf8.decodeString(chunk))

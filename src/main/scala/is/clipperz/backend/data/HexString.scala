@@ -2,11 +2,13 @@ package is.clipperz.backend.data
 
 import zio.json.{ JsonDecoder, JsonEncoder }
 import java.nio.charset.StandardCharsets
+import zio.schema.Schema
+import zio.schema.DeriveSchema
 
 enum Base:
   case Dec, Hex
 
-class HexString private (private val s: String):
+case class HexString private (private val s: String):
     private val hexString: String = normalizeHex(
         if HexString.isHex(s)
         then s
@@ -45,6 +47,7 @@ object HexString:   //  TODO: make `HeString` Chunk aware, both Chunk[Byte] and 
 
     implicit val decoder: JsonDecoder[HexString] = JsonDecoder[String].map(HexString(_))
     implicit val encoder: JsonEncoder[HexString] = JsonEncoder[String].contramap(_.toString)
+    implicit val schema:  Schema[HexString]      = DeriveSchema.gen[HexString]
 
     def isHex(s: String): Boolean = s.matches("^[0-9a-fA-F\\s]+$")
 
