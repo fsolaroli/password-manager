@@ -3,13 +3,13 @@ module Views.ImportView where
 import Concur.Core (Widget)
 import Concur.Core.FRP (demand, fireOnce, loopS, loopW)
 import Concur.React (HTML)
-import Concur.React.DOM (a, a', br', button, dd, div, div_, dl, dt, form, h1, h3, h5, input, label, li', li_, p, span, text, ul, ul_)
+import Concur.React.DOM (a, button, dd, div, div_, dl, dt, form, h1, h3, h5, input, label, li', li_, p, span, text, ul, ul_)
 import Concur.React.Props as Props
 import Control.Alt (map, ($>), (<#>), (<|>))
 import Control.Applicative (pure)
-import Control.Bind (bind, (>>=))
+import Control.Bind (bind)
 import Control.Category ((>>>))
-import Data.Array (concat, filter, head, length)
+import Data.Array (concat, filter, length)
 import Data.Either (Either(..), fromRight)
 import Data.Function (flip, (#), ($))
 import Data.Functor ((<$>), (<$))
@@ -22,11 +22,9 @@ import Data.Traversable (sequence)
 import Data.Tuple (Tuple(..), fst, snd, swap)
 import DataModel.CardVersions.Card (Card(..), CardField(..), CardValues(..))
 import DataModel.WidgetState (ImportState, ImportStep(..))
-import React.SyntheticEvent (NativeEventTarget, SyntheticEvent_)
-import Unsafe.Coerce (unsafeCoerce)
+import Views.FileImportView (AcceptedFileFormat(..), AcceptedFileFormats(..), dragAndDropFileInputWidget)
 import Views.SimpleWebComponents (simpleButton, simpleTextAreaSignal, simpleTextInputWidget)
 import Web.File.File (File)
-import Web.File.FileList (FileList, items)
 
 data QuickSelection = All | None | Archived | NonArchived
 
@@ -41,8 +39,6 @@ initialImportState = {
 , selection: []
 , tag:       Tuple false ""
 }
-
-data DragFileEvents a = DragEnter a | DragLeave a | Drop a | File (Maybe File)
 
 data NavigationAction = Back ImportState | Next ImportState 
 
@@ -66,7 +62,7 @@ importView state@{step, content, selection, tag} = do
       p [Props.className "description"] [text "Import data from another Clipperz account using a JSON/HTML export file created by Clipperz."]
       <|>
       div [Props.className "importInput"] [
-        dragAndDropFileInputWidget <#> (\file -> Next $ state {content = Left file})
+        dragAndDropFileInputWidget "Clipperz export file" (Formats [HTML]) <#> (\(file :: Maybe File) -> Next $ state {content = Left file})
       , p [Props.className "description"] [text "Alternatively you may type or paste any properly formatted JSON data."]
       , demand do
         textContent <- simpleTextAreaSignal "importText" (text "Import") "Type or copy your data here" (fromRight "" content)
@@ -149,7 +145,7 @@ importView state@{step, content, selection, tag} = do
     filterCards NonArchived = map (\(Tuple _ c@(Card r)) -> Tuple (not r.archived) c)
 
     cardContentView :: forall a. Card -> Maybe String -> Widget HTML a
-    cardContentView (Card {content: (CardValues {title, tags: ts, fields: fs, notes: n})}) newTag = 
+    cardContentView (Card {content: (CardValues {title, tags: ts, fields: fs, notes: n, attachments: _})}) newTag = 
       div [Props.className "cardContent"] [
         h3 [Props.className "card_title"] [text title]
       , ul [Props.className "card_tags"]   $ (\s -> li' [text s]) <$> (maybe ts (flip insert ts) newTag # toUnfoldable)
@@ -161,38 +157,3 @@ importView state@{step, content, selection, tag} = do
         ]) <$> fs
       , p [Props.className "card_notes"] [text n]
       ]
-
-    dragAndDropFileInputWidget :: Widget HTML (Maybe File)
-    dragAndDropFileInputWidget = do
-      dropDiv false
-
-      where 
-        dropDiv highlight = do
-          res <- div  [ Props.classList (Just <$> (["dropArea"] <> if highlight then ["highlight"] else []))
-                      , Props._id "import"
-                      , Props.onDragEnter   <#> DragEnter 
-                      , Props.onDragLeave   <#> DragLeave 
-                      , Props.onDropCapture <#> Drop      
-                      ]
-                      [ span [] [text "Drag your Clipperz export file here"], br'
-                      , span [] [text "or"], br'
-                      , label [Props.className "importButton"] [
-                          span [Props.className "label"] [a' [text "select it manually"]]
-                        , input [
-                            Props._type "file"
-                          , Props.onChange
-                          , Props.accept ".html"
-                          ] >>= fromSyntheticEvent
-                        ] <#> (items >>> head >>> File)
-                      ]
-          case res of
-            DragEnter _    -> dropDiv true
-            DragLeave _    -> dropDiv false
-            Drop      a    -> (getFileFromDrop a) <#> (items >>> head)
-            File      file -> pure file
-
-        fromSyntheticEvent :: forall r. SyntheticEvent_ (currentTarget :: NativeEventTarget | r) -> Widget HTML FileList
-        fromSyntheticEvent  se = pure $ (unsafeCoerce se).target.files
-
-        getFileFromDrop :: forall r. SyntheticEvent_ (currentTarget :: NativeEventTarget | r) -> Widget HTML FileList
-        getFileFromDrop se = pure $ (unsafeCoerce se).dataTransfer.files

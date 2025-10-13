@@ -56,6 +56,7 @@ importSpec  =
                                                                , CardField { name: "", value: "", locked: true, settings: Nothing }
                                                                ]
                                                      , notes: ""
+                                                     , attachments: []
                                                      }
                            }
       makeTestableOnBrowser importFirstCard (head <$> decodeResult) shouldEqual (Right $ Just result)
@@ -73,6 +74,7 @@ importSpec  =
                                                                , CardField { name: "password", value: "I9EJpXaOzNoNATZB0NjUcUZYBa", locked: true, settings: Nothing }
                                                                ]
                                                      , notes: "Ah the good old times. :)"
+                                                     , attachments: []
                                                      }
                            }
       makeTestableOnBrowser importArchivedCard ((\a -> filter (\(Card { content: CardValues { title } }) -> title == "AOL ") a) <$> decodeResult) shouldEqual (Right $ [result])
@@ -96,6 +98,7 @@ importSpec  =
                                                         , notes: "非常掘客 / 新闻"
                                                         , tags: empty
                                                         , title: "非常掘客 / 新闻"
+                                                        , attachments: []
                                                         }
                                   , secrets: []
                                   , timestamp: 0.0 }

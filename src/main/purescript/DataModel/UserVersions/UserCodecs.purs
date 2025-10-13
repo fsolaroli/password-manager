@@ -1,25 +1,22 @@
 module DataModel.UserVersions.UserCodecs where
 
-import Control.Bind (bind, pure, (>>=))
-import Control.Category ((<<<), (>>>))
-import Data.Bifunctor (lmap)
-import Data.Codec.Argonaut (JsonDecodeError(..), codec', decode, encode)
+import Control.Bind (bind, pure)
+import Control.Category ((>>>))
 import Data.Codec.Argonaut as CA
 import Data.Codec.Argonaut.Common as CAC
 import Data.Codec.Argonaut.Record as CAR
 import Data.CommutativeRing ((*))
 import Data.DateTime (DateTime, adjust)
 import Data.Either (Either)
-import Data.Formatter.DateTime (Formatter, FormatterCommand(..), format, unformat)
 import Data.Function (($))
 import Data.HexString (HexString, hexStringCodec)
 import Data.Identifier (Identifier)
-import Data.List (List(..), (:))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Profunctor (wrapIso)
 import Data.Time.Duration (Days(..))
 import DataModel.CardVersions.CardV1 (passwordGeneratorSettingsV1Codec)
+import DataModel.CommonCodec (dateTimeCodec)
 import DataModel.IndexVersions.Index (IndexVersion, indexVersionCodec)
 import DataModel.Password (PasswordGeneratorSettings)
 import DataModel.UserVersions.User (class UserInfoVersions, IndexReference(..), UserInfo(..), UserPreferences(..), toUserInfo)
@@ -48,12 +45,6 @@ toUserInfo_V2 :: UserInfo_V1 -> UserInfo_V2
 toUserInfo_V2 (UserInfo_V1 userInfo@{indexReference: IndexReference_V1 indexReference, userPreferences: UserPreferences_V1 userPreferences}) = UserInfo_V2 {indexReference: IndexReference_V1 indexReference, userPreferences: UserPreferences_V1 userPreferences, dateOfLastDonation: Nothing, identifier: userInfo.identifier}
 
 -- ----------------------------------------------------------------
-
-iso8601DateFormatter :: Formatter
-iso8601DateFormatter = YearFull : Placeholder "-" : MonthTwoDigits : Placeholder "-" : DayOfMonthTwoDigits : Nil
-
-dateTimeCodec :: CA.JsonCodec DateTime
-dateTimeCodec = codec' (\json -> decode CA.string json >>= (lmap TypeMismatch <<< unformat iso8601DateFormatter)) (format iso8601DateFormatter >>> encode CA.string)
 
 newtype UserInfo_V2 = 
   UserInfo_V2

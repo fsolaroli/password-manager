@@ -11,6 +11,7 @@ import Effect (Effect)
 import Foreign (Foreign)
 import Foreign as F
 import Web.File.Blob (Blob)
+import Web.File.File (File)
 
 -- | A class to represent types which can be downloaded using
 -- | this library.
@@ -26,6 +27,9 @@ instance dlString :: Downloadable String where
   toDownloadData = F.unsafeToForeign
 
 instance dlBlob :: Downloadable Blob where
+  toDownloadData = F.unsafeToForeign
+
+instance dlFile :: Downloadable File where
   toDownloadData = F.unsafeToForeign
 
 instance dlArrayBuffer :: Downloadable ArrayBuffer where

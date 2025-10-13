@@ -1,7 +1,7 @@
 module Views.CreateCardView where
 
 import Concur.Core (Widget)
-import Concur.React (HTML)
+import Concur.React (HTML, affAction)
 import Concur.React.DOM (button, datalist, div, form, h4, input, label, li, option, span, text, textarea, ul)
 import Concur.React.Props as Props
 import Control.Alt (($>), (<#>), (<|>))
@@ -12,7 +12,7 @@ import Control.Semigroupoid ((<<<))
 import Data.Array (delete, snoc, sort)
 import Data.Either (Either(..))
 import Data.Eq ((==), (/=))
-import Data.Function (($))
+import Data.Function ((#), ($))
 import Data.Functor (map, (<$), (<$>))
 import Data.HeytingAlgebra (not, (||))
 import Data.Lens (Lens', set, view)
@@ -20,22 +20,25 @@ import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Semigroup ((<>))
 import Data.Set (Set, difference, fromFoldable, member, toUnfoldable)
+import Data.Show (show)
 import Data.String (null)
 import Data.Tuple (Tuple(..), fst)
 import Data.Unit (Unit, unit)
 import DataModel.AsyncValue as Async
-import DataModel.CardVersions.Card (Card(..), CardField(..), FieldType(..), _fields, _notes, _tags, _title, emptyCard, emptyCardField)
+import DataModel.CardVersions.Card (Card(..), CardAttachment(..), CardField(..), FieldType(..), _attachments, _fields, _notes, _tags, _title, emptyCard, emptyCardField)
 import DataModel.Password (PasswordGeneratorSettings)
 import DataModel.Proxy (ProxyInfo(..))
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import Functions.Card (getFieldType)
+import Functions.Card (attachmentFromFile, getFieldType)
 import Functions.Time (getCurrentTimestamp)
 import MarkdownIt (renderString)
 import Type.Proxy (Proxy(..))
 import Views.Components (dynamicWrapper, entropyMeter)
+import Views.FileImportView (AcceptedFileFormats(..), dragAndDropFileInputWidget)
 import Views.PasswordGenerator (passwordGenerator)
 import Views.SimpleWebComponents (confirmationWidget, dragAndDropAndRemoveList, simpleButton)
+import Web.File.File (File)
 
 type CardFormData = {
   newTag  :: String
@@ -173,6 +176,28 @@ createCardView cardFormData@{card} originalCard allTags passwordGeneratorSetting
           ]
       ]
       
+    attachmentsSignal :: Array CardAttachment -> Widget HTML (Array CardAttachment)
+    attachmentsSignal attachments = do
+      let loopables = (\a -> Tuple a cardAttachmentWidget) <$> attachments
+      
+      dragAndDropAndRemoveList loopables <#> (map fst)
+      <>
+      (div [Props.className "newCardAttachment"] [
+        dragAndDropFileInputWidget "attachment file" Any
+      ] >>= (\(maybeFile :: Maybe File) -> 
+        case maybeFile of
+          Nothing   -> pure attachments
+          Just file -> snoc attachments <$> attachmentFromFile file # affAction
+      )) 
+
+    cardAttachmentWidget :: CardAttachment -> Widget HTML CardAttachment
+    cardAttachmentWidget (CardAttachment {name, lastModified}) = div [] [
+      div [Props.className "attachmentValues"] [
+        div [Props.className "attachmentLabel"] [text name]
+      , div [Props.className "attachmentValue"] [text $ show lastModified]
+      ]
+    ]
+
     notesSignal :: Boolean -> String -> Widget HTML (Tuple String Boolean)
     notesSignal preview notes = do
       div [Props.className "preview"] [
@@ -208,10 +233,11 @@ createCardView cardFormData@{card} originalCard allTags passwordGeneratorSetting
                       , Props.unsafeTargetValue <$> Props.onChange
                       , Props.value              (view (_card <<< _title)  cardFormData)
                       ] []
-        ]                                                                                <#> (\title                 -> (set (_card <<< _title)  title)                                        cardFormData)
-      , tagsSignal  (view _newTag cardFormData)  (view (_card <<< _tags)   cardFormData) <#> (\(Tuple newTag tags)   -> (set (_card <<< _tags)   (fromFoldable tags) <<< set _newTag newTag)   cardFormData)
-      , fieldsSignal settings                    (view (_card <<< _fields) cardFormData) <#> (\fields                -> (set (_card <<< _fields)  fields)                                      cardFormData)
-      , notesSignal (view _preview cardFormData) (view (_card <<< _notes)  cardFormData) <#> (\(Tuple notes preview) -> (set (_card <<< _notes)               notes  <<< set _preview preview) cardFormData)
+        ]                                                                                     <#> (\title                 -> (set (_card <<< _title)  title)                                        cardFormData)
+      , tagsSignal  (view _newTag cardFormData)  (view (_card <<< _tags)        cardFormData) <#> (\(Tuple newTag tags)   -> (set (_card <<< _tags)   (fromFoldable tags) <<< set _newTag newTag)   cardFormData)
+      , fieldsSignal settings                    (view (_card <<< _fields)      cardFormData) <#> (\fields                -> (set (_card <<< _fields)  fields)                                      cardFormData)
+      , attachmentsSignal                        (view (_card <<< _attachments) cardFormData) <#> (\attachments           -> (set (_card <<< _attachments) attachments)                             cardFormData)
+      , notesSignal (view _preview cardFormData) (view (_card <<< _notes)       cardFormData) <#> (\(Tuple notes preview) -> (set (_card <<< _notes)               notes  <<< set _preview preview) cardFormData)
 
         -- pure $ {
         --   newTag: newTag'

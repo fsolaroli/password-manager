@@ -10,6 +10,8 @@ import Data.Newtype (class Newtype, unwrap)
 import Data.Profunctor (wrapIso)
 import Data.Set (Set)
 import DataModel.CardVersions.Card (class CardVersions, Card(..), CardField(..), CardValues(..))
+import Record (delete, merge)
+import Type.Proxy (Proxy(..))
 
 newtype Card_V1 = Card_V1 
   { content :: CardValues_V1
@@ -29,8 +31,8 @@ cardV1Codec = wrapIso Card_V1 $
 derive instance newtypeCard_V1 :: Newtype Card_V1 _
 
 instance card_v1 :: CardVersions Card_V1 where
-  toCard (Card_V1 card) = Card card { content = CardValues card.content { fields = CardField <$> card.content.fields } }
-  fromCard (Card card@{content: CardValues content@{fields}}) = Card_V1 card {content = content {fields = unwrap <$> fields}}
+  toCard (Card_V1 card) = Card card { content = CardValues $ (merge card.content { attachments: [] }) { fields = CardField <$> card.content.fields } }
+  fromCard (Card card@{content: CardValues content@{fields}}) = Card_V1 card {content = (delete (Proxy :: _ "attachments") content) {fields = unwrap <$> fields}}
 
 -- ---------------------------------------------------------
 

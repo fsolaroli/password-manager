@@ -13,16 +13,17 @@ import Data.Either (Either(..))
 import Data.Function (($))
 import Data.HexString (hexStringCodec)
 import Data.Maybe (Maybe(..))
+import Data.MediaType (MediaType(..))
 import Data.Profunctor (dimap, wrapIso)
 import Data.Unit (unit)
 import Data.Variant as V
-import DataModel.CardVersions.Card (Card(..), CardField(..), CardValues(..), cardVersionCodec)
+import DataModel.CardVersions.Card (Card(..), CardAttachment(..), CardField(..), CardValues(..), cardVersionCodec)
+import DataModel.CommonCodec (dateTimeCodec, instantCodec)
 import DataModel.Credentials (Credentials)
 import DataModel.IndexVersions.Index (CardEntry(..), CardReference(..), Index(..))
 import DataModel.Password (PasswordGeneratorSettings)
 import DataModel.Proxy (DataOnLocalStorage(..), ProxyInfo(..))
 import DataModel.UserVersions.User (UserPreferences(..), DonationInfo)
-import DataModel.UserVersions.UserCodecs (dateTimeCodec)
 import DataModel.WidgetState (CardFormInput(..), CardManagerState, CardViewState, ImportState, ImportStep(..), LoginFormData, LoginType(..), MainPageWidgetState, Page(..), PagesState, UserAreaPage(..), UserAreaState, UserAreaSubmenu(..), WidgetState(..))
 import DataModel.WidgetState (CardViewState(..)) as CardViewState
 import Functions.Donations (DonationLevel(..))
@@ -477,6 +478,26 @@ cardValuesCodec = wrapIso CardValues (
       , tags   : CAC.set CA.string
       , fields : CA.array cardFieldCodec
       , notes  : CA.string
+      , attachments: CA.array cardAttachmentCodec
+      }
+    )
+)
+
+-- newtype CardAttachment =
+--   CardAttachment
+--     { base64Encoding :: String
+--     , name           :: String
+--     , type_          :: String
+--     , lastModified   :: Number
+--     }
+cardAttachmentCodec :: CA.JsonCodec CardAttachment
+cardAttachmentCodec = wrapIso CardAttachment (
+  CA.object "CardAttachment"
+    (CAR.record
+      { base64Encoding : CA.string
+      , name           : CA.string
+      , type_          : CAR.optional $ wrapIso MediaType CA.string
+      , lastModified   : instantCodec
       }
     )
 )

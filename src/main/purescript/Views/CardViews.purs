@@ -14,15 +14,18 @@ import Data.Eq ((==))
 import Data.Function ((#), ($))
 import Data.Functor ((<$), (<$>))
 import Data.HeytingAlgebra (not, (&&))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
+import Data.Newtype (unwrap)
 import Data.Ring (negate)
 import Data.Semigroup ((<>))
 import Data.Set (isEmpty, toUnfoldable)
+import Data.Show (show)
 import Data.Unit (unit)
-import DataModel.CardVersions.Card (Card(..), CardField(..), CardValues(..), FieldType(..))
+import DataModel.CardVersions.Card (Card(..), CardAttachment(..), CardField(..), CardValues(..), FieldType(..))
+import DataModel.File (base64ToFile)
 import DataModel.IndexVersions.Index (CardEntry)
 import DataModel.Proxy (ProxyInfo(..))
-import Effect.Aff (Milliseconds(..), delay)
+import Effect.Aff (Aff, Milliseconds(..), delay)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import Functions.Card (getFieldType)
@@ -32,6 +35,7 @@ import MarkdownIt (renderString)
 import Views.Components (dynamicWrapper, entropyMeter)
 import Views.OverlayView (OverlayColor(..), OverlayStatus(..), overlay)
 import Views.SimpleWebComponents (simpleButton, confirmationWidget)
+import Web.DownloadJs (download)
 
 -- -----------------------------------
 
@@ -89,15 +93,44 @@ secretSignal { creationDate, expirationDate, secretId } = li_ [] do
     Just _  -> pure $ Nothing
 
 cardContent :: forall a. CardValues -> Widget HTML a
-cardContent (CardValues {title: t, tags: ts, fields: fs, notes: n}) = div [Props._id "cardContent"] [
+cardContent (CardValues {title: t, tags: ts, fields: fs, notes: n, attachments: a}) = div [Props._id "cardContent"] [
   h3  [Props.className "card_title"]  [text t]
 , if (isEmpty ts) then (empty) else div [Props.className "card_tags"] [ul [] $ (\s -> li' [text s]) <$> (toUnfoldable ts)]
 , if (null    fs) then (empty) else div [Props.className "card_fields"] $ cardField false <$> fs
+, if (null     a) then (empty) else 
+    div [Props.className "card_attachments"] [
+      h4 [] [text "Attachments"]
+    , ul [Props.className "attachmentsList"] $ cardAttachment <$> a
+    ]
 , div [Props.className "card_notes"] [
     if (isEmpty ts && null fs) then (empty) else h4 [] [text "Notes"]
   , div [Props.className "markdown-body", Props.dangerouslySetInnerHTML { __html: unsafePerformEffect $ renderString n}] []
   ]
 ]
+
+data CardAttachmentAction = Download
+
+cardAttachment :: forall a. CardAttachment -> Widget HTML a
+cardAttachment att@(CardAttachment {base64Encoding, name, type_, lastModified}) = do
+  res <- li' [
+    div [Props.className "attachmentValues"] [
+      div [Props.className "attachmentLabel"] [text name]
+    , div [Props.className "attachmentValue"] [text $ show lastModified]
+    ]
+  , div [Props.className "attachmentAction"] [
+      button [Props.className "action DOWNLOAD", Props.disabled false, Props.onClick $> Download] [text "download"]
+    ]
+  ]
+  (case res of
+    Download -> cardAttachment att <|> (affAction $ downloadCardAttachment *> delay (Milliseconds 500.0)) <|> overlay { status: Spinner, color: Black, message: "download" }
+  *> (resetTimer # liftEffect))
+  cardAttachment att
+
+  where
+    downloadCardAttachment :: Aff Boolean
+    downloadCardAttachment = do
+      let file = base64ToFile base64Encoding name type_ lastModified
+      download file name (maybe "" (unwrap) type_) # liftEffect
 
 data CardFieldAction = ShowPassword | HidePassword | CopyValue
 

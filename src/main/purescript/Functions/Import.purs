@@ -18,7 +18,8 @@ import Data.String.Regex.Flags (noFlags)
 import Data.Traversable (sequence)
 import DataModel.AppError (AppError(..))
 import DataModel.CardVersions.Card (Card, CardVersion(..), cardVersionCodec, toCard)
-import DataModel.CardVersions.CurrentCardVersions (currentCardCodecVersion)
+import DataModel.CardVersions.CardV1 (cardV1Codec)
+import DataModel.CardVersions.CardV2 (cardV2Codec)
 import DataModel.Communication.ProtocolError (ProtocolError(..))
 import Effect.Aff (Aff)
 import Effect.Aff.Class (liftAff)
@@ -63,6 +64,7 @@ decodeImport version cards =
   (\json -> caseJsonArray (throwError $ ImportError "Cannot convert json to json array") (\array -> sequence $ array <#> 
     (\card -> case version of
       Delta                 -> caseJsonObject (throwError $ ImportError "Cannot conver json to json object") decodeDeltaCardObject card
-      Epsilon CardVersion_1 -> (except $ toCard <$> decode currentCardCodecVersion card) # withExceptT (ProtocolError <<< DecodeError <<< show)
+      Epsilon CardVersion_1 -> (except $ toCard <$> decode cardV1Codec card) # withExceptT (ProtocolError <<< DecodeError <<< show)
+      Epsilon CardVersion_2 -> (except $ toCard <$> decode cardV2Codec card) # withExceptT (ProtocolError <<< DecodeError <<< show)
     )
   ) json) =<< (except $ lmap (ProtocolError <<< DecodeError <<< show) (jsonParser cards))

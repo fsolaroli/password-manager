@@ -2,6 +2,7 @@ module Functions.Card
   ( addTag
   , appendToTitle
   , archiveCard
+  , attachmentFromFile
   , createCardEntry
   , decodeDeltaCardObject
   , decryptCard
@@ -41,9 +42,12 @@ import Data.String.Regex.Flags (noFlags)
 import Data.Traversable (sequence)
 import Data.Tuple (Tuple(..))
 import DataModel.AppError (AppError(..))
-import DataModel.CardVersions.Card (class CardVersions, Card(..), CardField(..), CardValues(..), CardVersion(..), FieldType(..), _archived, _fields, _notes, _tags, _title, fromCard, toCard)
+import DataModel.CardVersions.Card (class CardVersions, Card(..), CardAttachment(..), CardField(..), CardValues(..), CardVersion(..), FieldType(..), _archived, _fields, _notes, _tags, _title, fromCard, toCard)
+import DataModel.CardVersions.CardV1 (cardV1Codec)
+import DataModel.CardVersions.CardV2 (cardV2Codec)
 import DataModel.CardVersions.CurrentCardVersions (currentCardCodecVersion, currentCardVersion)
 import DataModel.Communication.ProtocolError (ProtocolError(..))
+import DataModel.File (fileToBase64)
 import DataModel.IndexVersions.Index (CardEntry(..), CardReference(..))
 import DataModel.SRPVersions.SRP (HashFunction)
 import Effect.Aff (Aff)
@@ -52,11 +56,13 @@ import Foreign.Object (Object, lookup, values)
 import Foreign.Object as Object
 import Functions.EncodeDecode (decryptJson, encryptJson, exportCryptoKeyToHex, generateCryptoKeyAesGCM, importCryptoKeyAesGCM)
 import Functions.Time (getCurrentTimestamp)
+import Web.File.File (File, lastModified, name, type_)
 
 decryptCard :: ArrayBuffer -> CardReference -> ExceptT AppError Aff Card
-decryptCard encryptedCard (CardReference {version, key}) =
+decryptCard encryptedCard (CardReference {version, key}) = 
   case version of 
-    CardVersion_1    -> decryptCardJson currentCardCodecVersion
+    CardVersion_1 -> decryptCardJson cardV1Codec
+    CardVersion_2 -> decryptCardJson cardV2Codec
 
   where
     decryptCardJson :: forall a. CardVersions a => CA.JsonCodec a -> ExceptT AppError Aff Card
@@ -118,6 +124,7 @@ decodeDeltaCardObject obj = do
                                     , tags: Set.fromFoldable tags
                                     , fields: fields
                                     , notes: notes
+                                    , attachments: []
                                     }
               }
   where
@@ -130,6 +137,11 @@ decodeDeltaCardObject obj = do
       pure $ CardField {name: label, value: value, locked: hidden, settings: Nothing}
 
 -- ------------------------------------------------------------------------
+
+attachmentFromFile :: File -> Aff CardAttachment
+attachmentFromFile file = do
+  base64Encoding <- fileToBase64 file
+  pure $ CardAttachment { base64Encoding, name: name file, type_: type_ file, lastModified: lastModified file }
 
 createCardEntry :: HashFunction -> Card -> Aff (Tuple ArrayBuffer CardEntry)
 createCardEntry hashFunc card@(Card { content: (CardValues content), archived, timestamp }) = do
